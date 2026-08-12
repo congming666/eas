@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>农庄牌：荒野远征 v1.5</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Microsoft YaHei', sans-serif;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  #gameContainer {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: #0f0f1a;
+    border: 2px solid #4a4a6a;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(100, 100, 200, 0.3);
+  }
+  canvas {
+    display: block;
+    image-rendering: auto;
+  }
+  #gameCanvas { filter:saturate(1.06) contrast(1.04); }
+  #expeditionHUD::after { content:"";position:absolute;inset:0;z-index:24;pointer-events:none;background:linear-gradient(180deg,rgba(188,220,224,.08),transparent 24%,transparent 68%,rgba(3,10,8,.22));mix-blend-mode:soft-light; }
+  /* 通用UI覆盖层 */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .hidden { display: none !important; }
+  /* 主菜单 */
+  #mainMenu {
+    background: linear-gradient(135deg, #1a3a1a 0%, #0f2810 50%, #1a1a2e 100%);
+  }
+  #mainMenu h1 {
+    font-size: 56px;
+    color: #7fff7f;
+    text-shadow: 0 0 20px rgba(127, 255, 127, 0.5), 4px 4px 0 #1a3a1a;
+    margin-bottom: 10px;
+    letter-spacing: 8px;
+  }
+  #mainMenu .subtitle {
+    font-size: 20px;
+    color: #aaccaa;
+    margin-bottom: 60px;
+    letter-spacing: 4px;
+  }
+  .menu-btn {
+    width: 280px;
+    padding: 16px 32px;
+    margin: 8px;
+    font-size: 20px;
+    background: linear-gradient(180deg, #3a6a3a, #2a4a2a);
+    color: #fff;
+    border: 2px solid #5a8a5a;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .menu-btn:hover {
+    background: linear-gradient(180deg, #4a8a4a, #3a6a3a);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(127, 255, 127, 0.3);
+  }
+  .menu-btn:active { transform: translateY(0); }
+  .menu-btn.danger {
+    background: linear-gradient(180deg, #6a3a3a, #4a2a2a);
+    border-color: #8a5a5a;
+  }
+  .version-info {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    font-size: 14px;
+    color: #666;
+  }
+  /* 农场界面 */
+  #farmScreen {
+    background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 40%, #90EE90 70%, #228B22 100%);
+  }
+  .farm-top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    justify-content: space-between;
+  }
+  .farm-title {
+    font-size: 24px;
+    color: #7fff7f;
+    font-weight: bold;
+  }
+  .resource-display {
+    display: flex;
+    gap: 24px;
+    font-size: 18px;
+  }
+  .resource-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .resource-icon {
+    width: 24px; height: 24px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .farm-content {
+    position: absolute;
+    top: 60px; left: 0; right: 0; bottom: 0;
+    display: flex;
+    padding: 20px;
+    gap: 20px;
+  }
+  .farm-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .farm-grid-container {
+    background: rgba(0,0,0,0.4);
+    border-radius: 12px;
+    padding: 16px;
+    flex: 1;
+  }
+  .farm-grid-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: #ffd700;
+  }
+  .farm-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .crop-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .crop-choice {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    color: #ddd;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .crop-choice:hover { border-color: #7fff7f; }
+  .crop-choice.selected {
+    border-color: #ffd700;
+    background: rgba(255,215,0,0.14);
+    color: #fff;
+  }
+  .farm-cell {
+    aspect-ratio: 1;
+    background: #5a3a1a;
+    border: 2px solid #7a5a3a;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .farm-cell:hover { border-color: #ffd700; }
+  .farm-cell.planted { background: #3a6a1a; border-color: #5a8a3a; }
+  .farm-cell.ready { 
+    background: #6a8a1a; 
+    border-color: #ffd700; 
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255,215,0,0); }
+  }
+  .farm-cell .growth-bar {
+    position: absolute;
+    bottom: 2px; left: 4px; right: 4px;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .farm-cell .growth-fill {
+    height: 100%;
+    background: #7fff7f;
+    transition: width 0.3s;
+  }
+  .farm-right {
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .panel {
+    background: rgba(0,0,0,0.5);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .panel-title {
+    font-size: 16px;
+    color: #ffd700;
+    margin-bottom: 12px;
+    font-weight: bold;
+    border-bottom: 1px solid rgba(255,215,0,0.3);
+    padding-bottom: 8px;
+  }
+  .map-select {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .map-option {
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .map-option:hover { background: rgba(255,255,255,0.1); }
+  .map-option.selected {
+    border-color: #7fff7f;
+    background: rgba(127,255,127,0.1);
+  }
+  .map-option.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .map-name { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+  .map-info { font-size: 12px; color: #aaa; display: flex; gap: 12px; }
+  .loadout-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .loadout-slot {
+    aspect-ratio: 1;
+    background: rgba(255,255,255,0.05);
+    border: 2px dashed #555;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: center;
+    padding: 4px;
+    transition: all 0.15s;
+  }
+  .loadout-slot:hover { border-color: #7fff7f; }
+  .loadout-slot.filled {
+    border-style: solid;
+    border-color: #5a8a5a;
+    background: rgba(90,138,90,0.2);
+  }
+  .loadout-slot .item-icon { font-size: 24px; margin-bottom: 2px; }
+  .loadout-slot .item-count {
+    position: absolute;
+    bottom: 2px; right: 4px;
+    font-size: 11px;
+    color: #ffd700;
+  }
+  .start-expedition-btn {
+    width: 100%;
+    padding: 16px;
+    font-size: 20px;
+    background: linear-gradient(180deg, #cc6600, #994400);
+    color: #fff;
+    border: 2px solid #ff8800;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  .start-expedition-btn:hover {
+    background: linear-gradient(180deg, #ff8800, #cc6600);
+    box-shadow: 0 0 20px rgba(255,136,0,0.4);
+  }
+  .start-expedition-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* 远征HUD */
+  #expeditionHUD {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .hud-top {
+    position: absolute;
+    top: 12px; left: 12px; right: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .hud-panel {
+    background: rgba(0,0,0,0.7);
+    border-radius: 8px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .timer-display {
+    font-size: 28px;
+    font-weight: bold;
+    color: #fff;
+    font-family: monospace;
+  }
+  .timer-display.warning { color: #ff6644; animation: blink 0.5s infinite; }
+  .map-badge {
+    margin-top: 4px;
+    color: #a7bdb1;
+    font-size: 10px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  @keyframes blink { 50% { opacity: 0.5; } }
+  .player-stats { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+  .stat-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-label {
+    font-size: 12px;
+    width: 36px;
+    color: #ccc;
+  }
+  .stat-bar-bg {
+    flex: 1;
+    height: 16px;
+    background: #222;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .stat-bar-fill {
+    height: 100%;
+    transition: width 0.2s;
+    border-radius: 8px;
+  }
+  .hp-fill { background: linear-gradient(90deg, #ff4444, #ff6666); }
+  .energy-fill { background: linear-gradient(90deg, #4488ff, #66aaff); }
+  .stat-value {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    color: #fff;
+    text-shadow: 1px 1px 2px #000;
+  }
+  .hud-bottom {
+    position: absolute;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+  }
+  .skill-slot {
+    width: 64px; height: 64px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #555;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .skill-slot.ready { border-color: #7fff7f; }
+  .skill-slot.consumable { border-color: #ffd700; }
+  .skill-slot .skill-icon { font-size: 28px; }
+  .skill-slot .skill-key {
+    position: absolute;
+    top: 2px; left: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+  }
+  .skill-slot .skill-cd {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: #fff;
+  }
+  .skill-slot .skill-count {
+    position: absolute;
+    bottom: 2px; right: 4px;
+    font-size: 12px;
+    color: #ffd700;
+    font-weight: bold;
+  }
+  .bag-display {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .bag-item {
+    background: rgba(0,0,0,0.7);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .minimap {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 160px;
+    height: 160px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #555;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  /* 结算界面 */
+  #resultScreen {
+    background: rgba(0,0,0,0.85);
+  }
+  .result-card {
+    background: linear-gradient(135deg, #1a2a1a, #0f1a0f);
+    border: 2px solid #5a8a5a;
+    border-radius: 16px;
+    padding: 40px 60px;
+    text-align: center;
+    min-width: 500px;
+  }
+  .result-card.failed {
+    border-color: #8a5a5a;
+    background: linear-gradient(135deg, #2a1a1a, #1a0f0f);
+  }
+  .result-title {
+    font-size: 42px;
+    margin-bottom: 8px;
+  }
+  .result-title.success { color: #7fff7f; }
+  .result-title.failed { color: #ff6644; }
+  .result-subtitle {
+    font-size: 16px;
+    color: #aaa;
+    margin-bottom: 30px;
+  }
+  .result-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 30px;
+    text-align: left;
+  }
+  .result-stat {
+    background: rgba(255,255,255,0.05);
+    padding: 12px 16px;
+    border-radius: 8px;
+  }
+  .result-stat-label { font-size: 12px; color: #888; }
+  .result-stat-value { font-size: 22px; color: #fff; font-weight: bold; }
+  .loot-list {
+    text-align: left;
+    margin-bottom: 30px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .loot-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+  .loot-item.lost { color: #ff6644; text-decoration: line-through; }
+  .loot-item.kept { color: #7fff7f; }
+  /* 提示消息 */
+  #toastContainer {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .toast {
+    background: rgba(0,0,0,0.85);
+    padding: 10px 24px;
+    border-radius: 20px;
+    font-size: 15px;
+    border: 1px solid rgba(255,255,255,0.2);
+    animation: toastIn 0.3s, toastOut 0.3s 2.2s forwards;
+    white-space: nowrap;
+  }
+  .toast.warning { border-color: #ff6644; color: #ff8866; }
+  .toast.success { border-color: #7fff7f; color: #99ff99; }
+  .toast.gold { border-color: #ffd700; color: #ffd700; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(-20px); } }
+  /* 交互提示 */
+  .interact-prompt {
+    position: absolute;
+    background: rgba(0,0,0,0.8);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -100%);
+  }
+  /* 撤离读条 */
+  .extract-bar-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    text-align: center;
+    z-index: 15;
+  }
+  .extract-bar-label {
+    font-size: 18px;
+    color: #ffd700;
+    margin-bottom: 8px;
+    text-shadow: 2px 2px 4px #000;
+  }
+  .extract-bar-bg {
+    height: 24px;
+    background: rgba(0,0,0,0.8);
+    border: 2px solid #ffd700;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .extract-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ffd700, #ffaa00);
+    transition: width 0.1s;
+  }
+  .extract-bar-text {
+    font-size: 14px;
+    margin-top: 6px;
+    color: #fff;
+    text-shadow: 1px 1px 2px #000;
+  }
+  /* 操作说明 */
+  .controls-hint {
+    position: absolute;
+    bottom: 90px;
+    left: 12px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.8;
+  }
+  .controls-hint kbd {
+    background: #333;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid #555;
+    font-size: 11px;
+    color: #fff;
+  }
+
+  /* ==================== v1.1 高级视觉覆盖 ==================== */
+  :root {
+    --gold: #f6c75b;
+    --mint: #83f2b2;
+    --ink: #07110e;
+    --glass: rgba(11, 28, 23, 0.82);
+    --glass-soft: rgba(21, 47, 39, 0.68);
+    --line: rgba(196, 255, 220, 0.16);
+  }
+  body {
+    background:
+      radial-gradient(circle at 18% 18%, rgba(53, 118, 91, 0.35), transparent 34%),
+      radial-gradient(circle at 82% 76%, rgba(125, 83, 34, 0.22), transparent 30%),
+      linear-gradient(145deg, #07100e, #111827 58%, #090d12);
+    font-family: Inter, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.24;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70' viewBox='0 0 70 70'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  }
+  #gameContainer {
+    border: 1px solid rgba(182, 255, 214, 0.26);
+    border-radius: 22px;
+    box-shadow: 0 28px 90px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.04) inset;
+  }
+  #mainMenu {
+    background:
+      linear-gradient(90deg, rgba(4,18,14,.93), rgba(7,26,20,.68), rgba(4,12,15,.92)),
+      radial-gradient(circle at 50% 25%, rgba(89, 216, 141, .28), transparent 38%),
+      linear-gradient(145deg, #173d2a, #0a1714 70%);
+  }
+  #mainMenu::before,
+  #mainMenu::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+  #mainMenu::before {
+    width: 520px; height: 520px; left: -210px; bottom: -270px;
+    background: radial-gradient(circle, rgba(85,174,100,.28), transparent 66%);
+  }
+  #mainMenu::after {
+    width: 420px; height: 420px; right: -130px; top: -190px;
+    background: radial-gradient(circle, rgba(231,171,72,.2), transparent 65%);
+  }
+  #mainMenu h1 {
+    position: relative;
+    font-size: 64px;
+    color: #f3ffe9;
+    text-shadow: 0 2px 0 #254b35, 0 0 34px rgba(131,242,178,.3);
+    letter-spacing: 12px;
+  }
+  #mainMenu h1::after {
+    content: "FARMBOUND EXPEDITION";
+    display: block;
+    margin-top: 10px;
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--gold);
+    text-shadow: none;
+  }
+  #mainMenu .subtitle { color: #9eb8aa; margin-bottom: 48px; }
+  .menu-btn {
+    position: relative;
+    background: linear-gradient(135deg, rgba(61,121,85,.92), rgba(26,66,49,.94));
+    border: 1px solid rgba(167,255,204,.34);
+    border-radius: 12px;
+    box-shadow: 0 10px 22px rgba(0,0,0,.24), 0 1px 0 rgba(255,255,255,.08) inset;
+    letter-spacing: 1px;
+  }
+  .menu-btn:hover {
+    background: linear-gradient(135deg, rgba(83,156,111,.98), rgba(33,91,63,.98));
+    box-shadow: 0 12px 26px rgba(32,131,80,.28), 0 0 0 1px rgba(156,255,194,.18) inset;
+  }
+  #farmScreen {
+    background:
+      radial-gradient(circle at 12% 10%, rgba(125,185,111,.26), transparent 28%),
+      linear-gradient(145deg, #142a22, #0b1717 55%, #18291d);
+  }
+  .farm-top-bar {
+    height: 64px;
+    background: rgba(5,17,14,.82);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--line);
+  }
+  .farm-title { color: #edffe9; letter-spacing: 1px; }
+  .resource-display { gap: 10px; }
+  .resource-item {
+    min-width: 92px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,.055);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(0,0,0,.18);
+  }
+  .farm-content { top: 64px; padding: 16px; gap: 16px; }
+  .farm-grid-container, .panel {
+    background: linear-gradient(145deg, rgba(13,35,28,.92), rgba(11,26,23,.84));
+    border: 1px solid var(--line);
+    box-shadow: 0 16px 32px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.045) inset;
+    backdrop-filter: blur(16px);
+  }
+  .farm-right { gap: 12px; }
+  .panel { padding: 13px; }
+  .map-select { gap: 6px; }
+  .map-option { padding: 9px 11px; }
+  .farm-grid-title, .panel-title { color: var(--gold); }
+  .farm-cell {
+    background: linear-gradient(145deg, #5c3a1c, #342316);
+    border: 1px solid rgba(226,178,109,.27);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2), inset 0 0 18px rgba(0,0,0,.18);
+  }
+  .farm-cell:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .farm-cell.planted { background: linear-gradient(145deg, #315d2b, #183b25); }
+  .farm-cell.ready { background: linear-gradient(145deg, #667821, #294d22); }
+  .crop-choice { background: rgba(255,255,255,.045); border-color: var(--line); }
+  .map-option {
+    background: linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
+    border: 1px solid rgba(255,255,255,.06);
+    border-left: 3px solid rgba(157,186,168,.34);
+  }
+  .map-option.selected {
+    border-color: rgba(131,242,178,.65);
+    border-left-color: var(--mint);
+    background: linear-gradient(135deg, rgba(69,153,99,.25), rgba(34,84,60,.16));
+    box-shadow: 0 0 22px rgba(84,202,128,.09);
+  }
+  .loadout-slot {
+    background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.015));
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 12px;
+    aspect-ratio: auto;
+    min-height: 92px;
+    padding: 6px;
+  }
+  .loadout-effect { margin-top: 3px; color: #b8c9c0; font-size: 9px; line-height: 1.35; }
+  .loadout-value { margin-top: 3px; color: var(--gold); font-size: 9px; }
+  .start-expedition-btn {
+    background: linear-gradient(135deg, #d28b2c, #9d4b16);
+    border: 1px solid #f5bb58;
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(141,77,19,.28), inset 0 1px rgba(255,255,255,.2);
+  }
+  .start-expedition-btn:hover { background: linear-gradient(135deg, #efa53c, #bc5b1c); }
+  .hud-panel, .bag-item {
+    background: rgba(5,14,13,.82);
+    border: 1px solid rgba(190,255,220,.15);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  }
+  .hud-bottom {
+    gap: 7px;
+    padding: 8px;
+    border: 1px solid rgba(190,255,220,.14);
+    border-radius: 16px;
+    background: rgba(4,12,11,.72);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 34px rgba(0,0,0,.42);
+  }
+  .skill-slot {
+    width: 116px;
+    height: 76px;
+    padding: 7px 7px 5px;
+    justify-content: flex-start;
+    background: linear-gradient(145deg, rgba(35,56,49,.96), rgba(10,21,19,.96));
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 11px;
+    overflow: hidden;
+    box-shadow: inset 0 1px rgba(255,255,255,.05);
+  }
+  .skill-slot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(111,235,163,.14), transparent 60%);
+    pointer-events: none;
+  }
+  .skill-slot.ready { border-color: rgba(131,242,178,.55); }
+  .skill-slot.consumable { border-color: rgba(246,199,91,.48); }
+  .skill-slot .skill-icon { font-size: 24px; line-height: 26px; }
+  .skill-slot .skill-icon {
+    width:30px; height:30px; display:grid; place-items:center; border-radius:50%;
+    background:radial-gradient(circle, color-mix(in srgb, var(--skill-color, #83f2b2) 36%, transparent), rgba(0,0,0,.08));
+    border:1px solid color-mix(in srgb, var(--skill-color, #83f2b2) 55%, transparent);
+    box-shadow:0 0 14px color-mix(in srgb, var(--skill-color, #83f2b2) 20%, transparent);
+  }
+  .skill-slot.quality-rare { border:2px solid #55aaf1; }
+  .skill-slot.quality-legendary { border:2px solid #ee9637; box-shadow:0 0 18px rgba(238,150,55,.22); }
+  .skill-slot .skill-key {
+    top: 6px; left: 6px;
+    min-width: 19px; height: 19px; line-height: 18px;
+    border-radius: 5px;
+    background: rgba(0,0,0,.48);
+    border: 1px solid rgba(255,255,255,.2);
+    text-align: center;
+    font-size: 10px;
+  }
+  .skill-name { width: 100%; font-size: 11px; font-weight: 700; color: #ecfff3; text-align: center; white-space: nowrap; }
+  .skill-meta { width: 100%; display: flex; justify-content: center; gap: 4px; margin-top: 3px; }
+  .skill-meta span {
+    padding: 2px 4px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.06);
+    color: #b8c9c0;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+  .skill-slot .skill-count { bottom: auto; top: 5px; right: 6px; }
+  .skill-slot .skill-cd { z-index: 2; font-size: 18px; backdrop-filter: blur(2px); }
+  .minimap { top: 92px; bottom: auto; border: 1px solid rgba(190,255,220,.24); border-radius: 12px; }
+  .hud-top { justify-content: center; }
+  .hud-top .player-stats { position: absolute; left: 0; }
+  .consumable-bar {
+    position:absolute; right:12px; bottom:12px;
+    display:flex; gap:7px; padding:8px;
+    border:1px solid rgba(229,163,74,.22); border-radius:15px;
+    background:rgba(18,13,10,.8); backdrop-filter:blur(12px);
+    box-shadow:0 13px 30px rgba(0,0,0,.42);
+    pointer-events:auto;
+  }
+  .consumable-bar .skill-slot { width:105px; background:linear-gradient(145deg, rgba(69,42,27,.95), rgba(21,18,15,.97)); }
+  .consumable-bar .skill-slot::after {
+    content:"🔥"; position:absolute; right:4px; bottom:2px; font-size:9px; opacity:.62;
+  }
+  .controls-hint {
+    background: rgba(4,12,11,.75);
+    border: 1px solid rgba(190,255,220,.12);
+    backdrop-filter: blur(12px);
+    border-radius: 10px;
+  }
+  #audioControl {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: rgba(5,15,13,.8);
+    border: 1px solid rgba(190,255,220,.17);
+    border-radius: 999px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 20px rgba(0,0,0,.28);
+  }
+  #musicToggle {
+    border: 0;
+    background: transparent;
+    color: #e9fff1;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  #musicVolume { width: 74px; accent-color: var(--mint); cursor: pointer; }
+  .homestead-card {
+    padding: 14px;
+    border-radius: 13px;
+    background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
+    border: 1px solid rgba(190,255,220,.12);
+  }
+  .homestead-card h3 { color: #effff4; font-size: 15px; margin-bottom: 5px; }
+  .homestead-card p { color: #9fb5aa; font-size: 11px; line-height: 1.55; }
+  .facility-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+  .facility {
+    min-height: 92px;
+    padding: 11px;
+    border-radius: 11px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    cursor: pointer;
+    transition: .18s ease;
+  }
+  .facility:hover { transform: translateY(-2px); border-color: rgba(131,242,178,.42); background: rgba(88,165,117,.11); }
+  .facility-icon { font-size: 25px; margin-bottom: 4px; }
+  .facility-name { color: #e8fff0; font-size: 12px; font-weight: 700; }
+  .facility-state { color: #80958a; font-size: 9px; margin-top: 3px; }
+  .expedition-gate {
+    margin-top: auto;
+    padding: 18px;
+    border-radius: 14px;
+    background: radial-gradient(circle at 80% 0%, rgba(240,160,61,.2), transparent 45%), linear-gradient(145deg, rgba(98,55,20,.52), rgba(31,30,23,.75));
+    border: 1px solid rgba(246,199,91,.28);
+  }
+  .expedition-gate-title { color: var(--gold); font-size: 20px; font-weight: 800; }
+  .expedition-gate p { color: #c4b89f; font-size: 11px; line-height: 1.6; margin: 7px 0 13px; }
+  .gate-btn { width: 100%; padding: 13px; font-size: 16px; }
+  #expeditionPrepScreen {
+    background:
+      linear-gradient(90deg, rgba(5,14,13,.93), rgba(11,25,22,.86)),
+      radial-gradient(circle at 76% 25%, rgba(188,115,41,.18), transparent 32%),
+      #091310;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  .prep-header {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(4,13,11,.82);
+    border-bottom: 1px solid var(--line);
+  }
+  .prep-title h2 { font-size: 23px; color: #effff4; }
+  .prep-title p { margin-top: 3px; color: #829b8e; font-size: 10px; letter-spacing: 1px; }
+  .prep-content {
+    height: calc(100% - 70px);
+    display: grid;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  .prep-column { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+  .prep-panel {
+    padding: 14px;
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(18,40,33,.9), rgba(8,23,19,.9));
+    border: 1px solid var(--line);
+    box-shadow: 0 15px 32px rgba(0,0,0,.22);
+  }
+  .prep-map-panel { flex: 1; }
+  .prep-map-panel .map-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .prep-map-panel .map-option { min-height: 112px; padding: 15px; display: flex; flex-direction: column; justify-content: center; }
+  .prep-skill-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .prep-skill {
+    padding: 10px 7px;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid rgba(131,242,178,.18);
+    background: rgba(255,255,255,.035);
+  }
+  .prep-skill .icon { font-size: 23px; }
+  .prep-skill .name { margin-top: 3px; color: #ebfff2; font-size: 10px; font-weight: 700; }
+  .prep-skill .stats { margin-top: 4px; color: #8ea89a; font-size: 8px; line-height: 1.5; }
+  .prep-loadout .loadout-grid { grid-template-columns: repeat(3, 1fr); }
+  .boost-card-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; min-height:92px; }
+  .boost-card {
+    position:relative; min-height:100px; padding:9px 7px; border-radius:10px;
+    background:linear-gradient(145deg, rgba(222,205,167,.1), rgba(25,34,29,.94));
+    border:1px solid #cdd8d1; text-align:center; cursor:pointer; transition:.18s ease;
+  }
+  .boost-card:hover { transform:translateY(-3px); box-shadow:0 10px 20px rgba(0,0,0,.3); }
+  .boost-card.rare { border:2px solid #55aaf1; }
+  .boost-card.legendary { border:2px solid #ee9637; box-shadow:0 0 13px rgba(238,150,55,.16); }
+  .boost-card.selected { outline:2px solid #7fffb1; outline-offset:2px; background:linear-gradient(145deg, rgba(76,138,93,.28), rgba(25,45,34,.96)); }
+  .boost-card .boost-check { position:absolute; top:4px; right:5px; color:#83f2b2; font-size:12px; }
+  .boost-count { color:#f1cf79; font-size:12px; font-weight:800; }
+  .prep-actions { display: flex; gap: 10px; }
+  .prep-actions .start-expedition-btn { flex: 1; }
+  .secondary-btn {
+    width: 150px;
+    padding: 12px;
+    border-radius: 11px;
+    color: #d8e7df;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.045);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* ==================== v1.3 农耕纸张 / 灾变帆布主题 ==================== */
+  #farmScreen {
+    background:
+      linear-gradient(to bottom, rgba(16,25,22,.02) 0 35%, rgba(19,28,21,.22) 55%, rgba(20,21,16,.58) 100%),
+      radial-gradient(circle at 78% 12%, rgba(245,211,145,.7) 0 2.5%, rgba(231,190,118,.18) 7%, transparent 18%),
+      linear-gradient(166deg, transparent 0 37%, rgba(73,88,74,.92) 37.3% 43%, transparent 43.3%),
+      linear-gradient(174deg, transparent 0 45%, rgba(58,75,53,.96) 45.3% 56%, transparent 56.3%),
+      repeating-linear-gradient(168deg, transparent 0 23px, rgba(218,184,118,.08) 24px 26px, transparent 27px 48px),
+      linear-gradient(to bottom, #879fa0 0 36%, #697d68 36% 52%, #46573b 52% 71%, #302d22 71% 100%);
+  }
+  #farmScreen::before, #expeditionPrepScreen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: .14;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='f'%3E%3CfeTurbulence baseFrequency='.3' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='.42'/%3E%3C/svg%3E");
+  }
+  #farmScreen .farm-grid-container, #farmScreen .panel, #farmScreen .homestead-card {
+    background: linear-gradient(145deg, rgba(61,52,38,.86), rgba(24,38,31,.88));
+    border-color: rgba(235,205,143,.18);
+    backdrop-filter: blur(5px);
+  }
+  #farmScreen::after {
+    content:""; position:absolute; inset:60px 0 0; pointer-events:none; opacity:.34;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 86px, rgba(78,50,27,.9) 87px 93px, transparent 94px 172px),
+      linear-gradient(177deg, transparent 0 59%, rgba(112,78,42,.82) 59.5% 61%, transparent 61.5%),
+      linear-gradient(183deg, transparent 0 65%, rgba(61,42,27,.78) 65.4% 67%, transparent 67.4%);
+    mask-image:linear-gradient(to bottom, transparent 0 35%, #000 53%, #000 100%);
+  }
+  #farmScreen .farm-top-bar, #farmScreen .farm-content { z-index:2; }
+  #mainMenu {
+    background:
+      linear-gradient(rgba(8,17,14,.3), rgba(8,13,11,.7)),
+      radial-gradient(circle at 72% 18%, rgba(239,204,135,.55), transparent 17%),
+      linear-gradient(170deg, transparent 0 49%, rgba(47,65,48,.95) 49.4% 61%, transparent 61.4%),
+      linear-gradient(to bottom, #687f80 0 45%, #455a48 45% 65%, #202b22 65% 100%);
+  }
+  #farmScreen .panel-title, #farmScreen .farm-grid-title { color: #f0d58f; }
+  #expeditionPrepScreen {
+    background:
+      linear-gradient(rgba(32,31,27,.83), rgba(18,25,22,.94)),
+      repeating-linear-gradient(12deg, rgba(146,73,43,.055) 0 3px, transparent 3px 11px),
+      #181d19;
+  }
+  #expeditionPrepScreen::before { opacity: .18; filter: sepia(.7); }
+  .farm-cell, .map-option, .prep-skill, .loadout-slot, .facility, .crop-choice {
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, filter .18s ease;
+  }
+  .farm-cell:hover, .map-option:hover, .prep-skill:hover, .loadout-slot:hover, .facility:hover, .crop-choice:hover {
+    transform: translateY(-3px) scale(1.025);
+    box-shadow: 0 10px 20px rgba(0,0,0,.28), 0 0 14px rgba(132,225,165,.08);
+  }
+  .farm-cell:active, .map-option:active, .prep-skill:active, .loadout-slot:active, .facility:active, .crop-choice:active {
+    transform: scale(.965);
+  }
+  .farm-cell.locked {
+    cursor: pointer;
+    color: #937f61;
+    background: repeating-linear-gradient(135deg, rgba(75,60,41,.82) 0 8px, rgba(49,42,32,.9) 8px 16px);
+    border: 1px dashed rgba(211,180,122,.25);
+    filter: saturate(.55);
+  }
+  .farm-cell.locked.next-unlock { border-color: #d7aa52; box-shadow: inset 0 0 18px rgba(208,155,66,.12); }
+  .plot-lock { text-align: center; font-size: 17px; line-height: 1.15; }
+  .plot-cost { margin-top: 4px; font-size: 8px; color: #d4b87c; }
+  .plot-status {
+    position: absolute;
+    top: 4px; right: 5px;
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: rgba(28,20,13,.78);
+    border: 1px solid rgba(255,214,133,.35);
+    font-size: 13px;
+    animation: statusBob 1.4s ease-in-out infinite;
+  }
+  @keyframes statusBob { 50% { transform: translateY(-2px); } }
+  .farm-cell.rarity-rare { border-color: #5fa9ed; box-shadow: inset 0 0 16px rgba(70,149,220,.13); }
+  .farm-cell.rarity-legendary { border: 2px solid #e49a39; box-shadow: inset 0 0 18px rgba(226,141,42,.2), 0 0 12px rgba(226,141,42,.12); }
+  .farm-cell { transform-style:preserve-3d; box-shadow:0 6px 0 #25170f,0 10px 16px rgba(0,0,0,.32),inset 0 2px rgba(255,225,173,.1),inset 0 -10px 18px rgba(18,10,5,.3); }
+  .farm-cell:hover { transform:translateY(-4px);box-shadow:0 10px 0 #25170f,0 16px 23px rgba(0,0,0,.35),inset 0 2px rgba(255,225,173,.14); }
+  .farm-cell:active { transform:translateY(4px) scale(.98);box-shadow:0 2px 0 #25170f,0 5px 9px rgba(0,0,0,.3),inset 0 3px 12px rgba(0,0,0,.35); }
+  .panel,.farm-grid-container,.homestead-card { box-shadow:0 18px 34px rgba(0,0,0,.3),0 5px 0 rgba(4,12,9,.6),inset 0 1px rgba(255,255,255,.08),inset 0 -14px 22px rgba(0,0,0,.12); }
+  .map-option,.prep-skill,.boost-card,.loadout-slot { box-shadow:0 5px 0 rgba(4,11,9,.62),0 9px 15px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.07); }
+  .map-option:hover,.prep-skill:hover,.boost-card:hover,.loadout-slot:hover { box-shadow:0 8px 0 rgba(4,11,9,.6),0 14px 22px rgba(0,0,0,.27),inset 0 1px rgba(255,255,255,.1); }
+  .map-option:active,.prep-skill:active,.boost-card:active,.loadout-slot:active { transform:translateY(3px) scale(.985);box-shadow:0 2px 0 rgba(4,11,9,.7),0 5px 10px rgba(0,0,0,.2); }
+  .menu-btn,.start-expedition-btn,.secondary-btn { box-shadow:0 5px 0 rgba(5,25,16,.85),0 11px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.12); }
+  .menu-btn:active,.start-expedition-btn:active,.secondary-btn:active { transform:translateY(4px);box-shadow:0 1px 0 rgba(5,25,16,.9),0 4px 8px rgba(0,0,0,.25),inset 0 2px 8px rgba(0,0,0,.22); }
+  .crop-choice.rare { border-color:#55aaf1; box-shadow:inset 0 0 10px rgba(85,170,241,.12); }
+  .crop-choice.legendary { border:2px solid #ee9637; box-shadow:0 0 12px rgba(238,150,55,.16); }
+  .crop-choice { display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:116px; }
+  .crop-choice small { color:#aebcad; font-size:9px; }
+  .crop-choice.selected small { color:#dfffe9; }
+
+  #gameContainer::after {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:3; opacity:.52;
+    background-image:
+      radial-gradient(circle, rgba(255,226,140,.75) 0 1px, transparent 1.8px),
+      radial-gradient(circle, rgba(116,224,190,.6) 0 1px, transparent 1.7px);
+    background-size:83px 83px, 127px 127px; background-position:12px 18px, 48px 64px;
+    animation:ambient-dust 11s linear infinite;
+    mix-blend-mode:screen;
+  }
+  @keyframes ambient-dust { from { transform:translateY(0); } to { transform:translateY(-83px); } }
+  #missionHud { position:absolute; left:18px; top:92px; width:210px; padding:11px 12px; z-index:35; color:#eaf5ed; background:linear-gradient(145deg,rgba(8,24,20,.9),rgba(13,18,17,.78)); border:1px solid rgba(132,224,167,.26); box-shadow:0 10px 28px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.06); backdrop-filter:blur(8px); border-radius:7px; display:flex; flex-direction:column; gap:4px; pointer-events:none; }
+  #missionHud .mission-label { color:#7fe3a7; font-size:9px; } #missionHud strong { font-size:13px; } #missionHud>span,#missionHud small { color:#afc1b5; font-size:9px; }
+  #weaponDisplay { position:absolute;left:18px;bottom:190px;z-index:35;display:flex;align-items:center;gap:9px;min-width:190px;padding:8px 10px;color:#edf7ef;background:linear-gradient(135deg,rgba(8,19,17,.9),rgba(22,28,23,.78));border:1px solid var(--weapon-color,#f2c45b);box-shadow:0 8px 24px rgba(0,0,0,.35),inset 3px 0 var(--weapon-color,#f2c45b);border-radius:6px;pointer-events:none; }
+  #weaponDisplay .weapon-glyph { display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--weapon-color);color:var(--weapon-color);font-size:17px;font-weight:900;background:rgba(0,0,0,.28);border-radius:4px; }
+  #weaponDisplay div { display:flex;flex:1;flex-direction:column;gap:2px; } #weaponDisplay b{font-size:12px;} #weaponDisplay small{font-size:9px;color:#aebcb3;} #weaponDisplay kbd{font-size:8px;color:#e5d7b5;border:1px solid #625d51;padding:3px 4px;border-radius:3px;}
+  .weapon-controls-tip { position:absolute;left:18px;bottom:164px;z-index:35;padding:5px 8px;color:#c7d4ca;background:rgba(8,17,15,.78);border:1px solid rgba(255,255,255,.1);border-radius:4px;font-size:9px;pointer-events:none; }
+  .mission-progress { height:5px; overflow:hidden; background:#17211e; border-radius:3px; } .mission-progress i { display:block;height:100%;background:linear-gradient(90deg,#48aa72,#b5e66e); }
+  .mission-event { margin-top:5px;padding-top:7px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:2px; } .mission-event b { color:var(--event-color,#7fe3a7);font-size:11px; } .mission-event span { color:#b9c6be;font-size:9px; } .mission-event.dormant { opacity:.58; }
+  .boss-hud { margin-top:4px;display:grid;grid-template-columns:1fr auto;gap:3px;color:#e9c6ff;font-size:9px; }.boss-hud i{grid-column:1/-1;height:5px;background:linear-gradient(90deg,#934fc4,#ee7d86);}
+  .modal-overlay {
+    z-index: 80;
+    background: rgba(4,9,8,.72);
+    backdrop-filter: blur(8px);
+    animation: modalFade .2s ease;
+  }
+  .workshop-window {
+    width: 940px;
+    max-height: 620px;
+    padding: 18px;
+    border-radius: 18px;
+    background:
+      repeating-linear-gradient(90deg, rgba(225,192,130,.025) 0 2px, transparent 2px 7px),
+      linear-gradient(145deg, #443622, #17271e 55%, #111b17);
+    border: 1px solid rgba(235,205,143,.28);
+    box-shadow: 0 30px 90px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.07);
+    animation: modalPop .24s ease;
+  }
+  @keyframes modalFade { from { opacity: 0; } }
+  @keyframes modalPop { from { opacity: 0; transform: scale(.94) translateY(10px); } }
+  .workshop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .workshop-header h2 { color: #f0d58f; font-size: 24px; }
+  .workshop-header p { color: #a99c82; font-size: 11px; margin-top: 4px; }
+  .workshop-section { padding: 12px; margin-top: 10px; border-radius: 13px; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.07); }
+  .workshop-skills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  .workshop-skill { padding: 11px; border-radius: 11px; background: rgba(255,255,255,.04); border: 1px solid rgba(131,242,178,.16); }
+  .workshop-skill .level { color: #f0c866; font-size: 12px; font-weight: 800; }
+  .workshop-cards { min-height: 150px; max-height: 230px; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .upgrade-card {
+    position: relative;
+    min-height: 142px;
+    padding: 12px;
+    overflow: hidden;
+    border-radius: 12px 9px 13px 10px;
+    background: linear-gradient(145deg, rgba(222,205,167,.16), rgba(37,44,36,.92));
+    border: 1px solid #d8ddd8;
+    cursor: pointer;
+    transition: .2s ease;
+  }
+  .upgrade-card::after { content:""; position:absolute; inset:0; pointer-events:none; background: repeating-linear-gradient(32deg, rgba(255,255,255,.018) 0 2px, transparent 2px 6px); }
+  .upgrade-card:hover { transform: translateY(-4px) scale(1.035); box-shadow: 0 15px 28px rgba(0,0,0,.34); }
+  .upgrade-card.common { border-color: #dce4df; }
+  .upgrade-card.rare { border: 2px solid #55aaf1; box-shadow: inset 0 0 18px rgba(62,145,226,.14); }
+  .upgrade-card.legendary { border: 3px solid #ee9637; box-shadow: 0 0 20px rgba(238,150,55,.2), inset 0 0 20px rgba(238,150,55,.16); }
+  .card-rarity { font-size: 9px; letter-spacing: 1px; opacity: .8; }
+  .card-icon { font-size: 31px; margin: 7px 0; }
+  .card-name { color: #f6fff7; font-weight: 800; font-size: 13px; }
+  .card-desc { margin-top: 5px; color: #aabbb0; font-size: 9px; line-height: 1.45; }
+  #cardDropContainer { position:absolute; top:88px; right:20px; z-index:90; pointer-events:none; }
+  .card-drop-banner {
+    width: 260px; margin-bottom: 8px; padding: 12px 14px;
+    border-radius: 11px; color:#fff;
+    background: linear-gradient(135deg, rgba(50,65,54,.96), rgba(24,32,27,.96));
+    box-shadow: 0 14px 30px rgba(0,0,0,.38);
+    animation: cardSlide .35s ease, cardExit .3s ease 2.7s forwards;
+  }
+  .card-drop-banner.rare { border: 2px solid #55aaf1; }
+  .card-drop-banner.legendary { border: 2px solid #ee9637; box-shadow: 0 0 24px rgba(238,150,55,.26); }
+  @keyframes cardSlide { from { opacity:0; transform:translateX(90px) scale(.94); } }
+  @keyframes cardExit { to { opacity:0; transform:translateX(40px) scale(.92); } }
+  .skill-slot.casting { animation: skillCast .28s ease; }
+  @keyframes skillCast { 45% { transform: translateY(-5px) scale(1.08); filter: brightness(1.8); } }
+  .skill-slot.spent { animation: consumeCard .3s ease; }
+  @keyframes consumeCard { to { transform: scale(.2) rotate(5deg); opacity:.15; filter: sepia(1); } }
+  .skill-cd-ring {
+    position:absolute; inset:4px; z-index:2; border-radius:10px;
+    background: conic-gradient(rgba(6,10,9,.88) calc(var(--progress) * 1turn), transparent 0);
+    display:grid; place-items:center;
+  }
+  .skill-cd-ring::after { content:""; position:absolute; inset:7px; border-radius:8px; background:rgba(9,15,13,.76); }
+  .skill-cd-ring span { position:relative; z-index:1; color:#fff; font-size:17px; font-weight:800; }
+  .timer-display.pressure { color:#f2b35a; animation: timerBreath 1.2s ease-in-out infinite; }
+  .timer-display.critical { color:#ff5a4f; animation: timerBreath .55s ease-in-out infinite; }
+  @keyframes timerBreath { 50% { text-shadow:0 0 16px currentColor; transform:scale(1.04); } }
+  #lowHealthVignette { position:absolute; inset:0; z-index:25; pointer-events:none; opacity:0; box-shadow:inset 0 0 100px 24px rgba(154,20,18,.82); transition:opacity .25s; }
+  #lowHealthVignette.active { opacity:.48; animation: lowHpPulse 1s ease-in-out infinite; }
+  @keyframes lowHpPulse { 50% { opacity:.7; } }
+  #signalFlash { position:absolute; inset:0; z-index:26; pointer-events:none; opacity:0; border:4px solid #ff573c; box-shadow:inset 0 0 90px #ff573c; }
+  #signalFlash.active { animation: signalAlert .85s ease; }
+  @keyframes signalAlert { 0%,100% { opacity:0; } 25%,60% { opacity:.72; } }
+
+  /* ==================== v1.5 家园补给站 ==================== */
+  .support-panel { padding:13px !important; }
+  .support-panel .panel-title { margin-bottom:8px; padding-bottom:7px; }
+  .daily-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:8px; }
+  .daily-day {
+    min-width:0; padding:5px 2px; text-align:center; border-radius:7px;
+    color:#aeb8ae; font-size:8px; background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.07);
+  }
+  .daily-day strong { display:block; color:#d5c18b; font-size:10px; margin-bottom:2px; }
+  .daily-day.claimed { background:rgba(74,125,77,.24); border-color:rgba(129,210,131,.3); color:#83d58a; }
+  .daily-day.next { border-color:#e0b957; box-shadow:inset 0 0 10px rgba(224,185,87,.14); color:#f1d482; }
+  .supply-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .supply-card {
+    min-height:73px; padding:8px; display:grid; grid-template-columns:32px 1fr; gap:7px;
+    border-radius:10px; background:rgba(9,18,14,.42); border:1px solid rgba(239,207,138,.15);
+  }
+  .supply-card.relief { border-color:rgba(126,184,151,.17); }
+  .supply-icon { font-size:25px; align-self:start; }
+  .supply-name { color:#f0ddb0; font-size:10px; font-weight:800; }
+  .supply-desc { min-height:22px; margin:3px 0 5px; color:#a8b3aa; font-size:8px; line-height:1.35; }
+  .supply-btn {
+    width:100%; padding:5px 4px; border:1px solid #b98532; border-radius:7px;
+    color:#fff6dc; background:linear-gradient(#a76b22,#744416); cursor:pointer; font:inherit; font-size:9px;
+  }
+  .supply-card.relief .supply-btn { border-color:#57806b; background:linear-gradient(#47705a,#294b3a); }
+  .supply-btn:disabled { cursor:not-allowed; opacity:.46; filter:grayscale(.65); }
+  #farmScreen .farm-right { gap:10px; }
+  #farmScreen .facility { min-height:78px; padding:9px; }
+  #farmScreen .facility-icon { font-size:22px; margin-bottom:2px; }
+  #farmScreen .expedition-gate { padding:14px; }
+  #farmScreen .expedition-gate p { margin:5px 0 9px; line-height:1.45; }
+  #farmScreen .gate-btn { padding:10px; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="1280" height="720"></canvas>
+  <div id="audioControl">
+    <button id="musicToggle" type="button" onclick="AudioManager.toggle()">♫ 音乐：开</button>
+    <input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)">
+  </div>
+
+  <!-- 主菜单 -->
+  <div id="mainMenu" class="overlay">
+    <h1>农庄牌</h1>
+    <div class="subtitle">荒 野 远 征</div>
+    <button class="menu-btn" onclick="Game.startGame()">开始游戏</button>
+    <button class="menu-btn" onclick="Game.showHelp()">游戏说明</button>
+    <div class="version-info">v1.5 Homestead Support Update | 每日奖励 × 开荒保障 × 写实环境</div>
+  </div>
+
+  <!-- 农场界面 -->
+  <div id="farmScreen" class="overlay hidden">
+    <div class="farm-top-bar">
+      <div class="farm-title">🌾 我的家园农场</div>
+      <div class="resource-display">
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#ffd700;">💰</span>
+          <span id="goldDisplay">500</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#7fff7f;">🌱</span>
+          <span id="seedDisplay">3</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#ff8800;">📦</span>
+          <span id="materialDisplay">0</span>
+        </div>
+      </div>
+      <button class="menu-btn" style="width:auto;padding:8px 20px;font-size:14px;" onclick="Game.backToMenu()">返回菜单</button>
+    </div>
+    <div class="farm-content">
+      <div class="farm-left">
+        <div class="farm-grid-container">
+          <div class="farm-grid-title">农田（点击空地播种，点击成熟作物收获）</div>
+          <div class="crop-selector" id="cropSelector"></div>
+          <div class="farm-grid" id="farmGrid"></div>
+        </div>
+      </div>
+      <div class="farm-right">
+        <div class="panel">
+          <div class="panel-title">🏡 家园设施</div>
+          <div class="facility-grid">
+            <div class="facility" onclick="showToast('仓库会保存远征带回的物资', 'success')"><div class="facility-icon">🏚️</div><div class="facility-name">物资仓库</div><div class="facility-state">容量充足 · 自动存档</div></div>
+            <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
+            <div class="facility" onclick="showToast('温室能保护稀有作物', 'success')"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">作物图鉴 · 5种</div></div>
+            <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
+          </div>
+        </div>
+        <div class="panel support-panel">
+          <div class="panel-title">🎁 家园补给站</div>
+          <div class="daily-strip" id="dailyRewardStrip"></div>
+          <div class="supply-actions">
+            <div class="supply-card">
+              <div class="supply-icon">📅</div>
+              <div><div class="supply-name" id="dailyRewardTitle">每日签到</div><div class="supply-desc" id="dailyRewardDesc"></div><button class="supply-btn" id="dailyRewardButton" onclick="RewardSystem.claimDaily()">领取</button></div>
+            </div>
+            <div class="supply-card relief">
+              <div class="supply-icon">🧺</div>
+              <div><div class="supply-name">开荒保障</div><div class="supply-desc" id="reliefRewardDesc"></div><button class="supply-btn" id="reliefRewardButton" onclick="RewardSystem.claimRelief()">申请救济</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="expedition-gate">
+          <div class="expedition-gate-title">荒野远征站</div>
+          <p>地图选择、技能确认和携带物配置已移至独立准备大厅。家园不会受到远征战斗影响。</p>
+          <button class="start-expedition-btn gate-btn" onclick="Game.openExpeditionPrep()">进入远征准备大厅 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 独立远征准备大厅 -->
+  <div id="expeditionPrepScreen" class="overlay hidden">
+    <div class="prep-header">
+      <div class="prep-title"><h2>⚔️ 荒野远征准备大厅</h2><p>SELECT REGION · CHECK SKILLS · PACK SUPPLIES</p></div>
+      <div class="resource-display">
+        <div class="resource-item"><span class="resource-icon" style="background:#ffd700;">💰</span><span id="prepGoldDisplay">500</span></div>
+        <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回家园</button>
+      </div>
+    </div>
+    <div class="prep-content">
+      <div class="prep-column">
+        <div class="prep-panel prep-map-panel">
+          <div class="panel-title">🗺️ 选择远征区域</div>
+          <div class="map-select" id="mapSelect"></div>
+        </div>
+        <div class="prep-panel">
+          <div class="panel-title">🃏 本次常驻技能</div>
+          <div class="prep-skill-grid" id="prepSkillGrid"></div>
+        </div>
+      </div>
+      <div class="prep-column">
+        <div class="prep-panel prep-loadout">
+          <div class="panel-title">🎒 携带消耗品</div>
+          <div class="loadout-grid" id="loadoutGrid"></div>
+        </div>
+        <div class="prep-panel">
+          <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
+          <div class="boost-card-grid" id="boostCardGrid"></div>
+        </div>
+        <div class="prep-panel" style="flex:1;">
+          <div class="panel-title">📡 区域提示</div>
+          <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">选择地图后查看地形、环境和陷阱情报。</div>
+        </div>
+        <div class="prep-actions">
+          <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">取消</button>
+          <button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()">确认配置并出发</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 远征HUD -->
+  <div id="expeditionHUD" class="hidden">
+    <div class="hud-top">
+      <div class="hud-panel player-stats">
+        <div class="stat-bar">
+          <span class="stat-label">生命</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill hp-fill" id="hpBar" style="width:100%"></div>
+            <span class="stat-value" id="hpText">100/100</span>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <span class="stat-label">能量</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill energy-fill" id="energyBar" style="width:100%"></div>
+            <span class="stat-value" id="energyText">100/100</span>
+          </div>
+        </div>
+      </div>
+      <div class="hud-panel">
+        <div class="timer-display" id="timerDisplay">12:00</div>
+        <div class="map-badge" id="mapNameDisplay">T1 · 荒废野田</div>
+      </div>
+      <div class="bag-display" id="bagDisplay"></div>
+    </div>
+    <div class="hud-bottom" id="skillBar"></div>
+    <div id="weaponDisplay"></div>
+    <div class="consumable-bar" id="consumableBar"></div>
+    <canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · <kbd>1-4</kbd> 释放技能</div>
+    <div class="controls-hint">
+      <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | <kbd>鼠标右键</kbd> 拾取<br>
+      <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>
+      <kbd>Shift</kbd> 冲刺 | <kbd>ESC</kbd> 暂停
+    </div>
+  </div>
+
+  <!-- 结算界面 -->
+  <div id="resultScreen" class="overlay hidden">
+    <div class="result-card" id="resultCard">
+      <div class="result-title" id="resultTitle">远征成功</div>
+      <div class="result-subtitle" id="resultSubtitle">你成功带着战利品撤离了荒野</div>
+      <div class="result-stats" id="resultStats"></div>
+      <div class="loot-list" id="lootList"></div>
+      <button class="menu-btn" onclick="Game.returnToFarm()">返回农场</button>
+    </div>
+  </div>
+
+  <!-- 卡牌工坊弹窗 -->
+  <div id="cardWorkshopModal" class="overlay modal-overlay hidden" onclick="if(event.target===this) Game.closeCardWorkshop()">
+    <div class="workshop-window">
+      <div class="workshop-header">
+        <div><h2>🛠️ 卡牌工坊</h2><p>收获作物有概率掉落强化卡，使用后永久提升基础技能。</p></div>
+        <button class="secondary-btn" onclick="Game.closeCardWorkshop()">关闭</button>
+      </div>
+      <div class="workshop-section"><div class="panel-title">基础技能等级</div><div class="workshop-skills" id="workshopSkills"></div></div>
+      <div class="workshop-section workshop-inventory"><div class="panel-title">作物卡牌库存</div><div class="workshop-cards" id="workshopCards"></div></div>
+    </div>
+  </div>
+
+  <div id="cardDropContainer"></div>
+  <div id="signalFlash"></div>
+  <div id="lowHealthVignette"></div>
+
+  <!-- 提示消息容器 -->
+  <div id="toastContainer"></div>
+</div>
+
+  <script src="js/config.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/card.js"></script>
+  <script src="js/farm.js"></script>
+  <script src="js/expedition.js"></script>
+  <script src="js/game.js"></script>
+
+</body>
+</html>

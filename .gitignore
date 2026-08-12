@@ -1,0 +1,9 @@
+# Local test screenshots and temporary regression artifacts
+*-test.png
+smoke-test.png
+output/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*.log
