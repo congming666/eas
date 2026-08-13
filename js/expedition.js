@@ -249,27 +249,16 @@ class Expedition {
     ctx.fillStyle = this.map.bgColor;
     ctx.fillRect(0, 0, viewW, viewH);
 
-    // World-aligned grass tiles: full-screen tiled ground without visible square grid lines.
-    const gridSize = this.map.gridSize || 96;
-    const offsetX = ((-cam.x % gridSize) + gridSize) % gridSize;
-    const offsetY = ((-cam.y % gridSize) + gridSize) % gridSize;
-    const firstWorldColumn = Math.floor(cam.x / gridSize);
-    const firstWorldRow = Math.floor(cam.y / gridSize);
+    // Continuous grass field: no square tile boundaries or visible grid lines.
     ctx.save();
-    for (let y = offsetY - gridSize, row = firstWorldRow - 1; y <= viewH + gridSize; y += gridSize, row++) {
-      for (let x = offsetX - gridSize, column = firstWorldColumn - 1; x <= viewW + gridSize; x += gridSize, column++) {
-        const shade = ((column * 17 + row * 31) & 3) * 0.012;
-        ctx.fillStyle = `rgba(255,255,255,${shade})`;
-        ctx.fillRect(x, y, gridSize + 1, gridSize + 1);
-        ctx.fillStyle = this.map.gridColor;
-        ctx.globalAlpha = 0.16;
-        for (let i = 0; i < 3; i++) {
-          const bladeX = x + 18 + ((column * 13 + row * 7 + i * 21) % (gridSize - 26));
-          const bladeY = y + 18 + ((row * 11 + column * 5 + i * 17) % (gridSize - 26));
-          ctx.beginPath(); ctx.moveTo(bladeX, bladeY + 5); ctx.lineTo(bladeX + 3, bladeY - 3); ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-      }
+    ctx.globalAlpha = 0.13;
+    ctx.strokeStyle = this.map.gridColor;
+    ctx.lineWidth = 1.2;
+    const seed = Math.floor(cam.x / 38) * 17 + Math.floor(cam.y / 38) * 31;
+    for (let i = 0; i < 160; i++) {
+      const x = ((i * 83 + seed * 7) % (viewW + 80)) - 40;
+      const y = ((i * 137 + seed * 11) % (viewH + 80)) - 40;
+      ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + 3, y - 3); ctx.stroke();
     }
     const light = ctx.createLinearGradient(0, 0, 0, viewH);
     light.addColorStop(0, 'rgba(255,255,255,.045)');
