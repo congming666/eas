@@ -64,6 +64,9 @@ class Expedition {
     this.visionCellSize = 96;
     this.visionRadius = 360;
     this.exploredCells = new Set();
+    this.fogCanvas = document.createElement('canvas');
+    this.fogCanvas.width = CONFIG.canvas.width;
+    this.fogCanvas.height = CONFIG.canvas.height;
     this.screenShake = 0;
     this.sunVector = [
       { x: 0.72, y: 0.38 }, { x: 0.82, y: 0.28 },
@@ -108,32 +111,42 @@ class Expedition {
   renderFogOfWar(ctx) {
     const cell = this.visionCellSize;
     const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
-    const revealed = new Set(this.exploredCells);
-    const minX = Math.floor((this.player.x - radius) / cell), maxX = Math.ceil((this.player.x + radius) / cell);
-    const minY = Math.floor((this.player.y - radius) / cell), maxY = Math.ceil((this.player.y + radius) / cell);
-    for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) revealed.add(`${cx},${cy}`);
-    revealed.forEach(key => {
+    const fogCtx = this.fogCanvas.getContext('2d');
+    fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+
+    // 未探索区域使用深色蓝灰迷雾。
+    fogCtx.globalCompositeOperation = 'source-over';
+    fogCtx.globalAlpha = 1;
+    fogCtx.fillStyle = 'rgba(8,14,22,.72)';
+    fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+
+    // 已探索区域保留轻雾，不能再直接擦除主游戏画布。
+    fogCtx.globalCompositeOperation = 'destination-out';
+    fogCtx.globalAlpha = 0.72;
+    this.exploredCells.forEach(key => {
       const [cx, cy] = key.split(',').map(Number);
       const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
+      fogCtx.beginPath();
+      fogCtx.arc(sx + cell / 2, sy + cell / 2, cell * 1.05, 0, Math.PI * 2);
+      fogCtx.fill();
     });
-    ctx.save();
-    ctx.fillStyle = 'rgba(10,18,28,.58)';
-    ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-    // 逐块擦除已探索区域，避免重叠路径的填充规则产生黑色十字缝。
-    ctx.globalCompositeOperation = 'destination-out';
-    revealed.forEach(key => {
-      const [cx, cy] = key.split(',').map(Number);
-      const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
-      // 圆形视野过渡，避免把战争迷雾切成规则方格并出现黑色十字缝。
-      ctx.beginPath();
-      ctx.arc(sx + cell / 2, sy + cell / 2, cell * 1.16, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalCompositeOperation = 'source-over';
-    const glow = ctx.createRadialGradient(CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * .42, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * 1.1);
-    glow.addColorStop(0, 'rgba(2,8,12,0)'); glow.addColorStop(1, 'rgba(2,8,12,.12)');
-    ctx.fillStyle = glow; ctx.globalCompositeOperation = 'source-over'; ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-    ctx.restore();
+
+    // 当前玩家视野完全清晰，边缘做柔和过渡。
+    fogCtx.globalAlpha = 1;
+    const px = this.player.x - this.camera.x;
+    const py = this.player.y - this.camera.y;
+    const clearVision = fogCtx.createRadialGradient(px, py, radius * .72, px, py, radius * 1.08);
+    clearVision.addColorStop(0, 'rgba(0,0,0,1)');
+    clearVision.addColorStop(0.72, 'rgba(0,0,0,.96)');
+    clearVision.addColorStop(1, 'rgba(0,0,0,0)');
+    fogCtx.fillStyle = clearVision;
+    fogCtx.beginPath();
+    fogCtx.arc(px, py, radius * 1.08, 0, Math.PI * 2);
+    fogCtx.fill();
+
+    fogCtx.globalCompositeOperation = 'source-over';
+    fogCtx.globalAlpha = 1;
+    ctx.drawImage(this.fogCanvas, 0, 0);
   }
 
   getBalanceProfile() {
