@@ -117,7 +117,7 @@ class Expedition {
       const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
     });
     ctx.save();
-    ctx.fillStyle = 'rgba(3,8,14,.82)';
+    ctx.fillStyle = 'rgba(10,18,28,.58)';
     ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
     // 逐块擦除已探索区域，避免重叠路径的填充规则产生黑色十字缝。
     ctx.globalCompositeOperation = 'destination-out';
@@ -126,12 +126,12 @@ class Expedition {
       const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
       // 圆形视野过渡，避免把战争迷雾切成规则方格并出现黑色十字缝。
       ctx.beginPath();
-      ctx.arc(sx + cell / 2, sy + cell / 2, cell * 0.82, 0, Math.PI * 2);
+      ctx.arc(sx + cell / 2, sy + cell / 2, cell * 1.16, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.globalCompositeOperation = 'source-over';
     const glow = ctx.createRadialGradient(CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * .42, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * 1.1);
-    glow.addColorStop(0, 'rgba(2,8,12,0)'); glow.addColorStop(1, 'rgba(2,8,12,.28)');
+    glow.addColorStop(0, 'rgba(2,8,12,0)'); glow.addColorStop(1, 'rgba(2,8,12,.12)');
     ctx.fillStyle = glow; ctx.globalCompositeOperation = 'source-over'; ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
     ctx.restore();
   }
@@ -388,7 +388,7 @@ class Expedition {
 
     const vignette = ctx.createRadialGradient(viewW / 2, viewH / 2, 170, viewW / 2, viewH / 2, 720);
     vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,.26)');
+    vignette.addColorStop(1, 'rgba(0,0,0,.12)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, viewW, viewH);
   }
