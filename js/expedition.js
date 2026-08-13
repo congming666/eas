@@ -108,8 +108,6 @@ class Expedition {
   renderFogOfWar(ctx) {
     const cell = this.visionCellSize;
     const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
-    const path = new Path2D();
-    path.rect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
     const revealed = new Set(this.exploredCells);
     const minX = Math.floor((this.player.x - radius) / cell), maxX = Math.ceil((this.player.x + radius) / cell);
     const minY = Math.floor((this.player.y - radius) / cell), maxY = Math.ceil((this.player.y + radius) / cell);
@@ -117,11 +115,21 @@ class Expedition {
     revealed.forEach(key => {
       const [cx, cy] = key.split(',').map(Number);
       const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
-      path.rect(sx - 3, sy - 3, cell + 6, cell + 6);
     });
     ctx.save();
     ctx.fillStyle = 'rgba(3,8,14,.82)';
-    ctx.fill(path, 'evenodd');
+    ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+    // 逐块擦除已探索区域，避免重叠路径的填充规则产生黑色十字缝。
+    ctx.globalCompositeOperation = 'destination-out';
+    revealed.forEach(key => {
+      const [cx, cy] = key.split(',').map(Number);
+      const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
+      // 圆形视野过渡，避免把战争迷雾切成规则方格并出现黑色十字缝。
+      ctx.beginPath();
+      ctx.arc(sx + cell / 2, sy + cell / 2, cell * 0.82, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
     const glow = ctx.createRadialGradient(CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * .42, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, radius * 1.1);
     glow.addColorStop(0, 'rgba(2,8,12,0)'); glow.addColorStop(1, 'rgba(2,8,12,.28)');
     ctx.fillStyle = glow; ctx.globalCompositeOperation = 'source-over'; ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
@@ -251,9 +259,9 @@ class Expedition {
 
     // Continuous grass field: no square tile boundaries or visible grid lines.
     ctx.save();
-    ctx.globalAlpha = 0.13;
-    ctx.strokeStyle = this.map.gridColor;
-    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.11;
+    ctx.strokeStyle = theme.glow;
+    ctx.lineWidth = 1;
     const seed = Math.floor(cam.x / 38) * 17 + Math.floor(cam.y / 38) * 31;
     for (let i = 0; i < 160; i++) {
       const x = ((i * 83 + seed * 7) % (viewW + 80)) - 40;
@@ -320,6 +328,7 @@ class Expedition {
       ctx.globalAlpha = 1;
     });
 
+    // 不再绘制规则田块、边框和横向犁沟；只保留柔和的不规则地表斑块。
     this.terrainFields.forEach(field => {
       const cx = field.x + field.w / 2 - cam.x;
       const cy = field.y + field.h / 2 - cam.y;
@@ -327,26 +336,18 @@ class Expedition {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(field.rotation);
-      ctx.fillStyle = field.ruined ? 'rgba(50,35,30,.62)' : 'rgba(101,70,39,.6)';
-      ctx.strokeStyle = field.ruined ? 'rgba(156,86,76,.42)' : 'rgba(224,180,104,.27)';
-      ctx.lineWidth = 2;
+      ctx.fillStyle = field.ruined ? 'rgba(50,35,30,.14)' : 'rgba(101,70,39,.13)';
       ctx.beginPath();
-      ctx.moveTo(-field.w / 2 + 11, -field.h / 2);
-      ctx.lineTo(field.w / 2 - 7, -field.h / 2 + 6);
-      ctx.lineTo(field.w / 2, field.h / 2 - 10);
-      ctx.lineTo(-field.w / 2 + 5, field.h / 2);
+      const points = 18;
+      for (let i = 0; i <= points; i++) {
+        const a = i / points * Math.PI * 2;
+        const wobble = 1 + Math.sin(a * 3 + field.x) * .08 + Math.sin(a * 5 + field.y) * .05;
+        const px = Math.cos(a) * field.w * .46 * wobble;
+        const py = Math.sin(a) * field.h * .46 * wobble;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
-      ctx.clip();
-      ctx.lineWidth = 3;
-      for (let y = -field.h / 2 + 18; y < field.h / 2; y += 24) {
-        if (field.ruined && (Math.floor(y + field.x) % 5 === 0)) continue;
-        ctx.beginPath();
-        ctx.moveTo(-field.w / 2 + 10, y);
-        ctx.lineTo(field.w / 2 - 10, y);
-        ctx.stroke();
-      }
       ctx.restore();
     });
 
