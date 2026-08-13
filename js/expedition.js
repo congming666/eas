@@ -74,6 +74,12 @@ class Expedition {
     this.fogCanvas = document.createElement('canvas');
     this.fogCanvas.width = CONFIG.canvas.width;
     this.fogCanvas.height = CONFIG.canvas.height;
+    this.fogUpdateInterval = 0.12;
+    this.fogUpdateTimer = this.fogUpdateInterval;
+    this.fogDirty = true;
+    this.entitySpatialHash = new SpatialHash(176);
+    this.obstacleSpatialHash = new SpatialHash(176);
+    this.terrainChunkCache = new TerrainChunkCache(CONFIG.expedition.mapSize, 512);
     this.bossSprites = {};
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
@@ -94,6 +100,8 @@ class Expedition {
 
     this.generateTerrain();
     this.spawnEntities();
+    this.obstacleSpatialHash.rebuild(this.obstacles);
+    this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
     this.setupMission();
     this.setupInput();
     this.updateVision();
@@ -111,10 +119,16 @@ class Expedition {
     const maxX = Math.min(Math.ceil(CONFIG.expedition.mapSize / cell), Math.ceil((this.player.x + radius) / cell));
     const minY = Math.max(0, Math.floor((this.player.y - radius) / cell));
     const maxY = Math.min(Math.ceil(CONFIG.expedition.mapSize / cell), Math.ceil((this.player.y + radius) / cell));
+    let changed = false;
     for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) {
       const centerX = cx * cell + cell / 2, centerY = cy * cell + cell / 2;
-      if (dist({ x: centerX, y: centerY }, this.player) <= radius + cell * .68) this.exploredCells.add(`${cx},${cy}`);
+      const key = `${cx},${cy}`;
+      if (dist({ x: centerX, y: centerY }, this.player) <= radius + cell * .68 && !this.exploredCells.has(key)) {
+        this.exploredCells.add(key);
+        changed = true;
+      }
     }
+    if (changed) this.fogDirty = true;
   }
 
   isWorldVisible(x, y) {
@@ -126,7 +140,8 @@ class Expedition {
     const cell = this.visionCellSize;
     const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
     const fogCtx = this.fogCanvas.getContext('2d');
-    fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+    if (this.fogDirty) {
+      fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
 
     // 未探索区域使用深色蓝灰迷雾。
     fogCtx.globalCompositeOperation = 'source-over';
@@ -158,8 +173,10 @@ class Expedition {
     fogCtx.arc(px, py, radius * 1.08, 0, Math.PI * 2);
     fogCtx.fill();
 
-    fogCtx.globalCompositeOperation = 'source-over';
-    fogCtx.globalAlpha = 1;
+      fogCtx.globalCompositeOperation = 'source-over';
+      fogCtx.globalAlpha = 1;
+      this.fogDirty = false;
+    }
     ctx.drawImage(this.fogCanvas, 0, 0);
   }
 
@@ -277,7 +294,7 @@ class Expedition {
     }
   }
 
-  renderTerrain(ctx, cam) {
+  renderTerrainDirect(ctx, cam) {
     const theme = this.map.terrain;
     const viewW = CONFIG.canvas.width;
     const viewH = CONFIG.canvas.height;
@@ -418,6 +435,20 @@ class Expedition {
     vignette.addColorStop(1, 'rgba(0,0,0,.12)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, viewW, viewH);
+  }
+
+  renderTerrain(ctx, cam) {
+    const chunkSize = this.terrainChunkCache.chunkSize;
+    const minX = Math.max(0, Math.floor(cam.x / chunkSize));
+    const maxX = Math.min(Math.ceil(CONFIG.expedition.mapSize / chunkSize) - 1, Math.floor((cam.x + CONFIG.canvas.width) / chunkSize));
+    const minY = Math.max(0, Math.floor(cam.y / chunkSize));
+    const maxY = Math.min(Math.ceil(CONFIG.expedition.mapSize / chunkSize) - 1, Math.floor((cam.y + CONFIG.canvas.height) / chunkSize));
+    for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) {
+      const chunk = this.terrainChunkCache.get(cx, cy, (chunkCtx, worldX, worldY) => {
+        this.renderTerrainDirect(chunkCtx, { x: worldX, y: worldY });
+      });
+      ctx.drawImage(chunk, cx * chunkSize - cam.x, cy * chunkSize - cam.y);
+    }
   }
 
   getDepthScale(worldY) {
@@ -642,7 +673,7 @@ class Expedition {
   }
 
   collidesWithObstacle(x, y, radius = 0) {
-    return this.obstacles.some(obstacle => {
+    return this.obstacleSpatialHash.queryCircle(x, y, radius + 90).some(obstacle => {
       const dx = x - obstacle.x;
       const dy = y - obstacle.y;
       const minDistance = radius + obstacle.radius;
@@ -1247,6 +1278,12 @@ class Expedition {
   update(dt) {
     if (this.paused || this.gameOver) return;
     this.updateWorldSystems(dt);
+    this.fogUpdateTimer -= dt;
+    if (this.fogUpdateTimer <= 0) {
+      this.fogUpdateTimer += this.fogUpdateInterval;
+      this.fogDirty = true;
+    }
+    this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
 
     // 倒计时
     this.timeLeft -= dt;
@@ -1474,7 +1511,8 @@ class Expedition {
       if (t.state === 'player') {
         // 攻击怪物
         let nearest = null, minD = t.range;
-        this.monsters.forEach(m => {
+        this.entitySpatialHash.queryCircle(t.x, t.y, t.range).forEach(m => {
+          if (!this.monsters.includes(m)) return;
           const d = dist(t, m);
           if (d < minD) { minD = d; nearest = m; }
         });
@@ -1952,6 +1990,7 @@ class Expedition {
 
     // 粒子
     this.particles.forEach(p => {
+      if (window.PixiEffects?.graphics && (!p.type || p.type === 'smoke')) return;
       const sx = p.x - cam.x, sy = p.y - cam.y;
       const alpha = p.life / p.maxLife;
       if (p.type === 'aoe') {

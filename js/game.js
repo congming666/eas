@@ -77,6 +77,7 @@ const Game = {
     GameState.screen = 'expedition';
 
     this.expedition = new Expedition(GameState.selectedMap);
+    PixiEffects.init();
     GameState.expedition = this.expedition;
     const consumedCards = GameState.selectedBoostCards
       .map(id => GameState.cardInventory.find(card => card.id === id))
@@ -90,18 +91,28 @@ const Game = {
     }
     this.expedition.updateHUD();
     this.lastTime = performance.now();
+    this.accumulator = 0;
     this.gameLoop();
   },
 
   gameLoop() {
     const now = performance.now();
-    const dt = Math.min((now - this.lastTime) / 1000, 0.05);
+    const frameTime = Math.min((now - this.lastTime) / 1000, 0.25);
     this.lastTime = now;
 
     if (this.expedition && !this.expedition.gameOver) {
-      this.expedition.update(dt);
+      // Fixed 60 Hz simulation; rendering remains synchronized to the display refresh rate.
+      const fixedStep = 1 / 60;
+      this.accumulator = Math.min((this.accumulator || 0) + frameTime, fixedStep * 8);
+      let steps = 0;
+      while (this.accumulator >= fixedStep && steps < 8) {
+        this.expedition.update(fixedStep);
+        this.accumulator -= fixedStep;
+        steps++;
+      }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      this.expedition.render(ctx);
+      this.expedition.render(ctx, this.accumulator / fixedStep);
+      PixiEffects.render(this.expedition);
     }
 
     if (GameState.screen === 'expedition') {
@@ -113,6 +124,7 @@ const Game = {
     AudioManager.setScene('result');
     document.getElementById('lowHealthVignette').classList.remove('active');
     cancelAnimationFrame(this.animId);
+    PixiEffects.clear();
     document.getElementById('expeditionHUD').classList.add('hidden');
     document.getElementById('resultScreen').classList.remove('hidden');
 
