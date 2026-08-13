@@ -60,6 +60,13 @@ class Expedition {
     this.nextEventAt = 45;
     this.elapsed = 0;
     this.eventModifiers = { enemySpeed: 1, enemyDamage: 1, loot: 1, vision: 1 };
+    this.beastWave = {
+      wave: 0,
+      nextIn: 48,
+      active: false,
+      remaining: 0,
+      duration: 0
+    };
     this.camera = { x: 0, y: 0 };
     this.visionCellSize = 96;
     this.visionRadius = 360;
@@ -637,8 +644,9 @@ class Expedition {
       const position = this.findSafeSpawn(300, size - 300, 30);
       this.towers.push({
         x: position.x, y: position.y,
-        state: Math.random() < 0.4 ? 'neutral' : (Math.random() < 0.5 ? 'enemy' : 'broken'),
-        radius: 30, range: 200, damage: 8, attackCd: 0,
+        state: i === 0 ? 'neutral' : (Math.random() < 0.55 ? 'neutral' : (Math.random() < 0.72 ? 'enemy' : 'broken')),
+        radius: 30, range: 230, damage: 10 + this.map.tier * 2, attackCd: 0,
+        hp: 180 + this.map.tier * 55, maxHp: 180 + this.map.tier * 55,
         captureProgress: 0
       });
     }
@@ -674,6 +682,35 @@ class Expedition {
     };
     this.monsters.push(this.boss);
     showToast(`区域首领「${this.boss.name}」已现身`, 'warning');
+  }
+
+  spawnBeastWave() {
+    this.beastWave.wave++;
+    this.beastWave.active = true;
+    this.beastWave.duration = 32 + this.map.tier * 3;
+    const count = 5 + this.map.tier * 2 + this.beastWave.wave * 2;
+    const types = ['boar', 'locust', 'wolf'];
+    for (let i = 0; i < count; i++) {
+      const type = types[randInt(0, Math.min(types.length - 1, this.map.tier))];
+      const data = CONFIG.monsters[type];
+      const angle = Math.PI * 2 * i / count + rand(-0.22, 0.22);
+      const distance = rand(430, 620);
+      const x = clamp(this.player.x + Math.cos(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
+      const y = clamp(this.player.y + Math.sin(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
+      const hpScale = this.balance.enemyHp * (1 + this.beastWave.wave * 0.13);
+      this.monsters.push({
+        type, ...data, x, y,
+        hp: Math.round(data.hp * hpScale), maxHp: Math.round(data.hp * hpScale),
+        damage: Math.round(data.damage * this.balance.enemyDamage * (1 + this.beastWave.wave * 0.08)),
+        speed: data.speed * this.balance.enemySpeed * 1.08,
+        attackCd: 0, stunned: 0, target: null, vx: 0, vy: 0,
+        facing: angle + Math.PI, animTime: rand(0, 10), hitFlash: 0,
+        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true
+      });
+    }
+    this.beastWave.remaining = count;
+    this.screenShake = 1;
+    showToast(`第 ${this.beastWave.wave} 波兽潮来袭！立即进入已占领防御塔射程`, 'warning');
   }
 
   startMapEvent() {
@@ -901,9 +938,10 @@ class Expedition {
     }
     // 检查防御塔
     for (const tower of this.towers) {
-      if (tower.state === 'neutral' && dist(this.player, tower) < 50 && dist({x:worldMouseX,y:worldMouseY}, tower) < 40) {
+      if (tower.state !== 'player' && dist(this.player, tower) < 50 && dist({x:worldMouseX,y:worldMouseY}, tower) < 40) {
         tower.state = 'player';
-        showToast('占领防御塔！', 'success');
+        tower.hp = tower.maxHp;
+        showToast('防御塔已占领：进入射程可获得护盾减伤！', 'success');
         this.spawnAoeEffect(tower.x, tower.y, 50, '#7fff7f');
         return;
       }
@@ -1391,8 +1429,8 @@ class Expedition {
           if (d < minD) { minD = d; nearest = r; }
         });
         if (nearest) {
-          nearest.hp -= t.damage;
-          t.attackCd = 0.8;
+          nearest.hp -= t.damage * (this.beastWave.active ? 2.15 : 1);
+          t.attackCd = this.beastWave.active ? 0.42 : 0.72;
           this.projectiles.push({
             x: t.x, y: t.y,
             vx: (nearest.x - t.x) / minD * 400,
@@ -1462,6 +1500,12 @@ class Expedition {
 
   damagePlayer(amount) {
     if (this.player.invuln > 0) return;
+    const defendingTower = this.towers.find(t => t.state === 'player' && dist(t, this.player) <= t.range);
+    if (this.beastWave.active) {
+      amount *= defendingTower ? 0.38 : 1.45;
+    } else if (defendingTower) {
+      amount *= 0.76;
+    }
     this.player.hp -= amount;
     this.damageTaken += amount;
     this.screenShake = Math.min(1, this.screenShake + 0.48);
@@ -1563,7 +1607,12 @@ class Expedition {
     const objective = this.objective;
     const progress = Math.min(objective.progress, objective.target);
     const eventMarkup = this.activeEvent ? `<div class="mission-event" style="--event-color:${this.activeEvent.color}"><b>${this.activeEvent.name}</b><span>${Math.ceil(this.activeEvent.timeLeft)}s · ${this.activeEvent.text}</span></div>` : '<div class="mission-event dormant"><b>区域平静</b><span>探索可能触发地图事件</span></div>';
-    panel.innerHTML = `<div class="mission-label">远征任务</div><strong>${objective.title}${objective.complete ? ' · 已完成' : ''}</strong><span>${objective.description}</span><div class="mission-progress"><i style="width:${progress/objective.target*100}%"></i></div><small>${progress}/${objective.target}</small>${eventMarkup}${this.boss && this.boss.hp > 0 ? `<div class="boss-hud"><b>${this.boss.name}</b><span>阶段 ${this.boss.phase}</span><i style="width:${this.boss.hp/this.boss.maxHp*100}%"></i></div>` : ''}`;
+    const ownedTowers = this.towers.filter(t => t.state === 'player').length;
+    const protectedByTower = this.towers.some(t => t.state === 'player' && dist(t, this.player) <= t.range);
+    const waveMarkup = this.beastWave.active
+      ? `<div class="wave-status active"><b>⚠ 第 ${this.beastWave.wave} 波兽潮</b><span>剩余 ${this.beastWave.remaining} 只 · ${protectedByTower ? '防御塔护盾生效' : '未受保护，伤害提升'}</span></div>`
+      : `<div class="wave-status"><b>兽潮预警 ${Math.ceil(this.beastWave.nextIn)}s</b><span>已占塔 ${ownedTowers} · 提前进入绿色射程</span></div>`;
+    panel.innerHTML = `<div class="mission-label">远征任务</div><strong>${objective.title}${objective.complete ? ' · 已完成' : ''}</strong><span>${objective.description}</span><div class="mission-progress"><i style="width:${progress/objective.target*100}%"></i></div><small>${progress}/${objective.target}</small>${waveMarkup}${eventMarkup}${this.boss && this.boss.hp > 0 ? `<div class="boss-hud"><b>${this.boss.name}</b><span>阶段 ${this.boss.phase}</span><i style="width:${this.boss.hp/this.boss.maxHp*100}%"></i></div>` : ''}`;
   }
 
   updateHUD() {
@@ -1931,6 +1980,19 @@ class Expedition {
 
   updateWorldSystems(dt) {
     this.elapsed += dt;
+    const waveMonsters = this.monsters.filter(monster => monster.beastWave && monster.hp > 0);
+    this.beastWave.remaining = waveMonsters.length;
+    if (this.beastWave.active) {
+      if (waveMonsters.length === 0) {
+        this.beastWave.active = false;
+        this.beastWave.nextIn = Math.max(58, 92 - this.map.tier * 4);
+        GameState.gold += 20 * this.beastWave.wave * this.map.tier;
+        showToast(`第 ${this.beastWave.wave} 波兽潮已击退，获得守塔奖励`, 'success');
+      }
+    } else {
+      this.beastWave.nextIn -= dt;
+      if (this.beastWave.nextIn <= 0) this.spawnBeastWave();
+    }
     if (this.elapsed >= this.nextEventAt && !this.activeEvent) {
       this.startMapEvent();
       this.nextEventAt += 90 + rand(0, 35);
@@ -2134,8 +2196,8 @@ class Expedition {
     }
     if (!prompt) {
       for (const tower of this.towers) {
-        if (tower.state === 'neutral' && dist(this.player, tower) < 60) {
-          prompt = { x: tower.x, y: tower.y - 40, text: '点击占领防御塔' };
+        if (tower.state !== 'player' && dist(this.player, tower) < 60) {
+          prompt = { x: tower.x, y: tower.y - 40, text: tower.state === 'broken' ? '点击修复并占领防御塔' : '点击占领防御塔' };
           break;
         }
       }

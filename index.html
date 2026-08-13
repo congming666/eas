@@ -1101,6 +1101,8 @@
   .weapon-controls-tip { position:absolute;left:18px;bottom:164px;z-index:35;padding:5px 8px;color:#c7d4ca;background:rgba(8,17,15,.78);border:1px solid rgba(255,255,255,.1);border-radius:4px;font-size:9px;pointer-events:none; }
   .mission-progress { height:5px; overflow:hidden; background:#17211e; border-radius:3px; } .mission-progress i { display:block;height:100%;background:linear-gradient(90deg,#48aa72,#b5e66e); }
   .mission-event { margin-top:5px;padding-top:7px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:2px; } .mission-event b { color:var(--event-color,#7fe3a7);font-size:11px; } .mission-event span { color:#b9c6be;font-size:9px; } .mission-event.dormant { opacity:.58; }
+  .wave-status { margin-top:7px;padding:6px 7px;border:1px solid rgba(219,171,74,.35);background:rgba(84,57,18,.24);display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 0 12px rgba(224,168,49,.08); }
+  .wave-status b { color:#f1cc6c;font-size:11px; }.wave-status span{color:#d3c49b;font-size:9px}.wave-status.active{border-color:#ef665b;background:rgba(115,28,24,.38);animation:wavePulse .75s ease-in-out infinite alternate}.wave-status.active b{color:#ff8a75}.wave-status.active span{color:#ffe0d5}@keyframes wavePulse{to{box-shadow:0 0 14px rgba(255,72,55,.25),inset 0 0 12px rgba(255,91,66,.12)}}
   .boss-hud { margin-top:4px;display:grid;grid-template-columns:1fr auto;gap:3px;color:#e9c6ff;font-size:9px; }.boss-hud i{grid-column:1/-1;height:5px;background:linear-gradient(90deg,#934fc4,#ee7d86);}
   .modal-overlay {
     z-index: 80;
