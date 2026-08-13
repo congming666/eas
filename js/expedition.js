@@ -74,6 +74,10 @@ class Expedition {
     this.fogCanvas = document.createElement('canvas');
     this.fogCanvas.width = CONFIG.canvas.width;
     this.fogCanvas.height = CONFIG.canvas.height;
+    this.bossSprites = {};
+    const t1BossSprite = new Image();
+    t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
+    this.bossSprites.t1 = t1BossSprite;
     this.screenShake = 0;
     this.sunVector = [
       { x: 0.72, y: 0.38 }, { x: 0.82, y: 0.28 },
@@ -509,7 +513,8 @@ class Expedition {
 
   renderMonster(ctx, monster, cam) {
     const sx = monster.x - cam.x, sy = monster.y - cam.y;
-    if (sx < -90 || sx > CONFIG.canvas.width + 90 || sy < -100 || sy > CONFIG.canvas.height + 90) return;
+    const cullMargin = monster.type === 'boss' ? 180 : 90;
+    if (sx < -cullMargin || sx > CONFIG.canvas.width + cullMargin || sy < -cullMargin || sy > CONFIG.canvas.height + cullMargin) return;
     const scale = (monster.elite ? 1.18 : 1) * (monster.radius / 18) * this.getDepthScale(monster.y);
     const stride = Math.sin(monster.animTime || 0);
     const hpPct = clamp(monster.hp / monster.maxHp, 0, 1);
@@ -517,6 +522,43 @@ class Expedition {
     const lift = monster.visualZ || 0;
     this.renderCastShadow(ctx, monster.x, monster.y, 28 * scale, 28 * scale, 0.38, lift);
     ctx.translate(sx, sy - lift);
+
+    // T1 Boss 使用三视图定制的伪 3D 透明素材，并保留实时阴影、受击和血条反馈。
+    if (monster.type === 'boss' && this.map.tier === 1 && this.bossSprites.t1?.complete) {
+      const bossImage = this.bossSprites.t1;
+      const bossScale = this.getDepthScale(monster.y) * (1 + Math.sin(monster.animTime * 2.2) * .018);
+      const drawW = 190 * bossScale;
+      const drawH = drawW * bossImage.naturalHeight / bossImage.naturalWidth;
+      ctx.save();
+      ctx.scale(1, .42);
+      const bossShadow = ctx.createRadialGradient(8, 18, 8, 8, 18, drawW * .44);
+      bossShadow.addColorStop(0, 'rgba(0,0,0,.68)');
+      bossShadow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = bossShadow;
+      ctx.beginPath(); ctx.arc(8, 18, drawW * .44, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(0, Math.sin(monster.animTime * 2.2) * 1.5);
+      if (monster.hitFlash > 0) {
+        ctx.shadowColor = '#fff4cf';
+        ctx.shadowBlur = 26;
+        ctx.globalAlpha = .9;
+      }
+      ctx.drawImage(bossImage, -drawW * .5, -drawH + 25 * bossScale, drawW, drawH);
+      ctx.restore();
+      ctx.restore();
+
+      const bossBarW = 112;
+      const bossBarY = sy - drawH + 10;
+      ctx.fillStyle = 'rgba(8,10,12,.9)'; ctx.beginPath(); ctx.roundRect(sx - bossBarW/2 - 3, bossBarY - 3, bossBarW + 6, 12, 5); ctx.fill();
+      const bossHp = ctx.createLinearGradient(sx-bossBarW/2, 0, sx+bossBarW/2, 0);
+      bossHp.addColorStop(0, '#759c42'); bossHp.addColorStop(1, '#d6b755');
+      ctx.fillStyle = bossHp; ctx.beginPath(); ctx.roundRect(sx - bossBarW/2, bossBarY, bossBarW * hpPct, 6, 3); ctx.fill();
+      ctx.fillStyle = '#f1dfaa'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(monster.name || '苔岩裂颚兽', sx, bossBarY - 8);
+      return;
+    }
 
     // Soft contact shadow anchors the creature to the terrain.
     ctx.save();
@@ -673,7 +715,7 @@ class Expedition {
     this.bossSpawned = true;
     const position = this.findSafeSpawn(650, CONFIG.expedition.mapSize - 350, 46);
     this.boss = {
-      type:'boss', name:['青木山君','鎏金守将','霜脉巨灵','紫月灾兽'][this.map.tier-1],
+      type:'boss', name:['苔岩裂颚兽','鎏金守将','霜脉巨灵','紫月灾兽'][this.map.tier-1],
       x:position.x, y:position.y, radius:46,
       hp:this.balance.bossHp, maxHp:this.balance.bossHp,
       damage:this.balance.bossDamage, speed:76 + this.map.tier * 5,
