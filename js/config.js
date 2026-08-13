@@ -84,10 +84,10 @@ const CONFIG = {
   },
   crops: [
     { id: 'pea_shooter', name: '豌豆射手', icon: '🫛', growTime: 24, sellPrice: 12, seedPrice: 8, rarity: 'rare', cardChance: 1, upgradeSkill: 'straw_smash', rewardType: 'attack_card', rewardLabel: '必得攻击卡' },
-    { id: 'sunflower', name: '向日葵', icon: '🌻', growTime: 18, sellPrice: 45, seedPrice: 6, rarity: 'common', cardChance: 0, upgradeSkill: 'straw_smash', rewardType: 'gold', rewardLabel: '大量金币' },
-    { id: 'watermelon', name: '西瓜', icon: '🍉', growTime: 36, sellPrice: 20, seedPrice: 15, rarity: 'rare', cardChance: 1, upgradeSkill: 'all', rewardType: 'skill_card', rewardLabel: '基础技能卡' },
+    { id: 'sunflower', name: '向日葵', icon: '🌻', growTime: 18, sellPrice: 45, seedPrice: 6, rarity: 'common', cardChance: 1, upgradeSkill: 'all', rewardType: 'skill_card', rewardLabel: '永久技能强化卡' },
+    { id: 'watermelon', name: '西瓜', icon: '🍉', growTime: 36, sellPrice: 20, seedPrice: 15, rarity: 'rare', cardChance: 1, upgradeSkill: 'all', rewardType: 'consumable_skill_card', rewardLabel: '一次性技能卡' },
     { id: 'cabbage', name: '卷心菜', icon: '🥬', growTime: 28, sellPrice: 18, seedPrice: 10, rarity: 'common', cardChance: 0, upgradeSkill: 'earth_dash', rewardType: 'healing', rewardLabel: '草药包扎包' },
-    { id: 'wheat', name: '小麦', icon: '🌾', growTime: 15, sellPrice: 15, seedPrice: 5, rarity: 'common', cardChance: 0.10, upgradeSkill: 'straw_smash' },
+    { id: 'wheat', name: '小麦', icon: '🌾', growTime: 15, sellPrice: 15, seedPrice: 5, rarity: 'common', cardChance: 0, upgradeSkill: null, rewardType: 'gold', rewardLabel: '金币' },
     { id: 'carrot', name: '胡萝卜', icon: '🥕', growTime: 20, sellPrice: 25, seedPrice: 10, rarity: 'common', cardChance: 0.14, upgradeSkill: 'earth_dash' },
     { id: 'corn', name: '玉米', icon: '🌽', growTime: 30, sellPrice: 45, seedPrice: 15, rarity: 'rare', cardChance: 0.20, upgradeSkill: 'vine_bind' },
     { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen' },

@@ -124,7 +124,15 @@ const Farm = {
       const card = CardSystem.createCard(crop);
       GameState.cardInventory.push(card);
       CardSystem.showDrop(card);
-      rewardText = `${card.name} x1`;
+      rewardText = `强化技能卡：${card.name} x1`;
+    } else if (crop.rewardType === 'consumable_skill_card') {
+      const card = CardSystem.createCard(crop);
+      card.singleUse = true;
+      card.name = `${card.name}（一次性）`;
+      card.desc = `本次远征可使用一次：临时提升「${CONFIG.skills.find(skill => skill.id === card.skillId)?.name || '随机技能'}」${card.power}级，撤离后消耗。`;
+      GameState.cardInventory.push(card);
+      CardSystem.showDrop(card);
+      rewardText = `一次性技能卡：${card.name} x1`;
     } else {
       CardSystem.tryDrop(crop);
     }

@@ -78,6 +78,16 @@ const Game = {
 
     this.expedition = new Expedition(GameState.selectedMap);
     GameState.expedition = this.expedition;
+    const consumedCards = GameState.selectedBoostCards
+      .map(id => GameState.cardInventory.find(card => card.id === id))
+      .filter(card => card?.singleUse);
+    if (consumedCards.length) {
+      const consumedIds = new Set(consumedCards.map(card => card.id));
+      GameState.cardInventory = GameState.cardInventory.filter(card => !consumedIds.has(card.id));
+      GameState.selectedBoostCards = GameState.selectedBoostCards.filter(id => !consumedIds.has(id));
+      showToast(`已消耗 ${consumedCards.length} 张一次性技能卡，本次远征生效`, 'gold');
+      SaveSystem.save();
+    }
     this.expedition.updateHUD();
     this.lastTime = performance.now();
     this.gameLoop();

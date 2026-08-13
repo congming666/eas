@@ -249,26 +249,27 @@ class Expedition {
     ctx.fillStyle = this.map.bgColor;
     ctx.fillRect(0, 0, viewW, viewH);
 
-    // World-aligned tactical grid: small cells plus a stronger line every five cells.
-    const gridSize = this.map.gridSize || 48;
+    // World-aligned grass tiles: full-screen tiled ground without visible square grid lines.
+    const gridSize = this.map.gridSize || 96;
     const offsetX = ((-cam.x % gridSize) + gridSize) % gridSize;
     const offsetY = ((-cam.y % gridSize) + gridSize) % gridSize;
     const firstWorldColumn = Math.floor(cam.x / gridSize);
     const firstWorldRow = Math.floor(cam.y / gridSize);
     ctx.save();
-    for (let x = offsetX - gridSize, column = firstWorldColumn - 1; x <= viewW + gridSize; x += gridSize, column++) {
-      const major = ((column % 5) + 5) % 5 === 0;
-      ctx.strokeStyle = major ? this.map.majorGridColor : this.map.gridColor;
-      ctx.globalAlpha = major ? 0.62 : 0.34;
-      ctx.lineWidth = major ? 1.8 : 1;
-      ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, viewH); ctx.stroke();
-    }
     for (let y = offsetY - gridSize, row = firstWorldRow - 1; y <= viewH + gridSize; y += gridSize, row++) {
-      const major = ((row % 5) + 5) % 5 === 0;
-      ctx.strokeStyle = major ? this.map.majorGridColor : this.map.gridColor;
-      ctx.globalAlpha = major ? 0.62 : 0.34;
-      ctx.lineWidth = major ? 1.8 : 1;
-      ctx.beginPath(); ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(viewW, Math.round(y) + 0.5); ctx.stroke();
+      for (let x = offsetX - gridSize, column = firstWorldColumn - 1; x <= viewW + gridSize; x += gridSize, column++) {
+        const shade = ((column * 17 + row * 31) & 3) * 0.012;
+        ctx.fillStyle = `rgba(255,255,255,${shade})`;
+        ctx.fillRect(x, y, gridSize + 1, gridSize + 1);
+        ctx.fillStyle = this.map.gridColor;
+        ctx.globalAlpha = 0.16;
+        for (let i = 0; i < 3; i++) {
+          const bladeX = x + 18 + ((column * 13 + row * 7 + i * 21) % (gridSize - 26));
+          const bladeY = y + 18 + ((row * 11 + column * 5 + i * 17) % (gridSize - 26));
+          ctx.beginPath(); ctx.moveTo(bladeX, bladeY + 5); ctx.lineTo(bladeX + 3, bladeY - 3); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
     }
     const light = ctx.createLinearGradient(0, 0, 0, viewH);
     light.addColorStop(0, 'rgba(255,255,255,.045)');
