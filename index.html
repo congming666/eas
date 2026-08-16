@@ -19,8 +19,8 @@
   }
   #gameContainer {
     position: relative;
-    width: 1280px;
-    height: 720px;
+    width: min(1280px, 100vw);
+    height: min(720px, 100vh);
     background: #0f0f1a;
     border: 2px solid #4a4a6a;
     border-radius: 8px;
@@ -921,9 +921,11 @@
       #091310;
     align-items: stretch;
     justify-content: flex-start;
+    overflow: hidden;
   }
   .prep-header {
     height: 70px;
+    flex: 0 0 70px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -934,12 +936,32 @@
   .prep-title h2 { font-size: 23px; color: #effff4; }
   .prep-title p { margin-top: 3px; color: #829b8e; font-size: 10px; letter-spacing: 1px; }
   .prep-content {
-    height: calc(100% - 70px);
+    height: auto;
+    flex: 1;
+    min-height: 0;
     display: grid;
     grid-template-columns: 1.15fr .85fr;
     gap: 16px;
-    padding: 16px;
+    padding: 16px 12px 84px 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-content: start;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #6eb88e rgba(5,14,12,.55);
   }
+  .prep-content::-webkit-scrollbar { width: 10px; }
+  .prep-content::-webkit-scrollbar-track {
+    background: rgba(5,14,12,.55);
+    border-left: 1px solid rgba(126,205,159,.12);
+  }
+  .prep-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(#81d5a4, #477c60);
+    border: 2px solid rgba(5,14,12,.75);
+    border-radius: 8px;
+  }
+  .prep-content::-webkit-scrollbar-thumb:hover { background: linear-gradient(#9be8ba, #579873); }
   .prep-column { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
   .prep-panel {
     padding: 14px;
@@ -975,7 +997,15 @@
   .boost-card.selected { outline:2px solid #7fffb1; outline-offset:2px; background:linear-gradient(145deg, rgba(76,138,93,.28), rgba(25,45,34,.96)); }
   .boost-card .boost-check { position:absolute; top:4px; right:5px; color:#83f2b2; font-size:12px; }
   .boost-count { color:#f1cf79; font-size:12px; font-weight:800; }
-  .prep-actions { display: flex; gap: 10px; }
+  .prep-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    display: flex;
+    gap: 10px;
+    padding: 12px 0 4px;
+    background: linear-gradient(transparent, rgba(8,22,18,.96) 30%);
+  }
   .prep-actions .start-expedition-btn { flex: 1; }
   .secondary-btn {
     width: 150px;
@@ -986,6 +1016,11 @@
     background: rgba(255,255,255,.045);
     cursor: pointer;
     font-family: inherit;
+  }
+
+  @media (max-height: 760px) {
+    .prep-header { height: 62px; flex-basis: 62px; }
+    .prep-content { padding-top: 12px; }
   }
 
   /* ==================== v1.3 农耕纸张 / 灾变帆布主题 ==================== */
