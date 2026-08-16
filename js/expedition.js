@@ -42,6 +42,9 @@ class Expedition {
     this.groundLoot = [];
     this.projectiles = [];
     this.particles = [];
+    this.damageNumbers = [];
+    this.hitStop = 0;
+    this.killFlash = 0;
     this.extractPoints = [];
     this.bag = []; // 背包物资
     this.safeBox = []; // 安全箱（阵亡保留）
@@ -137,41 +140,26 @@ class Expedition {
   }
 
   renderFogOfWar(ctx) {
-    const cell = this.visionCellSize;
     const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
     const fogCtx = this.fogCanvas.getContext('2d');
     if (this.fogDirty) {
       fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
-
-    // 未探索区域使用深色蓝灰迷雾。
-    fogCtx.globalCompositeOperation = 'source-over';
-    fogCtx.globalAlpha = 1;
-    fogCtx.fillStyle = 'rgba(8,14,22,.72)';
-    fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
-
-    // 已探索区域保留轻雾，不能再直接擦除主游戏画布。
-    fogCtx.globalCompositeOperation = 'destination-out';
-    fogCtx.globalAlpha = 0.72;
-    this.exploredCells.forEach(key => {
-      const [cx, cy] = key.split(',').map(Number);
-      const sx = cx * cell - this.camera.x, sy = cy * cell - this.camera.y;
+      // 单张连续迷雾：当前视野完全透明，视野外统一遮盖，不再按探索格画圆形泡泡。
+      fogCtx.globalCompositeOperation = 'source-over';
+      fogCtx.globalAlpha = 1;
+      fogCtx.fillStyle = 'rgba(10,16,24,.78)';
+      fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+      fogCtx.globalCompositeOperation = 'destination-out';
+      const px = this.player.x - this.camera.x;
+      const py = this.player.y - this.camera.y;
+      const clearVision = fogCtx.createRadialGradient(px, py, radius * .82, px, py, radius * 1.08);
+      clearVision.addColorStop(0, 'rgba(0,0,0,1)');
+      clearVision.addColorStop(.78, 'rgba(0,0,0,1)');
+      clearVision.addColorStop(1, 'rgba(0,0,0,0)');
+      fogCtx.fillStyle = clearVision;
       fogCtx.beginPath();
-      fogCtx.arc(sx + cell / 2, sy + cell / 2, cell * 1.05, 0, Math.PI * 2);
+      fogCtx.arc(px, py, radius * 1.08, 0, Math.PI * 2);
       fogCtx.fill();
-    });
-
-    // 当前玩家视野完全清晰，边缘做柔和过渡。
-    fogCtx.globalAlpha = 1;
-    const px = this.player.x - this.camera.x;
-    const py = this.player.y - this.camera.y;
-    const clearVision = fogCtx.createRadialGradient(px, py, radius * .72, px, py, radius * 1.08);
-    clearVision.addColorStop(0, 'rgba(0,0,0,1)');
-    clearVision.addColorStop(0.72, 'rgba(0,0,0,.96)');
-    clearVision.addColorStop(1, 'rgba(0,0,0,0)');
-    fogCtx.fillStyle = clearVision;
-    fogCtx.beginPath();
-    fogCtx.arc(px, py, radius * 1.08, 0, Math.PI * 2);
-    fogCtx.fill();
 
       fogCtx.globalCompositeOperation = 'source-over';
       fogCtx.globalAlpha = 1;
@@ -773,7 +761,7 @@ class Expedition {
     this.beastWave.wave++;
     this.beastWave.active = true;
     this.beastWave.duration = 32 + this.map.tier * 3;
-    const count = 5 + this.map.tier * 2 + this.beastWave.wave * 2;
+    const count = Math.min(42, 10 + this.map.tier * 4 + this.beastWave.wave * 4);
     const types = ['boar', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
       const type = types[randInt(0, Math.min(types.length - 1, this.map.tier))];
@@ -908,10 +896,8 @@ class Expedition {
     if (skill.id === 'straw_smash') {
       [...this.monsters, ...this.raiders].forEach(m => {
         if (dist(m, this.player) < skill.range) {
-          m.hp -= skill.damage;
-          m.hitFlash = 0.16;
+          this.damageEnemy(m, skill.damage, '#f2c45b', true);
           m.stunned = 0.5;
-          this.spawnHitParticles(m.x, m.y, '#7fff7f');
         }
       });
       this.spawnAoeEffect(px, py, skill.range, '#f2c45b', 'ring');
@@ -953,9 +939,7 @@ class Expedition {
     } else if (id === 'thorn_storm') {
       [...this.monsters, ...this.raiders].forEach(m => {
         if (dist(m, this.player) < item.range) {
-          m.hp -= item.damage;
-          m.hitFlash = 0.16;
-          this.spawnHitParticles(m.x, m.y, '#aa5500');
+          this.damageEnemy(m, item.damage, '#ff9a55', true);
         }
       });
       this.consumables[id]--;
@@ -1005,9 +989,17 @@ class Expedition {
     const target = candidates[0];
     this.groundLoot.splice(target.index, 1);
     const { x, y, bob, ...item } = target.item;
-    this.bag.push(item);
-    this.spawnAoeEffect(x, y, 34, '#f6c75b');
-    showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
+    if (item.type === 'invincible') {
+      this.player.invuln = Math.max(this.player.invuln, item.duration || 5);
+      this.player.slow = 0;
+      this.spawnAoeEffect(x, y, 70, '#7de7ff');
+      this.spawnRadialBurst(x, y, '#e6fbff', 22);
+      showToast('无敌核心生效：5 秒内免疫一切伤害和控制！', 'success');
+    } else {
+      this.bag.push(item);
+      this.spawnAoeEffect(x, y, 34, '#f6c75b');
+      showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
+    }
     this.updateHUD();
   }
 
@@ -1058,9 +1050,8 @@ class Expedition {
           const mAngle = Math.atan2(m.y - this.player.y, m.x - this.player.x);
           const angleDiff = Math.abs(((mAngle - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
           if (angleDiff < Math.PI / 2) {
-            m.hp -= this.weapon.damage; m.hitFlash = 0.16; m.stunned = 0.2;
+            this.damageEnemy(m, this.weapon.damage, this.weapon.color, true); m.stunned = 0.2;
             m.visualVz = Math.max(m.visualVz || 0, 105);
-            this.spawnHitParticles(m.x, m.y, this.weapon.color);
           }
         }
       });
@@ -1192,12 +1183,32 @@ class Expedition {
   }
 
   spawnHitParticles(x, y, color) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 11; i++) {
       this.particles.push({
-        x, y, vx: rand(-100, 100), vy: rand(-100, 100),
-        life: 0.4, maxLife: 0.4, color, size: rand(2, 5)
+        x, y, vx: rand(-175, 175), vy: rand(-175, 175),
+        life: 0.46, maxLife: 0.46, color, size: rand(2, 6)
       });
     }
+  }
+
+  damageEnemy(target, amount, color = '#ffffff', heavy = false) {
+    if (!target || target.hp <= 0) return;
+    target.hp -= amount;
+    target.hitFlash = heavy ? 0.22 : 0.14;
+    this.damageNumbers.push({
+      x: target.x + rand(-8, 8), y: target.y - target.radius - 8,
+      value: Math.round(amount), color, life: 0.72, maxLife: 0.72,
+      vx: rand(-10, 10), vy: heavy ? -64 : -48, heavy
+    });
+    this.spawnHitParticles(target.x, target.y, color);
+    this.hitStop = Math.max(this.hitStop, heavy ? 0.065 : 0.032);
+  }
+
+  spawnKillFeedback(target) {
+    this.killFlash = Math.max(this.killFlash, target.type === 'boss' ? 0.22 : 0.11);
+    this.hitStop = Math.max(this.hitStop, target.type === 'boss' ? 0.13 : 0.07);
+    this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 1 : 0.65);
+    this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 30 : 18);
   }
 
   spawnAoeEffect(x, y, radius, color) {
@@ -1373,7 +1384,7 @@ class Expedition {
       trap.phase += dt;
       if (trap.triggerCd <= 0 && dist(this.player, trap) < trap.radius) {
         trap.triggerCd = trap.cooldown;
-        this.player.slow = Math.max(this.player.slow, trap.slow);
+        if (this.player.invuln <= 0) this.player.slow = Math.max(this.player.slow, trap.slow);
         this.damagePlayer(trap.damage + Math.max(0, this.map.tier - 1) * 2);
         this.spawnAoeEffect(trap.x, trap.y, trap.radius, trap.color);
         showToast(`触发陷阱：${trap.name}！`, 'warning');
@@ -1404,7 +1415,7 @@ class Expedition {
       if (m.stunned > 0) return;
 
       const d = dist(m, this.player);
-      const canSee = this.player.stealth <= 0 && d < 400;
+      const canSee = this.beastWave.active || (this.player.stealth <= 0 && d < 400);
 
       if (canSee) {
         // 追击
@@ -1442,6 +1453,7 @@ class Expedition {
     this.monsters = this.monsters.filter(m => {
       if (m.hp <= 0) {
         this.killCount++;
+        this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff4444');
         if (m.type === 'boss') {
           this.spawnGroundLoot({ type: 'material', name: '首领核心', amount: 2 + this.map.tier, icon: '◆' }, m.x + 18, m.y);
@@ -1452,6 +1464,9 @@ class Expedition {
         // 掉落
         if (Math.random() < 0.3) {
           this.spawnGroundLoot({ type: 'gold', name: '金币', amount: m.gold || 5, icon: '💰' }, m.x, m.y);
+        }
+        if (m.type !== 'boss' && Math.random() < 0.055) {
+          this.spawnGroundLoot({ type: 'invincible', name: '无敌核心', amount: 1, icon: '🛡️', duration: 5 }, m.x, m.y);
         }
         return false;
       }
@@ -1521,7 +1536,7 @@ class Expedition {
           if (d < minD) { minD = d; nearest = r; }
         });
         if (nearest) {
-          nearest.hp -= t.damage * (this.beastWave.active ? 2.15 : 1);
+          this.damageEnemy(nearest, t.damage * (this.beastWave.active ? 2.15 : 1), '#8affb5');
           t.attackCd = this.beastWave.active ? 0.42 : 0.72;
           this.projectiles.push({
             x: t.x, y: t.y,
@@ -1549,12 +1564,10 @@ class Expedition {
         for (const target of [...this.monsters, ...this.raiders]) {
           if (target.hp <= 0 || p.hit.includes(target)) continue;
           if (dist(p, target) < target.radius + p.radius) {
-            target.hp -= p.damage;
-            target.hitFlash = 0.16;
+            this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff');
             target.visualVz = Math.max(target.visualVz || 0, p.weaponId === 'vine_staff' ? 82 : 52);
             p.hit.push(target);
             p.pierce--;
-            this.spawnHitParticles(target.x, target.y, p.color);
             if (p.weaponId === 'vine_staff') target.stunned = Math.max(target.stunned || 0, 0.18);
             if (p.pierce <= 0) return false;
           }
@@ -1576,6 +1589,14 @@ class Expedition {
       }
       return p.life > 0;
     });
+    this.damageNumbers = this.damageNumbers.filter(number => {
+      number.life -= dt;
+      number.x += number.vx * dt;
+      number.y += number.vy * dt;
+      number.vy += 72 * dt;
+      return number.life > 0;
+    });
+    this.killFlash = Math.max(0, this.killFlash - dt);
 
     // 撤离读条
     if (this.extracting) {
@@ -1620,6 +1641,15 @@ class Expedition {
     this.renderCastShadow(ctx, this.player.x, this.player.y, 34 * depthScale, 44 * depthScale, 0.42, lift);
     ctx.save();
     ctx.translate(sx, sy + bob - lift);
+    if (this.player.invuln > 0) {
+      ctx.save();
+      ctx.scale(1 / (0.6 * depthScale), 1 / (0.6 * depthScale));
+      ctx.strokeStyle = `rgba(125,231,255,${0.55 + Math.sin(this.elapsed * 10) * .2})`;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#7de7ff'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(0, 20, 34, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     ctx.scale(0.6 * depthScale, 0.6 * depthScale);
     if (facingLeft) ctx.scale(-1, 1);
 
@@ -1834,7 +1864,8 @@ class Expedition {
       if (sx < -50 || sx > CONFIG.canvas.width + 50 || sy < -50 || sy > CONFIG.canvas.height + 50) return;
       const near = dist(this.player, item) < 115;
       const glow = ctx.createRadialGradient(sx, sy, 2, sx, sy, 28);
-      glow.addColorStop(0, near ? 'rgba(246,199,91,.42)' : 'rgba(246,199,91,.24)');
+      const lootGlow = item.type === 'invincible' ? 'rgba(90,225,255,' : 'rgba(246,199,91,';
+      glow.addColorStop(0, `${lootGlow}${near ? '.52)' : '.28)'}`);
       glow.addColorStop(1, 'rgba(246,199,91,0)');
       ctx.fillStyle = glow;
       ctx.fillRect(sx - 30, sy - 30, 60, 60);
@@ -2039,6 +2070,30 @@ class Expedition {
         ctx.globalAlpha = 1;
       }
     });
+
+    // 伤害跳字：上浮、渐隐，重击字号更大。
+    this.damageNumbers.forEach(number => {
+      const sx = number.x - cam.x, sy = number.y - cam.y;
+      const alpha = clamp(number.life / number.maxLife, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = `${number.heavy ? 'bold 20px' : 'bold 15px'} sans-serif`;
+      ctx.textAlign = 'center'; ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(18,12,12,.85)';
+      ctx.strokeText(`-${number.value}`, sx, sy);
+      ctx.fillStyle = number.color;
+      ctx.fillText(`-${number.value}`, sx, sy);
+      ctx.restore();
+    });
+
+    if (this.killFlash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = clamp(this.killFlash * 4.2, 0, .42);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+      ctx.restore();
+    }
 
     // 战争迷雾：只保留已探索格与当前视野，未到达区域不显示实体信息。
     this.renderFogOfWar(ctx);

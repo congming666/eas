@@ -101,6 +101,14 @@ const Game = {
     this.lastTime = now;
 
     if (this.expedition && !this.expedition.gameOver) {
+      if (this.expedition.hitStop > 0) {
+        this.expedition.hitStop = Math.max(0, this.expedition.hitStop - frameTime);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        this.expedition.render(ctx, 0);
+        PixiEffects.render(this.expedition);
+        this.animId = requestAnimationFrame(() => this.gameLoop());
+        return;
+      }
       // Fixed 60 Hz simulation; rendering remains synchronized to the display refresh rate.
       const fixedStep = 1 / 60;
       this.accumulator = Math.min((this.accumulator || 0) + frameTime, fixedStep * 8);
