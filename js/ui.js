@@ -135,6 +135,7 @@ const AudioManager = {
   volume: 0.24,
   scene: 'menu',
   step: 0,
+  lastHitSfxAt: 0,
 
   init() {
     if (this.ctx) {
@@ -199,6 +200,53 @@ const AudioManager = {
     amp.connect(this.master);
     osc.start(now);
     osc.stop(now + duration + 0.08);
+  },
+
+  playMonsterHit(kind = 'normal') {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    const minGap = kind === 'kill' ? 0 : 0.025;
+    if (now - this.lastHitSfxAt < minGap) return;
+    this.lastHitSfxAt = now;
+
+    const presets = {
+      normal: { start: 185, end: 105, duration: .075, gain: .085, noise: .045 },
+      heavy: { start: 132, end: 62, duration: .12, gain: .12, noise: .072 },
+      kill: { start: 96, end: 38, duration: .19, gain: .15, noise: .095 },
+    };
+    const preset = presets[kind] || presets.normal;
+    const pitch = 1 + (Math.random() - .5) * .12;
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    osc.type = kind === 'normal' ? 'square' : 'sawtooth';
+    osc.frequency.setValueAtTime(preset.start * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(preset.end * pitch, now + preset.duration);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(kind === 'kill' ? 720 : 1050, now);
+    oscGain.gain.setValueAtTime(preset.gain, now);
+    oscGain.gain.exponentialRampToValueAtTime(.0001, now + preset.duration);
+    osc.connect(filter); filter.connect(oscGain); oscGain.connect(this.master);
+
+    const frameCount = Math.max(1, Math.floor(this.ctx.sampleRate * preset.duration));
+    const noiseBuffer = this.ctx.createBuffer(1, frameCount, this.ctx.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < frameCount; i++) {
+      const envelope = 1 - i / frameCount;
+      noiseData[i] = (Math.random() * 2 - 1) * envelope;
+    }
+    const noise = this.ctx.createBufferSource();
+    const noiseFilter = this.ctx.createBiquadFilter();
+    const noiseGain = this.ctx.createGain();
+    noise.buffer = noiseBuffer;
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = kind === 'kill' ? 420 : 760;
+    noiseFilter.Q.value = .75;
+    noiseGain.gain.setValueAtTime(preset.noise, now);
+    noiseGain.gain.exponentialRampToValueAtTime(.0001, now + preset.duration);
+    noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(this.master);
+    osc.start(now); noise.start(now);
+    osc.stop(now + preset.duration + .02); noise.stop(now + preset.duration + .02);
   },
 
   tick() {

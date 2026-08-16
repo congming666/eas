@@ -1202,6 +1202,7 @@ class Expedition {
     });
     this.spawnHitParticles(target.x, target.y, color);
     this.hitStop = Math.max(this.hitStop, heavy ? 0.065 : 0.032);
+    AudioManager.playMonsterHit(heavy ? 'heavy' : 'normal');
   }
 
   spawnKillFeedback(target) {
@@ -1209,6 +1210,7 @@ class Expedition {
     this.hitStop = Math.max(this.hitStop, target.type === 'boss' ? 0.13 : 0.07);
     this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 1 : 0.65);
     this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 30 : 18);
+    AudioManager.playMonsterHit('kill');
   }
 
   spawnAoeEffect(x, y, radius, color) {
