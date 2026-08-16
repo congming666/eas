@@ -998,13 +998,9 @@
   .boost-card .boost-check { position:absolute; top:4px; right:5px; color:#83f2b2; font-size:12px; }
   .boost-count { color:#f1cf79; font-size:12px; font-weight:800; }
   .prep-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 6;
     display: flex;
     gap: 10px;
-    padding: 12px 0 4px;
-    background: linear-gradient(transparent, rgba(8,22,18,.96) 30%);
+    padding: 0 0 4px;
   }
   .prep-actions .start-expedition-btn { flex: 1; }
   .secondary-btn {
@@ -1363,7 +1359,7 @@
           <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
           <div class="boost-card-grid" id="boostCardGrid"></div>
         </div>
-        <div class="prep-panel" style="flex:1;">
+        <div class="prep-panel">
           <div class="panel-title">📡 区域提示</div>
           <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">选择地图后查看地形、环境和陷阱情报。</div>
         </div>
