@@ -279,8 +279,20 @@ class Expedition {
       const type = obstacleTypes[randInt(0, obstacleTypes.length - 1)];
       const scales = { tree:1.1, bush:.88, deadTree:1.05, rock:.9, hay:.9, fence:1.15, ruin:1.25, toxicCrystal:1, voidCrystal:1.05, monolith:1.25 };
       const scale = (scales[type] || 1) * rand(.78, 1.22);
-      const footprint = { tree:16, bush:19, rock:17, hay:20, fence:26, ruin:25, deadTree:16, toxicCrystal:16, voidCrystal:16, monolith:19 };
-      this.obstacles.push({ type, x, y, scale, radius: (footprint[type] || 18) * scale, rotation: rand(-.16, .16) });
+      const footprint = { tree:24, bush:24, rock:19, hay:20, fence:26, ruin:25, deadTree:20, toxicCrystal:16, voidCrystal:16, monolith:19 };
+      const footprintShape = {
+        tree: { rx: 29, ry: 17, offsetY: 4 },
+        bush: { rx: 31, ry: 17, offsetY: 4 },
+        rock: { rx: 23, ry: 15, offsetY: 3 },
+        deadTree: { rx: 24, ry: 15, offsetY: 3 },
+      }[type];
+      this.obstacles.push({
+        type, x, y, scale, radius: (footprint[type] || 18) * scale,
+        collisionRx: footprintShape?.rx * scale,
+        collisionRy: footprintShape?.ry * scale,
+        collisionOffsetY: (footprintShape?.offsetY || 0) * scale,
+        rotation: rand(-.16, .16)
+      });
     }
 
     const trapCatalog = [
@@ -732,8 +744,17 @@ class Expedition {
 
   collidesWithObstacle(x, y, radius = 0) {
     return this.obstacleSpatialHash.queryCircle(x, y, radius + 90).some(obstacle => {
-      const dx = x - obstacle.x;
-      const dy = y - obstacle.y;
+      let dx = x - obstacle.x;
+      let dy = y - (obstacle.y + (obstacle.collisionOffsetY || 0));
+      if (obstacle.collisionRx && obstacle.collisionRy) {
+        const cos = Math.cos(-(obstacle.rotation || 0));
+        const sin = Math.sin(-(obstacle.rotation || 0));
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+        const rx = obstacle.collisionRx + radius;
+        const ry = obstacle.collisionRy + radius;
+        return localX * localX / (rx * rx) + localY * localY / (ry * ry) < 1;
+      }
       const minDistance = radius + obstacle.radius;
       return dx * dx + dy * dy < minDistance * minDistance;
     });
