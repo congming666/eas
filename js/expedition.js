@@ -10,6 +10,7 @@ class Expedition {
       maxEnergy: CONFIG.player.maxEnergy,
       speed: CONFIG.player.speed,
       radius: CONFIG.player.radius,
+      collisionRadius: CONFIG.player.collisionRadius || 11,
       angle: 0,
       attackCd: 0,
       invuln: 0,
@@ -85,6 +86,12 @@ class Expedition {
     this.terrainChunkCache = new TerrainChunkCache(CONFIG.expedition.mapSize, 512);
     this.bossSprites = {};
     this.monsterSprites = {};
+    this.obstacleSprites = {};
+    ['tree', 'bush', 'rock'].forEach(type => {
+      const sprite = new Image();
+      sprite.src = `assets/obstacles/${type}.webp`;
+      this.obstacleSprites[type] = sprite;
+    });
     ['bat', 'spider', 'boar'].forEach(type => {
       this.monsterSprites[type] = {};
       ['idle', 'attack', 'hit', 'death'].forEach(state => {
@@ -258,8 +265,8 @@ class Expedition {
     }
 
     const obstacleTypes = [
-      ['tree', 'rock', 'hay', 'fence'],
-      ['tree', 'rock', 'hay', 'fence', 'ruin'],
+      ['tree', 'bush', 'rock', 'hay', 'fence'],
+      ['tree', 'bush', 'rock', 'hay', 'fence', 'ruin'],
       ['deadTree', 'rock', 'ruin', 'toxicCrystal', 'fence'],
       ['deadTree', 'rock', 'monolith', 'voidCrystal', 'ruin'],
     ][this.map.tier - 1];
@@ -270,9 +277,10 @@ class Expedition {
         x = rand(120, size - 120); y = rand(120, size - 120);
       }
       const type = obstacleTypes[randInt(0, obstacleTypes.length - 1)];
-      const scales = { tree:1.1, deadTree:1.05, rock:.9, hay:.9, fence:1.15, ruin:1.25, toxicCrystal:1, voidCrystal:1.05, monolith:1.25 };
+      const scales = { tree:1.1, bush:.88, deadTree:1.05, rock:.9, hay:.9, fence:1.15, ruin:1.25, toxicCrystal:1, voidCrystal:1.05, monolith:1.25 };
       const scale = (scales[type] || 1) * rand(.78, 1.22);
-      this.obstacles.push({ type, x, y, scale, radius: (type === 'fence' ? 30 : 24) * scale, rotation: rand(-.24, .24) });
+      const footprint = { tree:16, bush:19, rock:17, hay:20, fence:26, ruin:25, deadTree:16, toxicCrystal:16, voidCrystal:16, monolith:19 };
+      this.obstacles.push({ type, x, y, scale, radius: (footprint[type] || 18) * scale, rotation: rand(-.16, .16) });
     }
 
     const trapCatalog = [
@@ -493,6 +501,14 @@ class Expedition {
     ctx.translate(sx, sy);
     ctx.rotate(obstacle.rotation);
     ctx.scale(s * depthScale, s * depthScale);
+
+    const obstacleSprite = this.obstacleSprites[obstacle.type];
+    if (obstacleSprite?.complete && obstacleSprite.naturalWidth) {
+      const size = obstacle.type === 'tree' ? 112 : obstacle.type === 'bush' ? 70 : 62;
+      ctx.drawImage(obstacleSprite, -size / 2, -size * .84, size, size);
+      ctx.restore();
+      return;
+    }
 
     ctx.save();
     ctx.rotate(-obstacle.rotation);
@@ -723,6 +739,40 @@ class Expedition {
     });
   }
 
+  moveEntityWithCollisions(entity, dx, dy, radius = entity.collisionRadius || entity.radius * .72) {
+    if (!dx && !dy) return;
+    const oldX = entity.x, oldY = entity.y;
+    entity.x += dx;
+    if (this.collidesWithObstacle(entity.x, entity.y, radius)) entity.x = oldX;
+    entity.y += dy;
+    if (this.collidesWithObstacle(entity.x, entity.y, radius)) entity.y = oldY;
+    entity.x = clamp(entity.x, radius, CONFIG.expedition.mapSize - radius);
+    entity.y = clamp(entity.y, radius, CONFIG.expedition.mapSize - radius);
+  }
+
+  resolveUnitCollisions() {
+    const living = this.monsters.filter(m => m.hp > 0);
+    for (let i = 0; i < living.length; i++) {
+      const a = living[i], ar = a.collisionRadius || a.radius * .72;
+      const pdx = a.x - this.player.x, pdy = a.y - this.player.y;
+      const playerMin = ar + this.player.collisionRadius;
+      const playerDist = Math.hypot(pdx, pdy) || .001;
+      if (playerDist < playerMin) {
+        const push = (playerMin - playerDist) * .7;
+        this.moveEntityWithCollisions(a, pdx / playerDist * push, pdy / playerDist * push, ar);
+      }
+      for (let j = i + 1; j < living.length; j++) {
+        const b = living[j], br = b.collisionRadius || b.radius * .72;
+        const dx = b.x - a.x, dy = b.y - a.y, minD = ar + br;
+        const d = Math.hypot(dx, dy) || .001;
+        if (d >= minD) continue;
+        const push = (minD - d) * .32, nx = dx / d, ny = dy / d;
+        this.moveEntityWithCollisions(a, -nx * push, -ny * push, ar);
+        this.moveEntityWithCollisions(b, nx * push, ny * push, br);
+      }
+    }
+  }
+
   findSafeSpawn(minEdge, maxEdge, radius = 20) {
     let position = { x: rand(minEdge, maxEdge), y: rand(minEdge, maxEdge) };
     for (let attempt = 0; attempt < 24; attempt++) {
@@ -829,12 +879,12 @@ class Expedition {
       const distance = rand(430, 620);
       const x = clamp(this.player.x + Math.cos(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
       const y = clamp(this.player.y + Math.sin(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
-      const hpScale = this.balance.enemyHp * (1 + this.beastWave.wave * 0.13);
+      const hpScale = this.balance.enemyHp * (0.72 + Math.min(0.18, this.beastWave.wave * 0.035));
       this.monsters.push({
         type, ...data, x, y,
         hp: Math.round(data.hp * hpScale), maxHp: Math.round(data.hp * hpScale),
-        damage: Math.round(data.damage * this.balance.enemyDamage * (1 + this.beastWave.wave * 0.08)),
-        speed: data.speed * this.balance.enemySpeed * 1.08,
+        damage: Math.max(3, Math.round(data.damage * this.balance.enemyDamage * (0.68 + Math.min(0.16, this.beastWave.wave * 0.03)))),
+        speed: data.speed * this.balance.enemySpeed * 0.88,
         attackCd: 0, stunned: 0, target: null, vx: 0, vy: 0,
         facing: angle + Math.PI, animTime: rand(0, 10), hitFlash: 0,
         elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true, state: 'idle', stateTimer: 0
@@ -1399,15 +1449,15 @@ class Expedition {
     const size = CONFIG.expedition.mapSize;
     this.player.x = clamp(this.player.x, 20, size - 20);
     this.player.y = clamp(this.player.y, 20, size - 20);
-    if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.radius)) {
+    if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.collisionRadius)) {
       const movedX = this.player.x;
       const movedY = this.player.y;
       this.player.x = movedX;
       this.player.y = previousY;
-      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.radius)) this.player.x = previousX;
+      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.collisionRadius)) this.player.x = previousX;
       this.player.y = movedY;
-      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.radius)) this.player.y = previousY;
-      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.radius)) {
+      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.collisionRadius)) this.player.y = previousY;
+      if (this.collidesWithObstacle(this.player.x, this.player.y, this.player.collisionRadius)) {
         this.player.x = previousX;
         this.player.y = previousY;
       }
@@ -1488,8 +1538,7 @@ class Expedition {
         m.facing = angle;
         if (d > m.attackRange) {
           m.state = 'move';
-          m.x += Math.cos(angle) * m.speed * dt;
-          m.y += Math.sin(angle) * m.speed * dt;
+          this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * dt, Math.sin(angle) * m.speed * dt);
         } else if (m.attackCd <= 0) {
           // 攻击
           m.state = 'attack'; m.stateTimer = .28;
@@ -1514,10 +1563,11 @@ class Expedition {
         }
         const angle = Math.atan2(m.wanderTarget.y - m.y, m.wanderTarget.x - m.x);
         m.facing = angle;
-        m.x += Math.cos(angle) * m.speed * 0.3 * dt;
-        m.y += Math.sin(angle) * m.speed * 0.3 * dt;
+        this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * 0.3 * dt, Math.sin(angle) * m.speed * 0.3 * dt);
       }
     });
+
+    this.resolveUnitCollisions();
 
     // 移除死亡怪物
     this.monsters = this.monsters.filter(m => {
@@ -1647,7 +1697,7 @@ class Expedition {
           }
         }
       }
-      if (p.fromMonster && dist(p, this.player) < this.player.radius + p.radius) {
+      if (p.fromMonster && dist(p, this.player) < this.player.collisionRadius + p.radius) {
         this.damagePlayer(p.damage);
         return false;
       }
