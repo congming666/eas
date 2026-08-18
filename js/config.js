@@ -77,6 +77,10 @@ const CONFIG = {
   monsters: {
     boar: { name: '野猪', icon: '🐗', hp: 60, damage: 15, speed: 140, radius: 18,
       attackRange: 40, attackCooldown: 1.2, xp: 10, gold: 8 },
+    bat: { name: '腐翼蝙蝠', icon: '🦇', hp: 32, damage: 10, speed: 205, radius: 15,
+      attackRange: 42, attackCooldown: 0.9, xp: 9, gold: 6, aerial: true },
+    spider: { name: '毒雾蛛', icon: '🕷️', hp: 44, damage: 13, speed: 108, radius: 17,
+      attackRange: 260, attackCooldown: 1.65, ranged: true, xp: 11, gold: 8 },
     locust: { name: '巨型蝗虫', icon: '🦗', hp: 35, damage: 8, speed: 160, radius: 14,
       attackRange: 200, attackCooldown: 1.8, ranged: true, xp: 8, gold: 5 },
     wolf: { name: '野狼', icon: '🐺', hp: 50, damage: 12, speed: 180, radius: 16,

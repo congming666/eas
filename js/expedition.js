@@ -84,6 +84,15 @@ class Expedition {
     this.obstacleSpatialHash = new SpatialHash(176);
     this.terrainChunkCache = new TerrainChunkCache(CONFIG.expedition.mapSize, 512);
     this.bossSprites = {};
+    this.monsterSprites = {};
+    ['bat', 'spider', 'boar'].forEach(type => {
+      this.monsterSprites[type] = {};
+      ['idle', 'attack', 'hit', 'death'].forEach(state => {
+        const sprite = new Image();
+        sprite.src = `assets/monsters/${type}-${state}.webp`;
+        this.monsterSprites[type][state] = sprite;
+      });
+    });
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -136,7 +145,8 @@ class Expedition {
 
   isWorldVisible(x, y) {
     const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
-    return dist({ x, y }, this.player) <= radius || this.exploredCells.has(this.getVisionKey(x, y));
+    // 实时视野：离开当前视野后，所有地图实体都隐藏。
+    return dist({ x, y }, this.player) <= radius;
   }
 
   renderFogOfWar(ctx) {
@@ -544,6 +554,15 @@ class Expedition {
     const lift = monster.visualZ || 0;
     this.renderCastShadow(ctx, monster.x, monster.y, 28 * scale, 28 * scale, 0.38, lift);
     ctx.translate(sx, sy - lift);
+    if (monster.state === 'death') {
+      ctx.globalAlpha = clamp((monster.deathTimer || 0) / .42, 0, 1);
+      ctx.rotate((1 - ctx.globalAlpha) * .85);
+      ctx.scale(1, .65 + ctx.globalAlpha * .35);
+    } else if (monster.state === 'hit') {
+      ctx.translate(-3, 0);
+    } else if (monster.state === 'attack') {
+      ctx.translate(5, 0);
+    }
 
     // T1/T2 Boss 使用三视图定制的伪 3D 透明素材，并保留实时阴影、受击和血条反馈。
     const bossSprite = this.bossSprites[`t${this.map.tier}`];
@@ -591,6 +610,24 @@ class Expedition {
       return;
     }
 
+    const spriteState = monster.state === 'death' ? 'death' : monster.hitFlash > 0 ? 'hit' : monster.state === 'attack' ? 'attack' : 'idle';
+    const creatureSprite = this.monsterSprites[monster.type]?.[spriteState];
+    if (creatureSprite?.complete && creatureSprite.naturalWidth) {
+      const spriteScale = this.getDepthScale(monster.y) * (monster.elite ? 1.15 : 1);
+      const drawSize = (monster.type === 'boar' ? 88 : monster.type === 'spider' ? 82 : 76) * spriteScale;
+      ctx.save();
+      if (Math.cos(monster.facing || 0) < 0) ctx.scale(-1, 1);
+      ctx.drawImage(creatureSprite, -drawSize * .5, -drawSize * .67, drawSize, drawSize);
+      ctx.restore();
+      ctx.restore();
+      const barW = monster.elite ? 54 : 44, barY = sy - drawSize * .52;
+      ctx.fillStyle = 'rgba(8,10,12,.82)'; ctx.beginPath(); ctx.roundRect(sx - barW/2 - 2, barY - 2, barW + 4, 9, 4); ctx.fill();
+      const spriteHp = ctx.createLinearGradient(sx-barW/2, 0, sx+barW/2, 0);
+      spriteHp.addColorStop(0, hpPct > .35 ? '#57c96b' : '#db4b43'); spriteHp.addColorStop(1, hpPct > .35 ? '#a6e56e' : '#ff8a52');
+      ctx.fillStyle = spriteHp; ctx.beginPath(); ctx.roundRect(sx - barW/2, barY, barW * hpPct, 5, 3); ctx.fill();
+      return;
+    }
+
     // Soft contact shadow anchors the creature to the terrain.
     ctx.save();
     ctx.scale(1, .42);
@@ -624,6 +661,23 @@ class Expedition {
       [-1,1].forEach(side => { ctx.beginPath(); ctx.moveTo(29, side * 7); ctx.quadraticCurveTo(38, side * 14, 43, side * 4); ctx.quadraticCurveTo(36, side * 9, 31, side * 3); ctx.fill(); });
       ctx.strokeStyle = 'rgba(255,205,150,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(-7, -2, 21, Math.PI * 1.05, Math.PI * 1.7); ctx.stroke();
       ctx.fillStyle = '#f4b64b'; ctx.beginPath(); ctx.arc(27, -6, 2.4, 0, Math.PI * 2); ctx.fill();
+    } else if (monster.type === 'bat') {
+      // 腐翼蝙蝠：待机悬浮、攻击俯冲，受击闪白。
+      const flap = Math.sin(monster.animTime * 5) * .25;
+      ctx.fillStyle = flash ? '#fff4f1' : '#31243f';
+      [-1, 1].forEach(side => { ctx.save(); ctx.rotate(side * (.55 + flap)); ctx.beginPath(); ctx.moveTo(-2, 0); ctx.quadraticCurveTo(-28, -25, -38, -4); ctx.quadraticCurveTo(-25, 3, -4, 9); ctx.closePath(); ctx.fill(); ctx.restore(); });
+      ctx.fillStyle = flash ? '#ffd7d1' : '#6f4a83'; ctx.beginPath(); ctx.ellipse(4, 0, 16, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f34f65'; [-1,1].forEach(side => { ctx.beginPath(); ctx.arc(11, side * 4, 2.4, 0, Math.PI * 2); ctx.fill(); });
+      ctx.strokeStyle = '#d8a3d9'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(15, 8); ctx.lineTo(12, 14); ctx.lineTo(18, 12); ctx.stroke();
+    } else if (monster.type === 'spider') {
+      // 毒雾蛛：八足待机，远程喷吐绿色毒液弹。
+      const step = Math.sin(monster.animTime * 3) * 3;
+      ctx.strokeStyle = flash ? '#fff' : '#3f342e'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i += 2) for (let j = 0; j < 4; j++) { ctx.beginPath(); ctx.moveTo(-4, i * 5); ctx.lineTo(-22 - j * 4, i * (12 + j * 4) + step * i); ctx.stroke(); }
+      const shell = ctx.createRadialGradient(-5, -8, 2, 4, 3, 25); shell.addColorStop(0, flash ? '#efffe4' : '#b1c56c'); shell.addColorStop(.55, '#58633a'); shell.addColorStop(1, '#20251e');
+      ctx.fillStyle = shell; ctx.beginPath(); ctx.ellipse(0, 0, 22, 17, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ef5b6d'; [-1, 1].forEach(side => { ctx.beginPath(); ctx.arc(15, side * 5, 2.5, 0, Math.PI * 2); ctx.fill(); });
+      if (monster.state === 'attack') { ctx.strokeStyle = 'rgba(167,255,90,.75)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(22, 0, 8 + (monster.stateTimer || 0) * 10, -0.55, 0.55); ctx.stroke(); }
     } else if (monster.type === 'locust') {
       // Translucent wings and segmented chitin catch the environment light.
       ctx.globalAlpha = .55;
@@ -683,9 +737,14 @@ class Expedition {
   spawnEntities() {
     const size = CONFIG.expedition.mapSize;
     // 怪物
-    const monsterTypes = ['boar', 'locust', 'wolf'];
+    const monsterTypes = ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < this.map.monsterCount; i++) {
-      const type = monsterTypes[randInt(0, Math.min(monsterTypes.length - 1, this.map.tier - 1))];
+      // 三种基础小兵在所有难度都会出现，其他种类随难度混入。
+      const basicTypes = ['boar', 'bat', 'spider'];
+      const extraTypes = this.map.tier >= 2 ? ['locust'] : [];
+      if (this.map.tier >= 3) extraTypes.push('wolf');
+      const pool = [...basicTypes, ...extraTypes];
+      const type = pool[randInt(0, pool.length - 1)];
       const data = CONFIG.monsters[type];
       const position = this.findSafeSpawn(300, size - 300, data.radius || 18);
       const elite = Math.random() < this.balance.eliteChance;
@@ -699,7 +758,7 @@ class Expedition {
         attackCd: 0, stunned: 0, target: null,
         vx: 0, vy: 0,
         facing: rand(0, Math.PI * 2), animTime: rand(0, 10), hitFlash: 0,
-        elite, abilityCd: rand(1, 4), packOffset: rand(-1, 1)
+        elite, abilityCd: rand(1, 4), packOffset: rand(-1, 1), state: 'idle', stateTimer: 0
       });
     }
     // 宝箱
@@ -762,9 +821,9 @@ class Expedition {
     this.beastWave.active = true;
     this.beastWave.duration = 32 + this.map.tier * 3;
     const count = Math.min(42, 10 + this.map.tier * 4 + this.beastWave.wave * 4);
-    const types = ['boar', 'locust', 'wolf'];
+    const types = ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
-      const type = types[randInt(0, Math.min(types.length - 1, this.map.tier))];
+      const type = types[randInt(0, types.length - 1)];
       const data = CONFIG.monsters[type];
       const angle = Math.PI * 2 * i / count + rand(-0.22, 0.22);
       const distance = rand(430, 620);
@@ -778,7 +837,7 @@ class Expedition {
         speed: data.speed * this.balance.enemySpeed * 1.08,
         attackCd: 0, stunned: 0, target: null, vx: 0, vy: 0,
         facing: angle + Math.PI, animTime: rand(0, 10), hitFlash: 0,
-        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true
+        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true, state: 'idle', stateTimer: 0
       });
     }
     this.beastWave.remaining = count;
@@ -1195,6 +1254,8 @@ class Expedition {
     if (!target || target.hp <= 0) return;
     target.hp -= amount;
     target.hitFlash = heavy ? 0.22 : 0.14;
+    target.state = target.hp <= 0 ? 'death' : 'hit';
+    target.stateTimer = target.hp <= 0 ? .4 : .18;
     this.damageNumbers.push({
       x: target.x + rand(-8, 8), y: target.y - target.radius - 8,
       value: Math.round(amount), color, life: 0.72, maxLife: 0.72,
@@ -1368,6 +1429,7 @@ class Expedition {
     this.player.visualVz -= 360 * dt;
     if (this.player.visualZ <= 0) { this.player.visualZ = 0; this.player.visualVz = 0; }
     this.monsters.forEach(monster => {
+      monster.deathTimer = Math.max(0, (monster.deathTimer || 0) - dt);
       monster.visualZ = Math.max(0, (monster.visualZ || 0) + (monster.visualVz || 0) * dt);
       monster.visualVz = (monster.visualVz || 0) - 330 * dt;
       if (monster.visualZ <= 0) { monster.visualZ = 0; monster.visualVz = 0; }
@@ -1413,6 +1475,7 @@ class Expedition {
       m.attackCd = Math.max(0, m.attackCd - dt);
       m.stunned = Math.max(0, m.stunned - dt);
       m.hitFlash = Math.max(0, (m.hitFlash || 0) - dt);
+      m.stateTimer = Math.max(0, (m.stateTimer || 0) - dt);
       m.animTime = (m.animTime || 0) + dt * (1.8 + m.speed / 120);
       if (m.stunned > 0) return;
 
@@ -1424,20 +1487,25 @@ class Expedition {
         const angle = Math.atan2(this.player.y - m.y, this.player.x - m.x);
         m.facing = angle;
         if (d > m.attackRange) {
+          m.state = 'move';
           m.x += Math.cos(angle) * m.speed * dt;
           m.y += Math.sin(angle) * m.speed * dt;
         } else if (m.attackCd <= 0) {
           // 攻击
+          m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
           if (m.ranged) {
             this.projectiles.push({
               x: m.x, y: m.y,
               vx: Math.cos(angle) * 300, vy: Math.sin(angle) * 300,
-              damage: m.damage, life: 2, fromMonster: true, radius: 6
+              damage: m.damage, life: 2, fromMonster: true, radius: 6,
+              monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644'
             });
           } else {
             this.damagePlayer(m.damage);
           }
+        } else {
+          m.state = 'idle';
         }
       } else {
         // 游荡
@@ -1454,6 +1522,10 @@ class Expedition {
     // 移除死亡怪物
     this.monsters = this.monsters.filter(m => {
       if (m.hp <= 0) {
+        if (m.deathProcessed) return m.deathTimer > 0;
+        m.deathProcessed = true;
+        m.deathTimer = .42;
+        m.state = 'death';
         this.killCount++;
         this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff4444');
@@ -1470,7 +1542,7 @@ class Expedition {
         if (m.type !== 'boss' && Math.random() < 0.055) {
           this.spawnGroundLoot({ type: 'invincible', name: '无敌核心', amount: 1, icon: '🛡️', duration: 5 }, m.x, m.y);
         }
-        return false;
+        return true;
       }
       return true;
     });
@@ -1841,6 +1913,7 @@ class Expedition {
 
     // 环境陷阱
     this.traps.forEach(trap => {
+      if (!this.isWorldVisible(trap.x, trap.y)) return;
       const sx = trap.x - cam.x, sy = trap.y - cam.y;
       if (sx < -80 || sx > CONFIG.canvas.width + 80 || sy < -80 || sy > CONFIG.canvas.height + 80) return;
       const pulse = 0.65 + Math.sin(trap.phase * 3) * 0.18;
@@ -1975,6 +2048,7 @@ class Expedition {
 
     // 子弹
     this.projectiles.forEach(p => {
+      if (p.fromMonster && !this.isWorldVisible(p.x, p.y)) return;
       const sx = p.x - cam.x, sy = p.y - cam.y;
       ctx.save();
       const projectileAngle = Math.atan2(p.vy, p.vx);
@@ -1989,7 +2063,7 @@ class Expedition {
         ctx.fillStyle = beam; ctx.beginPath(); ctx.ellipse(0, 0, 27, 7, 0, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#d5fff1'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.quadraticCurveTo(0, -8, 16, 0); ctx.stroke();
       } else {
-        ctx.beginPath(); ctx.arc(sx, sy, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.fromMonster ? '#ff6644' : '#7fff7f'; ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.fromMonster ? (p.color || '#ff6644') : '#7fff7f'; ctx.fill();
       }
       ctx.restore();
     });
@@ -2331,14 +2405,14 @@ class Expedition {
     // 检查附近可交互物
     let prompt = null;
     for (const item of this.groundLoot) {
-      if (dist(this.player, item) < 110) {
+      if (this.isWorldVisible(item.x, item.y) && dist(this.player, item) < 110) {
         prompt = { x: item.x, y: item.y - 42, text: `右键拾取 ${item.name}` };
         break;
       }
     }
     if (!prompt) {
       for (const chest of this.chests) {
-        if (!chest.opened && dist(this.player, chest) < 60) {
+        if (!chest.opened && this.isWorldVisible(chest.x, chest.y) && dist(this.player, chest) < 60) {
           prompt = { x: chest.x, y: chest.y - 40, text: '左键打开宝箱' };
           break;
         }
@@ -2346,7 +2420,7 @@ class Expedition {
     }
     if (!prompt) {
       for (const tower of this.towers) {
-        if (tower.state !== 'player' && dist(this.player, tower) < 60) {
+        if (tower.state !== 'player' && this.isWorldVisible(tower.x, tower.y) && dist(this.player, tower) < 60) {
           prompt = { x: tower.x, y: tower.y - 40, text: tower.state === 'broken' ? '点击修复并占领防御塔' : '点击占领防御塔' };
           break;
         }
@@ -2354,7 +2428,7 @@ class Expedition {
     }
     if (!prompt) {
       for (const ep of this.extractPoints) {
-        if (dist(this.player, ep) < ep.radius) {
+        if (this.isWorldVisible(ep.x, ep.y) && dist(this.player, ep) < ep.radius) {
           prompt = { x: ep.x, y: ep.y - ep.radius - 20, text: '点击开始撤离' };
           break;
         }
