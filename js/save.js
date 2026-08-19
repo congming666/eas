@@ -20,6 +20,7 @@ const SaveSystem = {
         ? [...new Set(['wheat', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
         : ['wheat'];
       GameState.loadout = { ...GameState.loadout, ...(data.loadout || {}) };
+      GameState.farmItems = { ...GameState.farmItems, ...(data.farmItems || {}) };
       GameState.skillLevels = { ...GameState.skillLevels, ...(data.skillLevels || {}) };
       GameState.cardInventory = Array.isArray(data.cardInventory) ? data.cardInventory : [];
       GameState.selectedBoostCards = Array.isArray(data.selectedBoostCards)
@@ -57,6 +58,7 @@ const SaveSystem = {
         selectedCrop: GameState.selectedCrop,
         unlockedCrops: GameState.unlockedCrops,
         loadout: GameState.loadout,
+        farmItems: GameState.farmItems,
         skillLevels: GameState.skillLevels,
         cardInventory: GameState.cardInventory,
         selectedBoostCards: GameState.selectedBoostCards,

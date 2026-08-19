@@ -967,9 +967,6 @@ class Expedition {
       if (e.button === 0) {
         this.mouse.down = true;
         this.tryInteract();
-      } else if (e.button === 2) {
-        e.preventDefault();
-        this.pickupLoot();
       }
     };
     this.mouseupHandler = (e) => { if (e.button === 0) this.mouse.down = false; };
@@ -1097,25 +1094,13 @@ class Expedition {
   }
 
   pickupLoot() {
-    if (this.groundLoot.length === 0) {
-      showToast('附近没有可拾取物品', 'warning');
-      return;
-    }
-    const cursor = { x: this.mouse.x + this.camera.x, y: this.mouse.y + this.camera.y };
-    let candidates = this.groundLoot
-      .map((item, index) => ({ item, index, playerDist: dist(this.player, item), cursorDist: dist(cursor, item) }))
-      .filter(entry => entry.playerDist <= 115 && entry.cursorDist <= 70)
-      .sort((a, b) => a.cursorDist - b.cursorDist);
-    if (candidates.length === 0) {
-      candidates = this.groundLoot
-        .map((item, index) => ({ item, index, playerDist: dist(this.player, item) }))
-        .filter(entry => entry.playerDist <= 72)
-        .sort((a, b) => a.playerDist - b.playerDist);
-    }
-    if (candidates.length === 0) {
-      showToast('靠近物品后再右键拾取', 'warning');
-      return;
-    }
+    if (this.groundLoot.length === 0) return false;
+    const pickupRange = CONFIG.weapons.find(weapon => weapon.mode === 'melee')?.range || CONFIG.player.attackRange;
+    const candidates = this.groundLoot
+      .map((item, index) => ({ item, index, playerDist: dist(this.player, item) }))
+      .filter(entry => entry.playerDist <= pickupRange && this.isWorldVisible(entry.item.x, entry.item.y))
+      .sort((a, b) => a.playerDist - b.playerDist);
+    if (candidates.length === 0) return false;
     const target = candidates[0];
     this.groundLoot.splice(target.index, 1);
     const { x, y, bob, ...item } = target.item;
@@ -1131,6 +1116,7 @@ class Expedition {
       showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
     }
     this.updateHUD();
+    return true;
   }
 
   tryInteract() {
@@ -1226,9 +1212,12 @@ class Expedition {
     if (chest.hasSignal) {
       loot.push({ type: 'consumable', name: '撤离信号弹', amount: 1, icon: '🔥', id: 'signal_flare' });
     }
+    if (Math.random() < 0.24) {
+      loot.push({ type: 'farm_item', name: '生长催化剂', amount: 1, icon: '⏳', id: 'growth_catalyst' });
+    }
 
     loot.forEach(item => this.spawnGroundLoot(item, chest.x, chest.y));
-    showToast(`宝箱打开，掉落${loot.length}件物品，右键拾取`, 'gold');
+    showToast(`宝箱打开，掉落${loot.length}件物品，进入攻击范围后自动拾取`, 'gold');
     this.spawnAoeEffect(chest.x, chest.y, 50, '#ffd700');
     this.updateHUD();
   }
@@ -1283,6 +1272,9 @@ class Expedition {
       });
       this.bag.filter(i => i.type === 'consumable').forEach(i => {
         GameState.loadout[i.id] = (GameState.loadout[i.id] || 0) + i.amount;
+      });
+      this.bag.filter(i => i.type === 'farm_item').forEach(i => {
+        GameState.farmItems[i.id] = (GameState.farmItems[i.id] || 0) + i.amount;
       });
     } else {
       // 失败：只有安全箱保留（简化：随机保留20%）
@@ -1429,6 +1421,7 @@ class Expedition {
       this.fogDirty = true;
     }
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
+    this.pickupLoot();
 
     // 倒计时
     this.timeLeft -= dt;
@@ -2002,13 +1995,13 @@ class Expedition {
       ctx.globalAlpha = 1;
     });
 
-    // 地面战利品：必须靠近后使用鼠标右键拾取。
+    // 地面战利品：进入固定近战攻击范围后自动拾取。
     const nowSeconds = performance.now() / 1000;
     this.groundLoot.forEach(item => {
       if (!this.isWorldVisible(item.x, item.y)) return;
       const sx = item.x - cam.x, sy = item.y - cam.y + Math.sin(nowSeconds * 3 + item.bob) * 4;
       if (sx < -50 || sx > CONFIG.canvas.width + 50 || sy < -50 || sy > CONFIG.canvas.height + 50) return;
-      const near = dist(this.player, item) < 115;
+      const near = dist(this.player, item) <= (CONFIG.weapons.find(weapon => weapon.mode === 'melee')?.range || CONFIG.player.attackRange);
       const glow = ctx.createRadialGradient(sx, sy, 2, sx, sy, 28);
       const lootGlow = item.type === 'invincible' ? 'rgba(90,225,255,' : 'rgba(246,199,91,';
       glow.addColorStop(0, `${lootGlow}${near ? '.52)' : '.28)'}`);
@@ -2021,7 +2014,7 @@ class Expedition {
       if (near) {
         ctx.fillStyle = '#f6d77e';
         ctx.font = '10px sans-serif';
-        ctx.fillText(`右键拾取 ${item.name}`, sx, sy - 22);
+        ctx.fillText(`自动拾取 ${item.name}`, sx, sy - 22);
       }
     });
 
@@ -2475,20 +2468,12 @@ class Expedition {
     const cam = this.camera;
     // 检查附近可交互物
     let prompt = null;
-    for (const item of this.groundLoot) {
-      if (this.isWorldVisible(item.x, item.y) && dist(this.player, item) < 110) {
-        prompt = { x: item.x, y: item.y - 42, text: `右键拾取 ${item.name}` };
-        break;
-      }
-    }
-    if (!prompt) {
-      for (const chest of this.chests) {
+    for (const chest of this.chests) {
         if (!chest.opened && this.isWorldVisible(chest.x, chest.y) && dist(this.player, chest) < 60) {
           prompt = { x: chest.x, y: chest.y - 40, text: '左键打开宝箱' };
           break;
         }
       }
-    }
     if (!prompt) {
       for (const tower of this.towers) {
         if (tower.state !== 'player' && this.isWorldVisible(tower.x, tower.y) && dist(this.player, tower) < 60) {

@@ -54,6 +54,8 @@ const Farm = {
     document.getElementById('goldDisplay').textContent = GameState.gold;
     document.getElementById('seedDisplay').textContent = GameState.seeds;
     document.getElementById('materialDisplay').textContent = GameState.materials;
+    const catalystCount = document.getElementById('growthCatalystCount');
+    if (catalystCount) catalystCount.textContent = GameState.farmItems.growth_catalyst || 0;
     this.renderCropSelector();
     RewardSystem.render();
   },
@@ -156,6 +158,35 @@ const Farm = {
     showToast(`${names[plot.status]}完成，作物恢复正常生长`, 'success');
     plot.status = null;
     SaveSystem.save();
+    this.render();
+  },
+
+  useGrowthCatalyst() {
+    const count = GameState.farmItems.growth_catalyst || 0;
+    if (count <= 0) {
+      showToast('没有生长催化剂，可从远征宝箱中获取', 'warning');
+      return;
+    }
+    const now = Date.now();
+    const candidates = GameState.farmPlots
+      .map((plot, idx) => ({ plot, idx }))
+      .filter(({ plot, idx }) => idx < GameState.unlockedPlots && plot.crop && !plot.ready)
+      .map(entry => ({
+        ...entry,
+        remaining: entry.plot.crop.growTime - (now - entry.plot.plantedAt) / 1000,
+      }))
+      .filter(entry => entry.remaining > 0)
+      .sort((a, b) => b.remaining - a.remaining);
+    if (candidates.length === 0) {
+      showToast('当前没有正在生长的作物', 'warning');
+      return;
+    }
+    const { plot } = candidates[0];
+    const reductionSeconds = plot.crop.growTime * 0.1;
+    plot.plantedAt -= reductionSeconds * 1000;
+    GameState.farmItems.growth_catalyst = count - 1;
+    SaveSystem.save();
+    showToast(`使用生长催化剂：${plot.crop.name}生长时间缩短${reductionSeconds.toFixed(1)}秒（总时长10%）`, 'success');
     this.render();
   },
 

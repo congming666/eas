@@ -29,7 +29,7 @@ const Game = {
 
   showHelp() {
     AudioManager.start('menu');
-    showToast('WASD移动，左键攻击/交互，右键拾取，1-4技能', 'success');
+    showToast('WASD移动，左键攻击/交互，战利品会在近战范围内自动拾取，1-4技能', 'success');
     setTimeout(() => showToast('搜物资、打怪物、找撤离点，活着回来！', 'gold'), 1000);
   },
 

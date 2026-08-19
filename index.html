@@ -1309,6 +1309,10 @@
         </div>
         <div class="panel support-panel">
           <div class="panel-title">🎁 家园补给站</div>
+          <div class="supply-card" style="margin-bottom:9px;">
+            <div class="supply-icon">⏳</div>
+            <div><div class="supply-name">生长催化剂 ×<span id="growthCatalystCount">0</span></div><div class="supply-desc">对剩余时间最长的生长中作物使用，立即减少其总种植时间的10%。</div><button class="supply-btn" onclick="Farm.useGrowthCatalyst()">使用道具</button></div>
+          </div>
           <div class="daily-strip" id="dailyRewardStrip"></div>
           <div class="supply-actions">
             <div class="supply-card">
@@ -1400,9 +1404,9 @@
     <div id="weaponDisplay"></div>
     <div class="consumable-bar" id="consumableBar"></div>
     <canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
-    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · <kbd>1-4</kbd> 释放技能</div>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · 近战范围内自动拾取 · <kbd>1-4</kbd> 释放技能</div>
     <div class="controls-hint">
-      <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | <kbd>鼠标右键</kbd> 拾取<br>
+      <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | 战利品自动拾取<br>
       <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>
       <kbd>Shift</kbd> 冲刺 | <kbd>ESC</kbd> 暂停
     </div>
