@@ -12,6 +12,8 @@
 
 也可以下载仓库后直接使用浏览器打开 `index.html`。游戏不需要注册账号，进度保存在当前浏览器的 LocalStorage 中。
 
+> 🎮 **Unity 桌面版**：本游戏另有 Unity 6 原生 Windows 版本（2.5D 俯视角 + 战争迷雾 + 光柱特效），源码见 [farm-cards-expedition-unity](https://github.com/congming666/farm-cards-expedition-unity)。
+
 ## 核心玩法
 
 ### 家园农场
