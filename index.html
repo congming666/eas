@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>农庄牌：荒野远征 v1.8</title>
-<meta name="game-version" content="1.8.0">
+<title>农庄牌：荒野远征 v1.9</title>
+<meta name="game-version" content="1.9.0">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -1250,6 +1250,95 @@
   #farmScreen .expedition-gate { padding:14px; }
   #farmScreen .expedition-gate p { margin:5px 0 9px; line-height:1.45; }
   #farmScreen .gate-btn { padding:10px; }
+
+  /* 物资仓库弹窗 */
+  .warehouse-modal { background:linear-gradient(160deg,#1e2a1e,#162016); border:2px solid #4a6b4a; border-radius:16px; padding:20px; max-width:720px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
+  .warehouse-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #3a5a3a; }
+  .warehouse-modal-header h2 { margin:0; color:#a8d8a8; font-size:22px; }
+  .warehouse-modal .close-btn { background:#3a5a3a; color:#fff; border:none; border-radius:8px; width:32px; height:32px; font-size:16px; cursor:pointer; }
+  .warehouse-modal .close-btn:hover { background:#4a6b4a; }
+  .warehouse-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .warehouse-capacity { flex:1; min-width:200px; }
+  .capacity-label { font-size:14px; color:#a8d8a8; margin-bottom:6px; }
+  .capacity-bar { height:14px; background:#1a2a1a; border-radius:7px; overflow:hidden; border:1px solid #3a5a3a; }
+  .capacity-fill { height:100%; background:linear-gradient(90deg,#5a9a5a,#7aba7a); border-radius:7px; transition:width 0.3s; }
+  .warehouse-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .warehouse-btn { background:#3a5a3a; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; line-height:1.3; }
+  .warehouse-btn:hover { background:#4a6b4a; }
+  .sell-all-btn { background:#8a6a3a; }
+  .sell-all-btn:hover { background:#9a7a4a; }
+  .upgrade-btn { background:#3a5a8a; }
+  .upgrade-btn:hover { background:#4a6a9a; }
+  .warehouse-category { margin-bottom:16px; }
+  .category-title { font-size:15px; color:#8ab88a; margin-bottom:8px; font-weight:bold; }
+  .warehouse-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+  .warehouse-item { background:#1a2a1a; border:1px solid #3a5a3a; border-radius:10px; padding:10px; text-align:center; transition:all 0.2s; }
+  .warehouse-item:hover { border-color:#5a8a5a; transform:translateY(-2px); }
+  .warehouse-item.rare { border-color:#8a7a3a; }
+  .warehouse-item.legendary { border-color:#8a5a8a; box-shadow:0 0 12px rgba(138,90,138,0.3); }
+  .item-icon { font-size:28px; margin-bottom:4px; }
+  .item-name { font-size:13px; color:#d8e8d8; margin-bottom:2px; }
+  .item-count { font-size:16px; color:#ffd700; font-weight:bold; margin-bottom:6px; }
+  .item-sell-btn { display:block; width:100%; background:#5a7a3a; color:#fff; border:none; border-radius:6px; padding:4px; font-size:11px; cursor:pointer; margin-bottom:4px; }
+  .item-sell-btn:hover { background:#6a8a4a; }
+  .item-sell-all-btn { display:block; width:100%; background:#7a5a3a; color:#fff; border:none; border-radius:6px; padding:4px; font-size:11px; cursor:pointer; }
+  .item-sell-all-btn:hover { background:#8a6a4a; }
+  .item-not-sellable { font-size:11px; color:#666; padding:4px; }
+  .warehouse-empty { text-align:center; padding:40px 20px; color:#888; }
+
+  /* 育种温室 */
+  .greenhouse-modal { background:linear-gradient(160deg,#1e2a2e,#162028); border:2px solid #4a7a8a; border-radius:16px; padding:20px; max-width:900px; width:95%; max-height:85vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
+  .greenhouse-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #3a6a7a; }
+  .greenhouse-modal-header h2 { margin:0; color:#8ac8d8; font-size:22px; }
+  .greenhouse-content { display:flex; gap:16px; flex-wrap:wrap; }
+  .greenhouse-left { flex:1; min-width:320px; }
+  .greenhouse-right { width:260px; }
+  .greenhouse-grid-title { font-size:14px; color:#8ac8d8; margin-bottom:8px; font-weight:bold; }
+  .greenhouse-plant-selector { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .gh-plant-choice { background:#1a2a2e; border:2px solid #3a5a6a; border-radius:8px; padding:6px 8px; text-align:center; cursor:pointer; transition:all 0.2s; min-width:70px; }
+  .gh-plant-choice:hover { border-color:#5a8a9a; transform:translateY(-2px); }
+  .gh-plant-choice.selected { border-color:#7ac8d8; background:#2a4a5a; box-shadow:0 0 10px rgba(122,200,216,0.3); }
+  .gh-plant-choice.locked { opacity:0.5; cursor:not-allowed; }
+  .gh-plant-choice .gh-plant-icon { font-size:20px; }
+  .gh-plant-choice .gh-plant-name { font-size:11px; color:#d8e8e8; margin-top:2px; }
+  .gh-plant-choice .gh-plant-time { font-size:10px; color:#888; }
+  .gh-plant-choice.rare { border-color:#8a7a3a; }
+  .gh-plant-choice.epic { border-color:#7a5a8a; }
+  .gh-plant-choice.legendary { border-color:#8a5a5a; }
+  .greenhouse-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .greenhouse-cell { aspect-ratio:1; background:#1a2a2e; border:2px solid #3a5a6a; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s; position:relative; overflow:hidden; }
+  .greenhouse-cell:hover { border-color:#5a8a9a; transform:translateY(-2px); }
+  .greenhouse-cell.empty { background:#152025; border-style:dashed; }
+  .greenhouse-cell.empty .gh-empty-icon { font-size:24px; color:#4a6a7a; }
+  .greenhouse-cell.empty .gh-empty-text { font-size:11px; color:#5a7a8a; margin-top:2px; }
+  .greenhouse-cell.planted { background:#1a2a22; }
+  .greenhouse-cell.ready { background:#2a3a1a; border-color:#8aba5a; box-shadow:0 0 12px rgba(138,186,90,0.4); animation:pulse 1.5s infinite; }
+  .greenhouse-cell.locked { background:#151515; border-color:#333; cursor:pointer; }
+  .greenhouse-cell.locked:hover { border-color:#555; }
+  .greenhouse-cell.next-unlock { border-color:#6a6a3a; }
+  .gh-plant-icon { font-size:28px; margin-bottom:2px; }
+  .gh-plant-name { font-size:10px; color:#d8e8d8; text-align:center; padding:0 2px; }
+  .gh-ready-tag { position:absolute; top:4px; right:4px; background:#8aba5a; color:#1a2a1a; font-size:9px; padding:2px 5px; border-radius:4px; font-weight:bold; }
+  .gh-progress { width:80%; height:5px; background:#2a3a3a; border-radius:3px; margin-top:4px; overflow:hidden; }
+  .gh-progress-fill { height:100%; background:linear-gradient(90deg,#5a9a5a,#7aba7a); border-radius:3px; transition:width 0.3s; }
+  .gh-progress-text { font-size:9px; color:#888; margin-top:1px; }
+  .greenhouse-cell.rarity-rare { border-color:#8a7a3a; }
+  .greenhouse-cell.rarity-epic { border-color:#7a5a8a; }
+  .greenhouse-cell.rarity-legendary { border-color:#8a5a5a; box-shadow:0 0 12px rgba(138,90,90,0.3); }
+  .greenhouse-drops { background:#1a2528; border:1px solid #3a5a6a; border-radius:10px; padding:10px; margin-bottom:12px; }
+  .gh-drops-title { font-size:14px; color:#8ac8d8; margin-bottom:8px; font-weight:bold; }
+  .gh-drop-item { display:flex; align-items:center; gap:8px; padding:6px; background:#152025; border-radius:6px; margin-bottom:6px; }
+  .gh-drop-icon { font-size:22px; }
+  .gh-drop-info { flex:1; min-width:0; }
+  .gh-drop-name { font-size:12px; color:#d8e8e8; font-weight:bold; }
+  .gh-drop-desc { font-size:10px; color:#888; line-height:1.2; }
+  .gh-drop-use-btn { background:#3a6a7a; color:#fff; border:none; border-radius:5px; padding:4px 8px; font-size:11px; cursor:pointer; white-space:nowrap; }
+  .gh-drop-use-btn:hover { background:#4a7a8a; }
+  .gh-drops-empty { font-size:12px; color:#666; text-align:center; padding:10px; }
+  .greenhouse-tips { background:#1a2528; border:1px solid #3a5a6a; border-radius:10px; padding:10px; }
+  .tips-title { font-size:13px; color:#8ac8d8; margin-bottom:6px; font-weight:bold; }
+  .greenhouse-tips ul { margin:0; padding-left:16px; }
+  .greenhouse-tips li { font-size:11px; color:#aaa; line-height:1.6; margin-bottom:2px; }
 </style>
 </head>
 <body>
@@ -1301,9 +1390,9 @@
         <div class="panel">
           <div class="panel-title">🏡 家园设施</div>
           <div class="facility-grid">
-            <div class="facility" onclick="showToast('仓库会保存远征带回的物资', 'success')"><div class="facility-icon">🏚️</div><div class="facility-name">物资仓库</div><div class="facility-state">容量充足 · 自动存档</div></div>
+            <div class="facility" onclick="Warehouse.open()"><div class="facility-icon">🏚️</div><div class="facility-name">物资仓库</div><div class="facility-state" id="warehouseState">容量充足 · 点击查看</div></div>
             <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
-            <div class="facility" onclick="showToast('温室能保护稀有作物', 'success')"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">作物图鉴 · 5种</div></div>
+            <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">种植稀有植物 · 获取道具</div></div>
             <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
           </div>
         </div>
@@ -1439,6 +1528,47 @@
   <div id="signalFlash"></div>
   <div id="lowHealthVignette"></div>
 
+  <!-- 物资仓库弹窗 -->
+  <div id="warehouseModal" class="overlay hidden">
+    <div class="warehouse-modal">
+      <div class="warehouse-modal-header">
+        <h2>📦 物资仓库</h2>
+        <button class="close-btn" onclick="Warehouse.close()">✕</button>
+      </div>
+      <div id="warehouseContent" class="warehouse-content"></div>
+    </div>
+  </div>
+
+  <!-- 育种温室弹窗 -->
+  <div id="greenhouseModal" class="overlay hidden">
+    <div class="greenhouse-modal">
+      <div class="greenhouse-modal-header">
+        <h2>🏡 育种温室</h2>
+        <button class="close-btn" onclick="Greenhouse.close()">✕</button>
+      </div>
+      <div class="greenhouse-content">
+        <div class="greenhouse-left">
+          <div class="greenhouse-grid-title">温室 4/16</div>
+          <div class="greenhouse-plant-selector" id="greenhousePlantSelector"></div>
+          <div class="greenhouse-grid" id="greenhouseGrid"></div>
+        </div>
+        <div class="greenhouse-right">
+          <div class="greenhouse-drops" id="greenhouseDrops"></div>
+          <div class="greenhouse-tips">
+            <div class="tips-title">💡 温室提示</div>
+            <ul>
+              <li>种植稀有植物需要消耗金币购买种子</li>
+              <li>稀有植物成熟后可收获各种道具</li>
+              <li>传说植物有概率解锁新的稀有植物</li>
+              <li>温室格子需要金币和材料解锁</li>
+              <li>作物转化卡可将普通作物变为稀有作物</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 提示消息容器 -->
   <div id="toastContainer"></div>
 </div>
@@ -1448,6 +1578,8 @@
   <script src="js/ui.js"></script>
   <script src="js/card.js"></script>
   <script src="js/farm.js"></script>
+  <script src="js/warehouse.js"></script>
+  <script src="js/greenhouse.js"></script>
   <script src="js/performance.js"></script>
   <script src="vendor/pixi.min.js"></script>
   <script src="js/pixi-renderer.js"></script>

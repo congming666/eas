@@ -1267,20 +1267,20 @@ class Expedition {
       this.bag.forEach(i => keptItems.push({ ...i, kept: true }));
       GameState.gold += totalGold;
       this.bag.filter(i => i.type === 'seed').forEach(i => {
-        GameState.seeds += i.amount;
+        Warehouse.addItem('seeds', i.amount);
         if (i.cropId && !GameState.unlockedCrops.includes(i.cropId)) {
           GameState.unlockedCrops.push(i.cropId);
           showToast(`解锁新作物：${CONFIG.crops.find(crop => crop.id === i.cropId)?.name || i.name}`, 'gold');
         }
       });
       this.bag.filter(i => i.type === 'material').forEach(i => {
-        GameState.materials += i.amount;
+        Warehouse.addItem('materials', i.amount);
       });
       this.bag.filter(i => i.type === 'consumable').forEach(i => {
-        GameState.loadout[i.id] = (GameState.loadout[i.id] || 0) + i.amount;
+        Warehouse.addItem(i.id, i.amount);
       });
       this.bag.filter(i => i.type === 'farm_item').forEach(i => {
-        GameState.farmItems[i.id] = (GameState.farmItems[i.id] || 0) + i.amount;
+        Warehouse.addItem(i.id, i.amount);
       });
     } else {
       // 失败：只有安全箱保留（简化：随机保留20%）
@@ -1288,7 +1288,9 @@ class Expedition {
         if (Math.random() < 0.2) {
           keptItems.push({ ...i, kept: true });
           if (i.type === 'gold') GameState.gold += Math.floor(i.amount * 0.2);
-          if (i.type === 'seed') GameState.seeds += Math.floor(i.amount * 0.5);
+          if (i.type === 'seed') Warehouse.addItem('seeds', Math.floor(i.amount * 0.5));
+          if (i.type === 'material') Warehouse.addItem('materials', Math.floor(i.amount * 0.5));
+          if (i.type === 'consumable') Warehouse.addItem(i.id, Math.max(1, Math.floor(i.amount * 0.5)));
         } else {
           lostItems.push({ ...i, kept: false });
         }

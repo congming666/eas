@@ -1,5 +1,5 @@
 const CONFIG = {
-  ruleset_id: 'farm-cards-expedition-v1.7',
+  ruleset_id: 'farm-cards-expedition-v1.9',
   canvas: { width: 1280, height: 720 },
   player: {
     maxHp: 100, maxEnergy: 100, speed: 220,
@@ -96,7 +96,96 @@ const CONFIG = {
     { id: 'corn', name: '玉米', icon: '🌽', growTime: 30, sellPrice: 45, seedPrice: 15, rarity: 'rare', cardChance: 0.20, upgradeSkill: 'vine_bind' },
     { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen' },
     { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true }
-  ]
+  ],
+  // 仓库物品定义
+  warehouseItems: {
+    // 作物类
+    wheat: { name: '小麦', icon: '🌾', category: 'crop', sellPrice: 15, rarity: 'common' },
+    pea_shooter: { name: '豌豆射手', icon: '🫛', category: 'crop', sellPrice: 12, rarity: 'rare' },
+    sunflower: { name: '向日葵', icon: '🌻', category: 'crop', sellPrice: 45, rarity: 'common' },
+    watermelon: { name: '西瓜', icon: '🍉', category: 'crop', sellPrice: 20, rarity: 'rare' },
+    cabbage: { name: '卷心菜', icon: '🥬', category: 'crop', sellPrice: 18, rarity: 'common' },
+    carrot: { name: '胡萝卜', icon: '🥕', category: 'crop', sellPrice: 25, rarity: 'common' },
+    corn: { name: '玉米', icon: '🌽', category: 'crop', sellPrice: 45, rarity: 'rare' },
+    pumpkin: { name: '南瓜', icon: '🎃', category: 'crop', sellPrice: 80, rarity: 'rare' },
+    moon_rice: { name: '月光稻', icon: '✨', category: 'crop', sellPrice: 200, rarity: 'legendary' },
+    // 资源类
+    seeds: { name: '种子', icon: '🌱', category: 'resource' },
+    materials: { name: '材料', icon: '🔧', category: 'resource' },
+    // 消耗品类
+    herb_kit: { name: '草药包扎包', icon: '💊', category: 'consumable' },
+    thorn_storm: { name: '荆棘狂潮', icon: '🌵', category: 'consumable' },
+    signal_flare: { name: '撤离信号弹', icon: '🔥', category: 'consumable' },
+    growth_catalyst: { name: '生长催化剂', icon: '⏳', category: 'consumable' },
+    // 温室掉落道具
+    gold_card: { name: '金币卡', icon: '💰', category: 'consumable', sellPrice: 200 },
+    big_gold_card: { name: '大金币卡', icon: '💎', category: 'consumable', sellPrice: 800 },
+    transform_card: { name: '作物转化卡', icon: '🔄', category: 'consumable', sellPrice: 150 },
+    rare_seed_pack: { name: '稀有种子包', icon: '🌱', category: 'consumable', sellPrice: 100 },
+    exp_boost_card: { name: '经验加成卡', icon: '📈', category: 'consumable', sellPrice: 120 },
+    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', category: 'consumable', sellPrice: 300 }
+  },
+  // 育种温室 - 稀有植物
+  greenhousePlants: [
+    { id: 'golden_wheat', name: '黄金小麦', icon: '🌟', growTime: 90, rarity: 'rare', seedPrice: 50,
+      desc: '闪耀着金光的小麦，成熟后有概率产出金币卡和催化剂',
+      drops: [
+        { id: 'gold_card', chance: 0.6, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.4, amount: 1 },
+        { id: 'gold', chance: 0.8, amount: [80, 150] }
+      ]},
+    { id: 'crystal_corn', name: '水晶玉米', icon: '💎', growTime: 150, rarity: 'epic', seedPrice: 120,
+      desc: '晶莹剔透的玉米，能产出作物转化卡和大量金币',
+      drops: [
+        { id: 'gold_card', chance: 0.5, amount: 1 },
+        { id: 'transform_card', chance: 0.5, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.3, amount: 1 },
+        { id: 'gold', chance: 0.9, amount: [150, 300] }
+      ]},
+    { id: 'rainbow_pumpkin', name: '彩虹南瓜', icon: '🎃', growTime: 200, rarity: 'epic', seedPrice: 200,
+      desc: '七彩斑斓的南瓜，蕴含着转化的魔力',
+      drops: [
+        { id: 'big_gold_card', chance: 0.4, amount: 1 },
+        { id: 'transform_card', chance: 0.6, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.5, amount: [1, 2] },
+        { id: 'gold', chance: 1, amount: [200, 400] }
+      ]},
+    { id: 'moonlight_rice', name: '月光稻', icon: '🌙', growTime: 280, rarity: 'legendary', seedPrice: 400,
+      desc: '只在月光下生长的神秘稻子，产出传说级奖励',
+      drops: [
+        { id: 'big_gold_card', chance: 0.6, amount: 1 },
+        { id: 'transform_card', chance: 0.5, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.7, amount: [1, 3] },
+        { id: 'rare_seed_pack', chance: 0.3, amount: 1 },
+        { id: 'gold', chance: 1, amount: [400, 800] }
+      ]},
+    { id: 'void_mushroom', name: '虚空蘑菇', icon: '🍄', growTime: 180, rarity: 'rare', seedPrice: 80,
+      desc: '来自虚空的蘑菇，能产出经验加成和神秘道具',
+      drops: [
+        { id: 'gold_card', chance: 0.4, amount: 1 },
+        { id: 'exp_boost_card', chance: 0.5, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.3, amount: 1 },
+        { id: 'gold', chance: 0.7, amount: [100, 200] }
+      ]},
+    { id: 'thunder_dragon_fruit', name: '雷龙果', icon: '⚡', growTime: 350, rarity: 'legendary', seedPrice: 600,
+      desc: '蕴含雷龙之力的果实，能强化武器和产出巨额奖励',
+      drops: [
+        { id: 'big_gold_card', chance: 0.7, amount: 1 },
+        { id: 'transform_card', chance: 0.4, amount: 1 },
+        { id: 'weapon_upgrade_stone', chance: 0.4, amount: 1 },
+        { id: 'growth_catalyst', chance: 0.5, amount: [2, 4] },
+        { id: 'gold', chance: 1, amount: [600, 1200] }
+      ]}
+  ],
+  // 温室掉落道具
+  greenhouseDrops: {
+    gold_card: { name: '金币卡', icon: '💰', desc: '使用获得500金币', value: 500, category: 'consumable', sellPrice: 200 },
+    big_gold_card: { name: '大金币卡', icon: '💎', desc: '使用获得2000金币', value: 2000, category: 'consumable', sellPrice: 800 },
+    transform_card: { name: '作物转化卡', icon: '🔄', desc: '将一块普通作物转化为随机稀有作物', category: 'consumable', sellPrice: 150 },
+    rare_seed_pack: { name: '稀有种子包', icon: '🌱', desc: '随机获得一种稀有植物种子', category: 'consumable', sellPrice: 100 },
+    exp_boost_card: { name: '经验加成卡', icon: '📈', desc: '下次远征击杀经验+50%', category: 'consumable', sellPrice: 120 },
+    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', desc: '永久提升当前武器伤害10%', category: 'consumable', sellPrice: 300 }
+  }
 };
 
 // ==================== 游戏状态 ====================
@@ -116,6 +205,14 @@ const GameState = {
   selectedWeapon: 'harvest_sickle',
   loadout: { herb_kit: 2, thorn_storm: 1, signal_flare: 0 },
   farmItems: { growth_catalyst: 0 },
+  warehouse: { capacity: 50, items: {} },
+  greenhouse: {
+    plots: [],
+    unlockedPlots: 4,
+    selectedPlant: 'golden_wheat',
+    unlockedPlants: ['golden_wheat', 'void_mushroom'],
+    weaponBonus: 0
+  },
   lastDailyClaim: '',
   dailyStreak: 0,
   lastReliefClaim: '',

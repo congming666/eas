@@ -45,6 +45,32 @@ const SaveSystem = {
           GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null });
         }
       }
+      // 加载物资仓库
+      if (data.warehouse && typeof data.warehouse === 'object') {
+        GameState.warehouse = {
+          capacity: Number(data.warehouse.capacity) || 50,
+          items: data.warehouse.items && typeof data.warehouse.items === 'object' ? data.warehouse.items : {}
+        };
+      } else {
+        GameState.warehouse = { capacity: 50, items: {} };
+      }
+      // 加载育种温室
+      if (data.greenhouse && typeof data.greenhouse === 'object') {
+        GameState.greenhouse = {
+          plots: Array.isArray(data.greenhouse.plots) ? data.greenhouse.plots.map(plot => ({
+            plant: plot.plantId ? CONFIG.greenhousePlants.find(p => p.id === plot.plantId) || null : null,
+            plantedAt: Number(plot.plantedAt) || 0,
+            ready: false,
+            status: plot.status || null
+          })) : [],
+          unlockedPlots: clamp(Number(data.greenhouse.unlockedPlots) || 4, 4, 16),
+          selectedPlant: CONFIG.greenhousePlants.some(p => p.id === data.greenhouse.selectedPlant) ? data.greenhouse.selectedPlant : 'golden_wheat',
+          unlockedPlants: Array.isArray(data.greenhouse.unlockedPlants) ? data.greenhouse.unlockedPlants : ['golden_wheat', 'void_mushroom'],
+          weaponBonus: Number(data.greenhouse.weaponBonus) || 0
+        };
+      } else {
+        GameState.greenhouse = { plots: [], unlockedPlots: 4, selectedPlant: 'golden_wheat', unlockedPlants: ['golden_wheat', 'void_mushroom'], weaponBonus: 0 };
+      }
       return true;
     } catch (error) {
       console.warn('读取本地存档失败，将使用新存档。', error);
@@ -77,6 +103,18 @@ const SaveSystem = {
           plantedAt: plot.plantedAt || 0,
           status: plot.status || null,
         })),
+        warehouse: GameState.warehouse || { capacity: 50, items: {} },
+        greenhouse: {
+          plots: (GameState.greenhouse?.plots || []).map(plot => ({
+            plantId: plot.plant?.id || null,
+            plantedAt: plot.plantedAt || 0,
+            status: plot.status || null
+          })),
+          unlockedPlots: GameState.greenhouse?.unlockedPlots || 4,
+          selectedPlant: GameState.greenhouse?.selectedPlant || 'golden_wheat',
+          unlockedPlants: GameState.greenhouse?.unlockedPlants || ['golden_wheat', 'void_mushroom'],
+          weaponBonus: GameState.greenhouse?.weaponBonus || 0
+        }
       }));
     } catch (error) {
       console.warn('保存本地存档失败。', error);

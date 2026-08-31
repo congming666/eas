@@ -52,10 +52,10 @@ const Farm = {
       grid.appendChild(cell);
     });
     document.getElementById('goldDisplay').textContent = GameState.gold;
-    document.getElementById('seedDisplay').textContent = GameState.seeds;
-    document.getElementById('materialDisplay').textContent = GameState.materials;
+    document.getElementById('seedDisplay').textContent = Warehouse.getCount('seeds');
+    document.getElementById('materialDisplay').textContent = Warehouse.getCount('materials');
     const catalystCount = document.getElementById('growthCatalystCount');
-    if (catalystCount) catalystCount.textContent = GameState.farmItems.growth_catalyst || 0;
+    if (catalystCount) catalystCount.textContent = Warehouse.getCount('growth_catalyst');
     this.renderCropSelector();
     RewardSystem.render();
   },
@@ -81,7 +81,7 @@ const Farm = {
 
   plant(idx) {
     if (idx >= GameState.unlockedPlots) return;
-    if (GameState.seeds <= 0) {
+    if (Warehouse.getCount('seeds') <= 0) {
       showToast('种子不足！去远征获取更多种子', 'warning');
       return;
     }
@@ -91,7 +91,7 @@ const Farm = {
     GameState.farmPlots[idx].ready = false;
     const ailmentRoll = Math.random();
     GameState.farmPlots[idx].status = ailmentRoll < 0.08 ? 'drought' : (ailmentRoll < 0.14 ? 'pest' : (ailmentRoll < 0.21 ? 'weeds' : null));
-    GameState.seeds--;
+    Warehouse.removeItem('seeds', 1);
     showToast(`种下了${crop.name}`, 'success');
     SaveSystem.save();
     this.render();
@@ -104,17 +104,27 @@ const Farm = {
       return;
     }
     const crop = plot.crop;
-    let rewardText = `${crop.sellPrice}金币`;
-    GameState.gold += crop.sellPrice;
-    if (Math.random() < 0.3) GameState.seeds++;
-    if (crop.rare) GameState.materials += randInt(1, 3);
+    // 作物存入仓库
+    const added = Warehouse.addItem(crop.id, 1);
+    let rewardText = `${crop.name} ×${added} 已入仓`;
+    // 30% 概率额外获得种子，存入仓库
+    if (Math.random() < 0.3) {
+      Warehouse.addItem('seeds', 1);
+      rewardText += '，种子 ×1 已入仓';
+    }
+    // 稀有作物额外获得材料，存入仓库
+    if (crop.rare) {
+      const matCount = randInt(1, 3);
+      Warehouse.addItem('materials', matCount);
+      rewardText += `，材料 ×${matCount} 已入仓`;
+    }
     if (crop.rewardType === 'gold') {
       const bonusGold = randInt(25, 45);
       GameState.gold += bonusGold;
-      rewardText = `${crop.sellPrice + bonusGold}金币`;
+      rewardText += `，额外金币 +${bonusGold}`;
     } else if (crop.rewardType === 'healing') {
-      GameState.loadout.herb_kit = (GameState.loadout.herb_kit || 0) + 1;
-      rewardText = '草药包扎包 x1';
+      Warehouse.addItem('herb_kit', 1);
+      rewardText += '，草药包扎包 ×1 已入仓';
     } else if (crop.rewardType === 'attack_card') {
       const card = CardSystem.createCard(crop);
       card.name = `豌豆连射 · ${card.name}`;
@@ -138,7 +148,7 @@ const Farm = {
     } else {
       CardSystem.tryDrop(crop);
     }
-    showToast(`收获${crop.name}，获得${rewardText}`, 'gold');
+    showToast(`收获${crop.name}，${rewardText}`, 'gold');
     plot.crop = null;
     plot.ready = false;
     plot.status = null;
@@ -162,7 +172,7 @@ const Farm = {
   },
 
   useGrowthCatalyst() {
-    const count = GameState.farmItems.growth_catalyst || 0;
+    const count = Warehouse.getCount('growth_catalyst');
     if (count <= 0) {
       showToast('没有生长催化剂，可从远征宝箱中获取', 'warning');
       return;
@@ -184,7 +194,7 @@ const Farm = {
     const { plot } = candidates[0];
     const reductionSeconds = plot.crop.growTime * 0.1;
     plot.plantedAt -= reductionSeconds * 1000;
-    GameState.farmItems.growth_catalyst = count - 1;
+    Warehouse.removeItem('growth_catalyst', 1);
     SaveSystem.save();
     showToast(`使用生长催化剂：${plot.crop.name}生长时间缩短${reductionSeconds.toFixed(1)}秒（总时长10%）`, 'success');
     this.render();
@@ -277,19 +287,21 @@ const Farm = {
     const container = document.getElementById('loadoutGrid');
     container.innerHTML = '';
     CONFIG.consumables.forEach(item => {
-      const count = GameState.loadout[item.id] || 0;
+      const equipped = GameState.loadout[item.id] || 0;
+      const inWarehouse = Warehouse.getCount(item.id);
       const div = document.createElement('div');
-      div.className = 'loadout-slot' + (count > 0 ? ' filled' : '');
+      div.className = 'loadout-slot' + (equipped > 0 ? ' filled' : '');
       div.innerHTML = `
         <div class="item-icon">${item.icon}</div>
         <div>${item.name}</div>
         <div class="loadout-effect">${item.desc}</div>
-        <div class="loadout-value">参考价值 ${item.value} 金币 · 携带 ${count}</div>
+        <div class="loadout-value">仓库 ${inWarehouse} · 已携带 ${equipped}</div>
       `;
       div.onclick = () => {
-        if (GameState.loadout[item.id] > 0) {
+        if (equipped > 0) {
           GameState.loadout[item.id]--;
-          showToast(`卸下1个${item.name}`);
+          Warehouse.addItem(item.id, 1);
+          showToast(`卸下1个${item.name}，放回仓库`);
         } else {
           // 从仓库取（简化：可以免费配置，远征后消耗）
           GameState.loadout[item.id] = Math.min(5, (GameState.loadout[item.id] || 0) + 1);
