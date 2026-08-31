@@ -314,8 +314,9 @@ class Expedition {
 
   renderTerrainDirect(ctx, cam) {
     const theme = this.map.terrain;
-    const viewW = CONFIG.canvas.width;
-    const viewH = CONFIG.canvas.height;
+    // 使用 chunk canvas 实际尺寸，而非全局画布尺寸（修复全黑问题）
+    const viewW = ctx.canvas.width || CONFIG.canvas.width;
+    const viewH = ctx.canvas.height || CONFIG.canvas.height;
     ctx.fillStyle = this.map.bgColor;
     ctx.fillRect(0, 0, viewW, viewH);
 
@@ -1013,6 +1014,7 @@ class Expedition {
     this.player.energy -= skill.energyCost;
     this.skillCooldowns[idx] = skill.cooldown;
     this.skillFlashes[idx] = 0.28;
+    AudioManager.playSkill(skill.id);
 
     const px = this.player.x, py = this.player.y;
     // 鼠标方向
@@ -1058,6 +1060,7 @@ class Expedition {
     }
     const item = CONFIG.consumables.find(c => c.id === id);
     this.consumableFlashes[id] = 0.3;
+    AudioManager.playConsumable(id);
     if (id === 'herb_kit') {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + item.heal);
       this.consumables[id]--;
@@ -1184,6 +1187,7 @@ class Expedition {
   openChest(chest) {
     chest.opened = true;
     this.chestOpened++;
+    AudioManager.playChestOpen();
     const loot = [];
     // 金币
     const gold = randInt(20, 80) * this.map.tier;
@@ -1240,12 +1244,14 @@ class Expedition {
   completeExtract() {
     this.gameOver = true;
     this.result = 'success';
+    AudioManager.playEvacuateSuccess();
     this.endExpedition();
   }
 
   playerDeath() {
     this.gameOver = true;
     this.result = 'failed';
+    AudioManager.playDeath();
     this.endExpedition();
   }
 
@@ -1758,6 +1764,7 @@ class Expedition {
       amount *= 0.76;
     }
     this.player.hp -= amount;
+    AudioManager.playPlayerHurt();
     this.damageTaken += amount;
     this.screenShake = Math.min(1, this.screenShake + 0.48);
     this.spawnHitParticles(this.player.x, this.player.y, '#ff4444');

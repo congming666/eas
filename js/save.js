@@ -38,6 +38,13 @@ const SaveSystem = {
           ready: false,
         }));
       }
+      // 确保 farmPlots 始终为 36 格（修复存档损坏或首次加载时空数组的问题）
+      if (!Array.isArray(GameState.farmPlots) || GameState.farmPlots.length !== 36) {
+        GameState.farmPlots = [];
+        for (let i = 0; i < 36; i++) {
+          GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null });
+        }
+      }
       return true;
     } catch (error) {
       console.warn('读取本地存档失败，将使用新存档。', error);

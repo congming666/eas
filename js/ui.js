@@ -287,6 +287,101 @@ const AudioManager = {
   updateControl() {
     const button = document.getElementById('musicToggle');
     if (button) button.textContent = this.enabled ? '♫ 音乐：开' : '♫ 音乐：关';
+  },
+
+  // ==================== 游戏音效 ====================
+
+  playNoise(duration = 0.1, gain = 0.05, filterFreq = 1000, filterType = 'lowpass') {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    const frameCount = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
+    const buffer = this.ctx.createBuffer(1, frameCount, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < frameCount; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / frameCount);
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = filterType;
+    filter.frequency.value = filterFreq;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    source.connect(filter); filter.connect(g); g.connect(this.master);
+    source.start(now);
+  },
+
+  playChestOpen() {
+    if (!this.ctx || !this.enabled) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((f, i) => setTimeout(() => {
+      this.playTone(f, 0.2, 'triangle', 0.08);
+      this.playTone(f * 2, 0.1, 'sine', 0.03);
+    }, i * 60));
+    this.playNoise(0.08, 0.04, 4000, 'highpass');
+  },
+
+  playSkill(skillId = '') {
+    if (!this.ctx || !this.enabled) return;
+    if (skillId === 'straw_smash') {
+      this.playTone(200, 0.2, 'sawtooth', 0.1);
+      this.playTone(80, 0.25, 'sine', 0.12);
+      this.playNoise(0.15, 0.06, 800);
+    } else if (skillId === 'vine_bind') {
+      this.playTone(300, 0.25, 'sine', 0.08);
+      setTimeout(() => this.playTone(600, 0.15, 'triangle', 0.06), 100);
+    } else if (skillId === 'earth_dash') {
+      this.playTone(600, 0.15, 'sawtooth', 0.08);
+      this.playNoise(0.1, 0.05, 2000);
+    } else if (skillId === 'smoke_screen') {
+      this.playNoise(0.3, 0.06, 400);
+      this.playTone(150, 0.3, 'sine', 0.06);
+    } else {
+      this.playTone(400, 0.15, 'square', 0.07);
+      this.playNoise(0.1, 0.05, 3000);
+    }
+  },
+
+  playPlayerHurt() {
+    if (!this.ctx || !this.enabled) return;
+    this.playTone(180, 0.2, 'sawtooth', 0.1);
+    this.playTone(90, 0.25, 'sine', 0.12);
+    this.playNoise(0.12, 0.08, 600);
+  },
+
+  playEvacuateSuccess() {
+    if (!this.ctx || !this.enabled) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+    notes.forEach((f, i) => setTimeout(() => {
+      this.playTone(f, 0.3, 'triangle', 0.1);
+      this.playTone(f * 1.5, 0.2, 'sine', 0.04);
+    }, i * 100));
+    setTimeout(() => {
+      this.playTone(1046.50, 0.5, 'sine', 0.08);
+      this.playTone(1318.51, 0.5, 'sine', 0.06);
+      this.playTone(1567.98, 0.5, 'sine', 0.05);
+    }, 500);
+  },
+
+  playDeath() {
+    if (!this.ctx || !this.enabled) return;
+    this.playTone(400, 0.5, 'sawtooth', 0.1);
+    setTimeout(() => this.playTone(200, 0.5, 'sawtooth', 0.1), 200);
+    setTimeout(() => this.playTone(100, 0.8, 'sine', 0.12), 400);
+    this.playNoise(0.3, 0.08, 300);
+  },
+
+  playConsumable(id = '') {
+    if (!this.ctx || !this.enabled) return;
+    if (id === 'herb_kit') {
+      this.playTone(400, 0.2, 'sine', 0.08);
+      setTimeout(() => this.playTone(800, 0.15, 'sine', 0.06), 100);
+    } else if (id === 'thorn_storm') {
+      this.playNoise(0.2, 0.1, 5000, 'highpass');
+      this.playTone(800, 0.2, 'sawtooth', 0.08);
+    } else if (id === 'signal_flare') {
+      this.playTone(600, 0.3, 'square', 0.08);
+      setTimeout(() => this.playTone(1200, 0.3, 'square', 0.08), 300);
+    }
   }
 };
 
