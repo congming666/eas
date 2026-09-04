@@ -74,6 +74,50 @@ const CONFIG = {
     { id: 'signal_flare', name: '撤离信号弹', icon: '🔥', key: 'E', value: 280,
       desc: '就地召唤撤离点（需宝箱获取）' }
   ],
+  // ========== 植物防线（远征可部署植物） ==========
+  plants: [
+    { id: 'pea_plant', name: '豌豆射手', icon: '🫛', type: 'attack', rarity: 'common',
+      deployCost: 8, sustain: 0.2, life: 60, hp: 60, maxPerRun: 3,
+      damage: 8, cooldown: 0.5, range: 260, projectileSpeed: 380,
+      desc: '持续远程输出，被厚甲猪克制' },
+    { id: 'frost_vine', name: '寒冰藤', icon: '🧊', type: 'slow', rarity: 'common',
+      deployCost: 10, sustain: 0.25, life: 50, hp: 50, maxPerRun: 3,
+      slowRadius: 120, slowFactor: 0.4,
+      desc: '对周围敌人减速40%，被疾风狼克制（免疫减速）' },
+    { id: 'bind_flower', name: '缠绕花', icon: '🌷', type: 'control', rarity: 'rare',
+      deployCost: 14, sustain: 0.3, life: 45, hp: 45, maxPerRun: 2,
+      controlRadius: 110, stunDuration: 1.5, cooldown: 4,
+      desc: '周期性定身范围内敌人（精英减半），专克快攻' },
+    { id: 'sun_flower', name: '阳光花', icon: '🌻', type: 'produce', rarity: 'rare',
+      deployCost: 6, sustain: 0, life: 80, hp: 40, maxPerRun: 2,
+      produceAmount: 2, produceInterval: 8,
+      desc: '周期性产出养分结晶，食草兽优先啃食' },
+    { id: 'sacred_tree', name: '圣树', icon: '🌳', type: 'ultimate', rarity: 'legendary',
+      deployCost: 30, sustain: 0.6, life: 90, hp: 150, maxPerRun: 1,
+      damage: 5, cooldown: 0.8, range: 180, slowRadius: 90, slowFactor: 0.3,
+      stunDuration: 0.8, controlRadius: 80, controlCooldown: 5, produceAmount: 2, produceInterval: 10,
+      desc: '全能植物：弱化输出+减速+控制+产养分，单局限1株' }
+  ],
+  // 养分资源线
+  nutrients: { start: 30, max: 200, crystalAmount: 5, crystalInterval: 20, normalKill: 2, eliteKill: 8 },
+  // 宝箱按T级掉落植物种子概率（common/rare/legendary）
+  plantDrops: [
+    { common: 0.35, rare: 0.08, legendary: 0 },
+    { common: 0.30, rare: 0.15, legendary: 0.01 },
+    { common: 0.25, rare: 0.20, legendary: 0.03 },
+    { common: 0.20, rare: 0.25, legendary: 0.06 }
+  ],
+  // 培育进度阈值
+  plantGrowth: { seedling: 30, mature: 70, deployable: 100,
+    basePerRun: 10, surviveBonus: 40, destroyPenalty: 30, firstDestroyPenalty: 15,
+    plantDestroyRecover: 3, firstDestroyGrace: 3 },
+  // 反制兵种按T级混入（T2起）
+  counterMixes: [
+    { swift_wolf: 0, herbivore: 0, armored_boar: 0 },       // T1 无
+    { swift_wolf: 0.16, herbivore: 0.14, armored_boar: 0 }, // T2 疾风狼+食草兽
+    { swift_wolf: 0.14, herbivore: 0.13, armored_boar: 0.12 }, // T3 +厚甲猪
+    { swift_wolf: 0.15, herbivore: 0.14, armored_boar: 0.13 }  // T4 全+精英
+  ],
   monsters: {
     boar: { name: '野猪', icon: '🐗', hp: 60, damage: 15, speed: 140, radius: 18, collisionRadius: 15,
       attackRange: 40, attackCooldown: 1.2, xp: 10, gold: 8 },
@@ -84,7 +128,16 @@ const CONFIG = {
     locust: { name: '巨型蝗虫', icon: '🦗', hp: 35, damage: 8, speed: 160, radius: 14,
       attackRange: 200, attackCooldown: 1.8, ranged: true, xp: 8, gold: 5 },
     wolf: { name: '野狼', icon: '🐺', hp: 50, damage: 12, speed: 180, radius: 16,
-      attackRange: 35, attackCooldown: 1.0, xp: 12, gold: 10 }
+      attackRange: 35, attackCooldown: 1.0, xp: 12, gold: 10 },
+    armored_boar: { name: '厚甲猪', icon: '🐗', hp: 95, damage: 18, speed: 105, radius: 21, collisionRadius: 17,
+      attackRange: 40, attackCooldown: 1.35, xp: 18, gold: 16, armor: 0.5, counter: 'armor',
+      desc: '披甲重装怪：减伤50%，专克输出植物' },
+    swift_wolf: { name: '疾风狼', icon: '🐺', hp: 46, damage: 12, speed: 240, radius: 15, collisionRadius: 11,
+      attackRange: 36, attackCooldown: 0.85, xp: 13, gold: 11, slowImmune: true, counter: 'slow',
+      desc: '速度极快且免疫减速，专克减速植物' },
+    herbivore: { name: '食草兽', icon: '🦌', hp: 62, damage: 11, speed: 118, radius: 18, collisionRadius: 14,
+      attackRange: 34, attackCooldown: 1.15, xp: 15, gold: 12, plantHate: true, counter: 'plant',
+      desc: '专啃植物防线，优先攻击植物' }
   },
   crops: [
     { id: 'pea_shooter', name: '豌豆射手', icon: '🫛', growTime: 24, sellPrice: 12, seedPrice: 8, rarity: 'rare', cardChance: 1, upgradeSkill: 'straw_smash', rewardType: 'attack_card', rewardLabel: '必得攻击卡' },
@@ -217,7 +270,16 @@ const GameState = {
   dailyStreak: 0,
   lastReliefClaim: '',
   expedition: null,
-  lastTime: 0
+  lastTime: 0,
+  // 植物防线（远征带回的可部署植物种子与培育进度）
+  // key=植物id, value={ progress: 0~100, count: 持有种子数 }
+  // 初始赠送2株可部署植物便于体验布防
+  defensePlants: {
+    pea_plant: { progress: 100, count: 1 },
+    frost_vine: { progress: 100, count: 1 }
+  },
+  // 本次远征携带的可部署防线（植物id数组）
+  defenseLoadout: ['pea_plant', 'frost_vine']
 };
 
 // ==================== 本地存档 ====================

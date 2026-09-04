@@ -312,6 +312,53 @@ const Farm = {
       };
       container.appendChild(div);
     });
+  },
+
+  // 植物防线配置（培育到100可携带部署）
+  renderDefenseLoadout() {
+    const container = document.getElementById('defenseLoadoutGrid');
+    if (!container) return;
+    container.innerHTML = '';
+    const g = CONFIG.plantGrowth;
+    CONFIG.plants.forEach(plant => {
+      const rec = GameState.defensePlants[plant.id] || { progress: 0, count: 0 };
+      const deployable = rec.progress >= g.deployable && rec.count > 0;
+      const equipped = GameState.defenseLoadout.includes(plant.id);
+      const div = document.createElement('div');
+      div.className = 'loadout-slot' + (equipped ? ' filled' : '') + (rec.count <= 0 ? ' muted' : '');
+      const stage = rec.progress >= g.deployable ? '可部署' : (rec.progress >= g.mature ? '成熟' : (rec.progress >= g.seedling ? '幼苗' : '未培育'));
+      div.innerHTML = `
+        <div class="item-icon">${plant.icon}</div>
+        <div>${plant.name} <small style="color:#8fa;font-size:10px;">${stage}</small></div>
+        <div class="loadout-effect">${plant.desc}</div>
+        <div class="loadout-value">持有 ${rec.count} · 培育 ${Math.floor(rec.progress)}/100</div>
+        <div class="growth-bar" style="height:6px;margin-top:4px;background:#1c2a20;border-radius:3px;overflow:hidden;">
+          <div class="growth-fill" style="width:${Math.floor(rec.progress)}%;height:100%;background:linear-gradient(90deg,#3f9d56,#7dff9a);"></div>
+        </div>
+        <div class="loadout-value" style="color:#9fd7b2;">${deployable ? (equipped ? '✔ 已装备' : '点击装备携带') : (rec.count > 0 ? `培育${g.deployable}后携带` : '远征宝箱获取种子')}</div>
+      `;
+      if (deployable) {
+        div.style.cursor = 'pointer';
+        div.onclick = () => {
+          if (equipped) {
+            GameState.defenseLoadout = GameState.defenseLoadout.filter(id => id !== plant.id);
+            showToast(`卸下防线：${plant.name}`);
+          } else {
+            if (GameState.defenseLoadout.length >= 6) {
+              showToast('防线携带上限为6种', 'warning');
+              return;
+            }
+            GameState.defenseLoadout.push(plant.id);
+            showToast(`装备防线：${plant.name}`, 'success');
+          }
+          SaveSystem.save();
+          this.renderDefenseLoadout();
+        };
+      } else {
+        div.title = rec.count > 0 ? `培育到${g.deployable}后可携带部署` : '未持有种子，远征宝箱有概率掉落';
+      }
+      container.appendChild(div);
+    });
   }
 };
 

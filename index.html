@@ -289,6 +289,7 @@
     transition: all 0.15s;
   }
   .loadout-slot:hover { border-color: #7fff7f; }
+  .loadout-slot.muted { opacity: .5; }
   .loadout-slot.filled {
     border-style: solid;
     border-color: #5a8a5a;
@@ -383,6 +384,7 @@
   }
   .hp-fill { background: linear-gradient(90deg, #ff4444, #ff6666); }
   .energy-fill { background: linear-gradient(90deg, #4488ff, #66aaff); }
+  .nutrient-fill { background: linear-gradient(90deg, #e2a82a, #ffe28a); }
   .stat-value {
     position: absolute;
     top: 50%; left: 50%;
@@ -852,6 +854,28 @@
   .consumable-bar .skill-slot::after {
     content:"🔥"; position:absolute; right:4px; bottom:2px; font-size:9px; opacity:.62;
   }
+  .defense-bar {
+    position:absolute; left:50%; transform:translateX(-50%); bottom:96px;
+    display:flex; gap:7px; padding:8px;
+    border:1px solid rgba(125,255,154,.2); border-radius:15px;
+    background:rgba(10,22,16,.82); backdrop-filter:blur(12px);
+    box-shadow:0 13px 30px rgba(0,0,0,.42);
+    pointer-events:auto; max-width: 82%;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .defense-slot {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-width:86px; padding:5px 9px; gap:2px;
+    border:1px solid rgba(125,255,154,.28); border-radius:11px;
+    background:linear-gradient(145deg, rgba(24,52,38,.95), rgba(12,24,18,.97));
+    color:#d7ffe2; font-size:11px; cursor:pointer;
+  }
+  .defense-slot.selected { border-color:#7dff9a; box-shadow:0 0 12px rgba(125,255,154,.55); background:linear-gradient(145deg, rgba(40,86,58,.97), rgba(18,40,28,.97)); }
+  .defense-slot.spent { opacity:.42; }
+  .defense-slot.empty { min-width:220px; color:#9fb8a8; font-style:italic; }
+  .defense-key { position:absolute; top:3px; left:6px; font-size:9px; color:#8fd8a8; background:rgba(0,0,0,.4); padding:1px 4px; border-radius:4px; }
+  .defense-icon { font-size:22px; line-height:1; }
+  .defense-meta { font-size:9px; color:#9fd7b2; }
   .controls-hint {
     background: rgba(4,12,11,.75);
     border: 1px solid rgba(190,255,220,.12);
@@ -1448,6 +1472,10 @@
           <div class="panel-title">🎒 携带消耗品</div>
           <div class="loadout-grid" id="loadoutGrid"></div>
         </div>
+        <div class="prep-panel prep-loadout">
+          <div class="panel-title">🌿 携带植物防线（培育满100可部署）</div>
+          <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
+        </div>
         <div class="prep-panel">
           <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
           <div class="boost-card-grid" id="boostCardGrid"></div>
@@ -1482,6 +1510,13 @@
             <span class="stat-value" id="energyText">100/100</span>
           </div>
         </div>
+        <div class="stat-bar">
+          <span class="stat-label">养分</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill nutrient-fill" id="nutrientBar" style="width:100%"></div>
+            <span class="stat-value" id="nutrientText">30/200</span>
+          </div>
+        </div>
       </div>
       <div class="hud-panel">
         <div class="timer-display" id="timerDisplay">12:00</div>
@@ -1492,8 +1527,9 @@
     <div class="hud-bottom" id="skillBar"></div>
     <div id="weaponDisplay"></div>
     <div class="consumable-bar" id="consumableBar"></div>
+    <div class="defense-bar" id="defenseBar"></div>
     <canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
-    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · 近战范围内自动拾取 · <kbd>1-4</kbd> 释放技能</div>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · 近战范围内自动拾取 · <kbd>1-4</kbd> 释放技能 · <kbd>5-9</kbd> 选防线 / <kbd>Z</kbd> 切换 · 左键部署</div>
     <div class="controls-hint">
       <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | 战利品自动拾取<br>
       <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>

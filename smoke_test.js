@@ -22,7 +22,7 @@ async function main() {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.waitForLoadState('networkidle');
-  if ((await page.title()) !== '农庄牌：荒野远征 v1.5') throw new Error('标题不正确');
+  if ((await page.title()) !== '农庄牌：荒野远征 v1.9') throw new Error('标题不正确');
   if (!(await page.locator('#mainMenu').isVisible())) throw new Error('主菜单未显示');
 
   await page.getByRole('button', { name: '开始游戏' }).click();

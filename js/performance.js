@@ -2,6 +2,7 @@ class SpatialHash {
   constructor(cellSize = 160) {
     this.cellSize = cellSize;
     this.cells = new Map();
+    this._queryResult = []; // 复用查询结果数组，避免每帧高频查询分配
   }
 
   key(x, y) { return `${Math.floor(x / this.cellSize)},${Math.floor(y / this.cellSize)}`; }
@@ -16,15 +17,17 @@ class SpatialHash {
     });
   }
 
+  // 注意：返回内部复用数组，调用方必须在本次调用内消费完，不可跨调用持有引用。
   queryCircle(x, y, radius) {
-    const result = [];
+    const result = this._queryResult;
+    result.length = 0;
     const minX = Math.floor((x - radius) / this.cellSize);
     const maxX = Math.floor((x + radius) / this.cellSize);
     const minY = Math.floor((y - radius) / this.cellSize);
     const maxY = Math.floor((y + radius) / this.cellSize);
     for (let cy = minY; cy <= maxY; cy++) for (let cx = minX; cx <= maxX; cx++) {
       const bucket = this.cells.get(`${cx},${cy}`);
-      if (bucket) result.push(...bucket);
+      if (bucket) for (let i = 0; i < bucket.length; i++) result.push(bucket[i]);
     }
     return result;
   }

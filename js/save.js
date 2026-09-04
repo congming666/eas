@@ -71,6 +71,22 @@ const SaveSystem = {
       } else {
         GameState.greenhouse = { plots: [], unlockedPlots: 4, selectedPlant: 'golden_wheat', unlockedPlants: ['golden_wheat', 'void_mushroom'], weaponBonus: 0 };
       }
+      // 加载植物防线（远征带回的可部署植物种子与培育进度）
+      // 老存档无此字段时保留 config.js 的初始可部署种子
+      if (data.defensePlants && typeof data.defensePlants === 'object') {
+        GameState.defensePlants = {};
+        Object.keys(data.defensePlants).forEach(id => {
+          if (!CONFIG.plants.some(p => p.id === id)) return;
+          const rec = data.defensePlants[id] || {};
+          GameState.defensePlants[id] = {
+            progress: clamp(Number(rec.progress) || 0, 0, 100),
+            count: Math.max(0, Math.floor(Number(rec.count) || 1))
+          };
+        });
+      }
+      if (Array.isArray(data.defenseLoadout)) {
+        GameState.defenseLoadout = data.defenseLoadout.filter(id => CONFIG.plants.some(p => p.id === id)).slice(0, 6);
+      }
       return true;
     } catch (error) {
       console.warn('读取本地存档失败，将使用新存档。', error);
@@ -115,6 +131,9 @@ const SaveSystem = {
           unlockedPlants: GameState.greenhouse?.unlockedPlants || ['golden_wheat', 'void_mushroom'],
           weaponBonus: GameState.greenhouse?.weaponBonus || 0
         }
+,
+        defensePlants: GameState.defensePlants || {},
+        defenseLoadout: Array.isArray(GameState.defenseLoadout) ? GameState.defenseLoadout : []
       }));
     } catch (error) {
       console.warn('保存本地存档失败。', error);

@@ -50,6 +50,7 @@ const Game = {
     GameState.screen = 'prep';
     Farm.renderMapSelect();
     Farm.renderLoadout();
+    Farm.renderDefenseLoadout();
     Farm.renderSkillPreview();
     CardSystem.renderBoostSelection();
   },
@@ -154,7 +155,17 @@ const Game = {
     `;
 
     const lootList = document.getElementById('lootList');
-    lootList.innerHTML = '<div style="font-size:14px;color:#888;margin-bottom:8px;">战利品清单</div>';
+    const plantGrowth = Array.isArray(data.plantGrowth) ? data.plantGrowth : [];
+    let plantHtml = '';
+    if (plantGrowth.length > 0) {
+      plantHtml = '<div style="font-size:14px;color:#7dff9a;margin:10px 0 6px;">🌿 植物培育</div>';
+      plantGrowth.forEach(p => {
+        const sign = p.delta > 0 ? '+' : '';
+        const color = p.delta > 0 ? '#7dff9a' : '#ff9a55';
+        plantHtml += `<div class="loot-item kept" style="margin-bottom:4px;"><span>${p.icon} ${p.name}</span><span style="color:${color};">${sign}${p.delta} 培育进度</span></div>`;
+      });
+    }
+    lootList.innerHTML = '<div style="font-size:14px;color:#888;margin-bottom:8px;">战利品清单</div>' + plantHtml;
     data.keptItems.forEach(i => {
       lootList.innerHTML += `<div class="loot-item kept"><span>${i.icon} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
     });
@@ -175,6 +186,7 @@ const Game = {
     Farm.render();
     Farm.renderMapSelect();
     Farm.renderLoadout();
+    Farm.renderDefenseLoadout();
     this.expedition = null;
   }
 };
@@ -197,5 +209,5 @@ function renderMenuBg() {
 }
 renderMenuBg();
 
-console.log('农庄牌：荒野远征 v1.5 已加载');
+console.log('农庄牌：荒野远征 v1.9 已加载');
 console.log('Ruleset ID:', CONFIG.ruleset_id);

@@ -1,3 +1,6 @@
+// 静止形状粒子类型（不参与位移积分，仅缩放/旋转呈现）
+const STATIC_SHAPE_TYPES = new Set(['aoe', 'slash', 'weaponRing', 'vine', 'earthTrail']);
+
 class Expedition {
   constructor(mapId) {
     this.map = CONFIG.maps.find(m => m.id === mapId);
@@ -30,6 +33,23 @@ class Expedition {
     this.consumableFlashes = {};
     this.skillBoosts = CardSystem.getSelectedBoosts();
     this.consumables = { ...GameState.loadout };
+    // ===== 植物防线系统（养分/部署/培育） =====
+    this.nutrient = CONFIG.nutrients.start;
+    this.nutrientMax = CONFIG.nutrients.max;
+    this.nutrientTimer = 0;          // 养分结晶刷新计时
+    this.nutrientCrystals = [];      // 地图上的养分结晶 {x,y,bob,amount}
+    this.plants = [];                // 已部署植物
+    this.plantSeeds = {};            // 本局可部署防线种子 id -> { maxPerRun, deployed }
+    this.selectedPlantId = null;     // 当前选中的防线种子
+    this.plantRecords = [];          // 本局部署记录 { seedId, survived, recovered, destroyIdx }
+    this.plantDestroyCount = {};     // 种子被摧毁次数（首杀-15 判定）
+    this.growthSummary = [];         // 本局培育结算摘要 { id, name, icon, delta }
+    // 从准备大厅携带已培育到可部署的植物
+    CONFIG.plants.forEach(p => {
+      if (GameState.defenseLoadout.includes(p.id)) {
+        this.plantSeeds[p.id] = { maxPerRun: p.maxPerRun, deployed: 0 };
+      }
+    });
     this.monsters = [];
     this.chests = [];
     this.towers = [];
@@ -44,6 +64,12 @@ class Expedition {
     this.projectiles = [];
     this.particles = [];
     this.damageNumbers = [];
+    this.particlePool = [];       // 粒子对象池（消灭每帧 filter 分配）
+    this.projectilePool = [];     // 弹道对象池
+    this.hudTimer = 0;            // HUD 重量更新节流计时
+    this.plantsSorted = null;     // 植物按 y 预排序缓存（渲染层排序用）
+    this.plantsDirty = true;
+    this.obstaclesByY = null;     // 障碍物按 y 预排序缓存（遮挡分层用）
     this.hitStop = 0;
     this.killFlash = 0;
     this.extractPoints = [];
@@ -120,6 +146,7 @@ class Expedition {
     this.generateTerrain();
     this.spawnEntities();
     this.obstacleSpatialHash.rebuild(this.obstacles);
+    this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
     this.setupMission();
     this.setupInput();
@@ -279,12 +306,14 @@ class Expedition {
       const type = obstacleTypes[randInt(0, obstacleTypes.length - 1)];
       const scales = { tree:1.1, bush:.88, deadTree:1.05, rock:.9, hay:.9, fence:1.15, ruin:1.25, toxicCrystal:1, voidCrystal:1.05, monolith:1.25 };
       const scale = (scales[type] || 1) * rand(.78, 1.22);
-      const footprint = { tree:24, bush:24, rock:19, hay:20, fence:26, ruin:25, deadTree:20, toxicCrystal:16, voidCrystal:16, monolith:19 };
+      const footprint = { tree:32, bush:26, rock:19, hay:20, fence:26, ruin:25, deadTree:28, toxicCrystal:16, voidCrystal:16, monolith:19 };
+      // 植物类碰撞盒扩大到覆盖视觉树冠/灌木本体，避免玩家角色“钻”进植物里。
+      // 数值以精灵图不透明像素包围盒为准：树冠半宽约43、灌木约13、枯树约21（scale=1）。
       const footprintShape = {
-        tree: { rx: 29, ry: 17, offsetY: 4 },
-        bush: { rx: 31, ry: 17, offsetY: 4 },
+        tree: { rx: 52, ry: 32, offsetY: 4 },
+        bush: { rx: 34, ry: 24, offsetY: 4 },
         rock: { rx: 23, ry: 15, offsetY: 3 },
-        deadTree: { rx: 24, ry: 15, offsetY: 3 },
+        deadTree: { rx: 38, ry: 26, offsetY: 3 },
       }[type];
       this.obstacles.push({
         type, x, y, scale, radius: (footprint[type] || 18) * scale,
@@ -816,6 +845,12 @@ class Expedition {
       const extraTypes = this.map.tier >= 2 ? ['locust'] : [];
       if (this.map.tier >= 3) extraTypes.push('wolf');
       const pool = [...basicTypes, ...extraTypes];
+      // 反制兵种按T级固定混入（T2起：疾风狼/食草兽，T3+厚甲猪）
+      const mix = CONFIG.counterMixes[this.map.tier - 1] || { swift_wolf: 0, herbivore: 0, armored_boar: 0 };
+      ['swift_wolf', 'herbivore', 'armored_boar'].forEach(mt => {
+        const weight = mix[mt] || 0;
+        for (let k = 0; k < Math.round(weight * (pool.length || 1)); k++) pool.push(mt);
+      });
       const type = pool[randInt(0, pool.length - 1)];
       const data = CONFIG.monsters[type];
       const position = this.findSafeSpawn(300, size - 300, data.radius || 18);
@@ -870,6 +905,11 @@ class Expedition {
       { x: rand(100, 300), y: rand(100, size-100), radius: 50 },
       { x: rand(size-300, size-100), y: rand(100, size-100), radius: 50 }
     ];
+    // 初始养分结晶
+    for (let i = 0; i < 3 + this.map.tier; i++) {
+      const pos = this.findSafeSpawn(150, size - 150, 16);
+      this.spawnNutrientCrystal(pos.x, pos.y, CONFIG.nutrients.crystalAmount);
+    }
   }
 
   spawnBoss() {
@@ -952,6 +992,8 @@ class Expedition {
       if (e.key === '2') this.useSkill(1);
       if (e.key === '3') this.useSkill(2);
       if (e.key === '4') this.useSkill(3);
+      if (e.key >= '5' && e.key <= '9') this.selectPlantByKey(Number(e.key) - 5);
+      if (e.key.toLowerCase() === 'z') this.cyclePlantSelection(1);
       if (e.key === 'Tab' || e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
       if (e.key === 'q' && e.shiftKey) { e.preventDefault(); this.cycleWeapon(-1); }
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
@@ -967,7 +1009,7 @@ class Expedition {
     this.mousedownHandler = (e) => {
       if (e.button === 0) {
         this.mouse.down = true;
-        this.tryInteract();
+        if (!this.tryDeployPlant()) this.tryInteract();
       }
     };
     this.mouseupHandler = (e) => { if (e.button === 0) this.mouse.down = false; };
@@ -1113,6 +1155,21 @@ class Expedition {
       this.spawnAoeEffect(x, y, 70, '#7de7ff');
       this.spawnRadialBurst(x, y, '#e6fbff', 22);
       showToast('无敌核心生效：5 秒内免疫一切伤害和控制！', 'success');
+    } else if (item.type === 'plant_seed') {
+      const plant = CONFIG.plants.find(p => p.id === item.plantId);
+      if (plant) {
+        if (!this.plantSeeds[plant.id]) this.plantSeeds[plant.id] = { maxPerRun: plant.maxPerRun, deployed: 0 };
+        const rec = GameState.defensePlants[plant.id] || { progress: 0, count: 0 };
+        rec.count = (rec.count || 0) + 1;
+        GameState.defensePlants[plant.id] = rec;
+        this.spawnAoeEffect(x, y, 34, '#7dff9a');
+        showToast(`拾取防线种子：${plant.name}（本局可部署，培育中）`, 'gold');
+      }
+    } else if (item.type === 'plant_remains') {
+      const record = this.plantRecords.find(r => r.seedId === item.seedId && r.destroyed && !r.recovered);
+      if (record) record.recovered = true;
+      this.spawnAoeEffect(x, y, 30, '#a5e675');
+      showToast('回收植物残骸，培育损失减半', 'gold');
     } else {
       this.bag.push(item);
       this.spawnAoeEffect(x, y, 34, '#f6c75b');
@@ -1120,6 +1177,285 @@ class Expedition {
     }
     this.updateHUD();
     return true;
+  }
+
+  // ==================== 植物防线系统 ====================
+  getPlantSeedList() {
+    return Object.keys(this.plantSeeds).map(id => {
+      const plant = CONFIG.plants.find(p => p.id === id);
+      if (!plant) return null;
+      const seed = this.plantSeeds[id];
+      return { ...plant, deployed: seed.deployed, maxPerRun: seed.maxPerRun };
+    }).filter(Boolean);
+  }
+
+  selectPlantByKey(idx) {
+    const list = this.getPlantSeedList();
+    if (idx >= list.length) { this.selectedPlantId = null; this.updateHUD(); return; }
+    const id = list[idx].id;
+    this.selectedPlantId = this.selectedPlantId === id ? null : id;
+    showToast(this.selectedPlantId ? `已选择防线：${CONFIG.plants.find(p => p.id === id).name}，点击空地部署` : '已取消选择防线', this.selectedPlantId ? 'success' : '');
+    this.updateHUD();
+  }
+
+  cyclePlantSelection(dir) {
+    const list = this.getPlantSeedList();
+    if (list.length === 0) { this.selectedPlantId = null; this.updateHUD(); return; }
+    const currentIdx = list.findIndex(p => p.id === this.selectedPlantId);
+    const next = (currentIdx + dir + list.length) % list.length;
+    this.selectedPlantId = list[next].id;
+    showToast(`已选择防线：${list[next].name}`, 'success');
+    this.updateHUD();
+  }
+
+  isInWater(wx, wy, radius) {
+    for (const patch of this.terrainPatches) {
+      if (patch.type !== 'water') continue;
+      const dx = wx - patch.x, dy = wy - patch.y;
+      const cos = Math.cos(-(patch.rotation || 0)), sin = Math.sin(-(patch.rotation || 0));
+      const lx = dx * cos - dy * sin, ly = dx * sin + dy * cos;
+      const rx = patch.rx + radius, ry = patch.ry + radius;
+      if (lx * lx / (rx * rx) + ly * ly / (ry * ry) < 1) return true;
+    }
+    return false;
+  }
+
+  canDeployHere(wx, wy, radius) {
+    const size = CONFIG.expedition.mapSize;
+    if (wx < radius || wx > size - radius || wy < radius || wy > size - radius) return false;
+    if (this.collidesWithObstacle(wx, wy, radius)) return false;
+    if (this.isInWater(wx, wy, radius)) return false;
+    if (this.towers.some(t => dist({ x: wx, y: wy }, t) < t.radius + radius)) return false;
+    if (this.plants.some(p => dist({ x: wx, y: wy }, p) < radius + 16)) return false;
+    return true;
+  }
+
+  tryDeployPlant() {
+    if (!this.selectedPlantId) return false;
+    const seed = this.plantSeeds[this.selectedPlantId];
+    const plant = CONFIG.plants.find(p => p.id === this.selectedPlantId);
+    if (!seed || !plant) { this.selectedPlantId = null; this.updateHUD(); return false; }
+    if (seed.deployed >= seed.maxPerRun) {
+      showToast(`${plant.name}本局已达部署上限（${seed.maxPerRun}株）`, 'warning');
+      return true;
+    }
+    const wx = this.mouse.x + this.camera.x;
+    const wy = this.mouse.y + this.camera.y;
+    if (dist(this.player, { x: wx, y: wy }) > 240) {
+      showToast('部署距离过远（最远240）', 'warning');
+      return true;
+    }
+    const cost = plant.deployCost;
+    if (this.nutrient < cost) {
+      showToast(`养分不足（需要${cost}，当前${Math.floor(this.nutrient)}）`, 'warning');
+      return true;
+    }
+    if (!this.canDeployHere(wx, wy, 18)) {
+      showToast('此处不能部署（障碍物/水域/塔/植物占位）', 'warning');
+      return true;
+    }
+    this.deployPlant(plant, wx, wy);
+    return true;
+  }
+
+  deployPlant(plant, wx, wy) {
+    this.nutrient -= plant.deployCost;
+    const seed = this.plantSeeds[plant.id];
+    seed.deployed++;
+    this.plants.push({
+      id: plant.id, type: plant.type, name: plant.name, icon: plant.icon,
+      x: wx, y: wy,
+      hp: plant.hp, maxHp: plant.hp,
+      life: plant.life, maxLife: plant.life,
+      sustain: plant.sustain, deployCost: plant.deployCost,
+      cooldown: plant.cooldown || 0.8, range: plant.range || 180,
+      damage: plant.damage || 5, projectileSpeed: plant.projectileSpeed || 380,
+      slowRadius: plant.slowRadius || 90, slowFactor: plant.slowFactor || 0.3,
+      controlRadius: plant.controlRadius || 80, stunDuration: plant.stunDuration || 0.8,
+      controlCooldown: plant.controlCooldown || 4, produceAmount: plant.produceAmount || 2,
+      produceInterval: plant.produceInterval || 8,
+      timer: 0, controlTimer: 0, produceTimer: 0, hitFlash: 0, attackAnim: 0, starving: false,
+      seedId: plant.id,
+    });
+    this.plantsDirty = true;
+    this.plantRecords.push({ seedId: plant.id, survived: false, recovered: false, destroyed: false });
+    showToast(`部署${plant.name}，预扣养分${plant.deployCost}`, 'success');
+    this.spawnAoeEffect(wx, wy, 34, '#7dff9a');
+    this.spawnRadialBurst(wx, wy, '#b9ffd1', 12);
+    this.updateHUD();
+  }
+
+  damagePlant(plant, amount) {
+    if (!plant || plant.hp <= 0) return;
+    plant.hp -= amount;
+    plant.hitFlash = 0.15;
+    this.damageNumbers.push({
+      x: plant.x + rand(-8, 8), y: plant.y - 22,
+      value: Math.round(amount), color: '#ff9a55', life: .5, maxLife: .5,
+      vx: rand(-8, 8), vy: -40, heavy: false
+    });
+    if (plant.hp <= 0) this.destroyPlant(plant);
+  }
+
+  destroyPlant(plant) {
+    plant.hp = 0;
+    const record = this.plantRecords.find(r => r.seedId === plant.seedId && !r.destroyed);
+    if (record) record.destroyed = true;
+    this.plantDestroyCount[plant.seedId] = (this.plantDestroyCount[plant.seedId] || 0) + 1;
+    const idx = this.plants.indexOf(plant);
+    if (idx >= 0) this.plants.splice(idx, 1);
+    this.plantsDirty = true;
+    showToast(`${plant.name}被摧毁！培育进度损失，3秒内可回收残骸`, 'warning');
+    this.spawnAoeEffect(plant.x, plant.y, 40, '#ff6644');
+    this.spawnHitParticles(plant.x, plant.y, '#ff7744');
+    this.spawnGroundLoot({
+      type: 'plant_remains', name: '植物残骸', amount: 1, icon: '🌿',
+      seedId: plant.seedId, expiresAt: performance.now() / 1000 + 3
+    }, plant.x, plant.y);
+    this.updateHUD();
+  }
+
+  updatePlants(dt) {
+    const toRemove = [];
+    for (const plant of this.plants) {
+      // 养分维持
+      if (plant.sustain > 0) {
+        this.nutrient -= plant.sustain * dt;
+        if (this.nutrient < 0) { this.nutrient = 0; plant.hp -= dt * 3; plant.starving = true; }
+        else plant.starving = false;
+      }
+      // 寿命
+      plant.life -= dt;
+      if (plant.life <= 0) { toRemove.push(plant); continue; }
+      // 输出
+      if (plant.type === 'attack' || plant.type === 'ultimate') {
+        plant.timer -= dt;
+        if (plant.timer <= 0) {
+          plant.timer = plant.cooldown;
+          let nearest = null, minD = plant.range;
+          this.monsters.forEach(m => { if (m.hp > 0) { const d = dist(plant, m); if (d < minD) { minD = d; nearest = m; } } });
+          this.raiders.forEach(r => { const d = dist(plant, r); if (d < minD) { minD = d; nearest = r; } });
+          if (nearest) {
+            const p = this.allocProjectile();
+            Object.assign(p, {
+              x: plant.x, y: plant.y - 8,
+              vx: (nearest.x - plant.x) / minD * plant.projectileSpeed,
+              vy: (nearest.y - plant.y) / minD * plant.projectileSpeed,
+              damage: plant.damage, life: plant.range / plant.projectileSpeed,
+              fromPlant: true, radius: 6, color: plant.type === 'ultimate' ? '#d9ffb0' : '#7dff9a'
+            });
+            p.hit = p.hit || []; p.hit.length = 0;
+            this.projectiles.push(p);
+            plant.attackAnim = 0.2;
+          }
+        }
+      }
+      // 减速
+      if (plant.type === 'slow' || plant.type === 'ultimate') {
+        this.monsters.forEach(m => {
+          if (m.hp > 0 && !m.slowImmune && dist(plant, m) < plant.slowRadius) {
+            m.slow = Math.max(m.slow || 0, plant.slowFactor);
+          }
+        });
+      }
+      // 控制
+      if (plant.type === 'control' || plant.type === 'ultimate') {
+        plant.controlTimer -= dt;
+        if (plant.controlTimer <= 0) {
+          plant.controlTimer = plant.controlCooldown;
+          this.monsters.forEach(m => {
+            if (m.hp > 0 && dist(plant, m) < plant.controlRadius) {
+              const stun = plant.stunDuration * (m.elite ? 0.5 : 1);
+              m.stunned = Math.max(m.stunned || 0, stun);
+            }
+          });
+          this.spawnVineEffect(plant.x, plant.y, plant.controlRadius);
+        }
+      }
+      // 产资
+      if (plant.type === 'produce' || plant.type === 'ultimate') {
+        plant.produceTimer -= dt;
+        if (plant.produceTimer <= 0) {
+          plant.produceTimer = plant.produceInterval;
+          this.nutrient = Math.min(this.nutrientMax, this.nutrient + plant.produceAmount);
+          this.spawnAoeEffect(plant.x, plant.y, 26, '#ffe28a');
+          this.damageNumbers.push({ x: plant.x + rand(-6, 6), y: plant.y - 30, value: `+${plant.produceAmount}`, color: '#ffe28a', life: .6, maxLife: .6, vx: 0, vy: -46, heavy: false });
+        }
+      }
+      plant.hitFlash = Math.max(0, (plant.hitFlash || 0) - dt);
+      plant.attackAnim = Math.max(0, (plant.attackAnim || 0) - dt);
+    }
+    for (const p of toRemove) {
+      const idx = this.plants.indexOf(p);
+      if (idx >= 0) this.plants.splice(idx, 1);
+    }
+    if (toRemove.length) this.plantsDirty = true;
+  }
+
+  // ============ 养分结晶 ============
+  spawnNutrientCrystal(x, y, amount) {
+    this.nutrientCrystals.push({ x, y, bob: rand(0, Math.PI * 2), amount, expiresAt: performance.now() / 1000 + 30 });
+  }
+
+  refreshNutrientCrystals(dt) {
+    this.nutrientTimer -= dt;
+    if (this.nutrientTimer <= 0) {
+      this.nutrientTimer = CONFIG.nutrients.crystalInterval;
+      const size = CONFIG.expedition.mapSize;
+      const pos = this.findSafeSpawn(150, size - 150, 16);
+      this.spawnNutrientCrystal(pos.x, pos.y, CONFIG.nutrients.crystalAmount);
+    }
+    const now = performance.now() / 1000;
+    this.nutrientCrystals = this.nutrientCrystals.filter(c => now < c.expiresAt);
+    this.pickupNutrientCrystals();
+  }
+
+  pickupNutrientCrystals() {
+    for (let i = this.nutrientCrystals.length - 1; i >= 0; i--) {
+      const c = this.nutrientCrystals[i];
+      if (dist(this.player, c) < 46) {
+        this.nutrient = Math.min(this.nutrientMax, this.nutrient + c.amount);
+        this.nutrientCrystals.splice(i, 1);
+        this.spawnAoeEffect(c.x, c.y, 30, '#ffe28a');
+        this.damageNumbers.push({ x: c.x, y: c.y - 16, value: `+${c.amount}`, color: '#ffe28a', life: .6, maxLife: .6, vx: 0, vy: -44, heavy: false });
+      }
+    }
+  }
+
+  // ============ 培育结算（每局结束调用） ============
+  applyPlantGrowthSettlement() {
+    const g = CONFIG.plantGrowth;
+    const record = (id, delta) => {
+      if (delta === 0) return;
+      const existing = this.growthSummary.find(s => s.id === id);
+      if (existing) { existing.delta += delta; return; }
+      const cfg = CONFIG.plants.find(p => p.id === id);
+      if (cfg) this.growthSummary.push({ id, name: cfg.name, icon: cfg.icon, delta });
+    };
+    Object.keys(GameState.defensePlants).forEach(id => {
+      const rec = GameState.defensePlants[id];
+      if (!rec || rec.count <= 0) return;
+      const before = rec.progress;
+      rec.progress = clamp(rec.progress + g.basePerRun, 0, g.deployable);
+      if (rec.progress !== before) record(id, rec.progress - before);
+    });
+    this.plantRecords.forEach(r => {
+      const rec = GameState.defensePlants[r.seedId];
+      if (!rec) return;
+      if (r.survived) {
+        const before = rec.progress;
+        rec.progress = clamp(rec.progress + g.surviveBonus, 0, g.deployable);
+        record(r.seedId, rec.progress - before);
+        showToast(`${CONFIG.plants.find(p => p.id === r.seedId)?.name || r.seedId}存活撤离，培育 +${g.surviveBonus}`, 'success');
+      } else if (r.destroyed) {
+        const first = (this.plantDestroyCount[r.seedId] || 0) === 1;
+        const penalty = (first ? g.firstDestroyPenalty : g.destroyPenalty) * (r.recovered ? 0.5 : 1);
+        const before = rec.progress;
+        rec.progress = clamp(rec.progress - penalty, 0, g.deployable);
+        record(r.seedId, rec.progress - before);
+        showToast(`${CONFIG.plants.find(p => p.id === r.seedId)?.name || r.seedId}被摧毁，培育 -${Math.round(penalty)}`, 'warning');
+      }
+    });
   }
 
   tryInteract() {
@@ -1176,10 +1512,13 @@ class Expedition {
       });
       this.spawnSlashEffect(this.player.x, this.player.y, angle, this.weapon.color, 64);
     } else {
-      this.projectiles.push({ x: this.player.x + Math.cos(angle) * 24, y: this.player.y + Math.sin(angle) * 24,
+      const p = this.allocProjectile();
+      Object.assign(p, { x: this.player.x + Math.cos(angle) * 24, y: this.player.y + Math.sin(angle) * 24,
         vx: Math.cos(angle) * this.weapon.projectileSpeed, vy: Math.sin(angle) * this.weapon.projectileSpeed,
         damage: this.weapon.damage, life: this.weapon.range / this.weapon.projectileSpeed, radius: 7,
-        fromPlayer: true, weaponId: this.weapon.id, pierce: this.weapon.pierce || 1, color: this.weapon.color, hit: [] });
+        fromPlayer: true, weaponId: this.weapon.id, pierce: this.weapon.pierce || 1, color: this.weapon.color });
+      p.hit = p.hit || []; p.hit.length = 0;
+      this.projectiles.push(p);
       this.spawnMuzzleEffect(this.player.x, this.player.y, angle, this.weapon.color);
     }
   }
@@ -1204,6 +1543,20 @@ class Expedition {
     // 传说种子
     if (Math.random() < this.map.legendarySeedChance) {
       loot.push({ type: 'seed', name: '月光稻种子', amount: 1, icon: '🌟', legendary: true, cropId: 'moon_rice' });
+    }
+    // 植物防线种子（按T级概率掉落）
+    const drops = CONFIG.plantDrops[this.map.tier - 1] || { common: 0, rare: 0, legendary: 0 };
+    const plantRoll = Math.random();
+    let plant = null;
+    if (plantRoll < drops.legendary) {
+      plant = CONFIG.plants.find(p => p.rarity === 'legendary');
+    } else if (plantRoll < drops.legendary + drops.rare) {
+      plant = CONFIG.plants.find(p => p.rarity === 'rare');
+    } else if (plantRoll < drops.legendary + drops.rare + drops.common) {
+      plant = CONFIG.plants.find(p => p.rarity === 'common');
+    }
+    if (plant) {
+      loot.push({ type: 'plant_seed', name: plant.name + '防线种子', amount: 1, icon: plant.icon, plantId: plant.id });
     }
     // 材料
     if (Math.random() < 0.4) {
@@ -1256,7 +1609,16 @@ class Expedition {
   }
 
   endExpedition() {
+    // 标记存活植物（撤离时仍在场）
+    this.plants.forEach(p => {
+      if (p.hp > 0) {
+        const record = this.plantRecords.find(r => r.seedId === p.seedId && !r.destroyed);
+        if (record) record.survived = true;
+      }
+    });
     this.cleanup();
+    // 培育结算（基础+10 / 存活+40 / 被毁-30，首杀-15）
+    this.applyPlantGrowthSettlement();
     // 计算结算
     const totalGold = this.bag.filter(i => i.type === 'gold').reduce((s, i) => s + i.amount, 0);
     const keptItems = [];
@@ -1308,21 +1670,27 @@ class Expedition {
       chests: this.chestOpened,
       damageTaken: this.damageTaken,
       goldEarned: this.result === 'success' ? totalGold : Math.floor(totalGold * 0.2),
-      keptItems, lostItems
+      keptItems, lostItems,
+      plantGrowth: this.growthSummary || []
     });
   }
 
+  allocParticle() { return this.particlePool.length ? this.particlePool.pop() : {}; }
+
+  allocProjectile() { return this.projectilePool.length ? this.projectilePool.pop() : {}; }
+
   spawnHitParticles(x, y, color) {
     for (let i = 0; i < 11; i++) {
-      this.particles.push({
-        x, y, vx: rand(-175, 175), vy: rand(-175, 175),
-        life: 0.46, maxLife: 0.46, color, size: rand(2, 6)
-      });
+      const p = this.allocParticle();
+      Object.assign(p, { x, y, vx: rand(-175, 175), vy: rand(-175, 175),
+        life: 0.46, maxLife: 0.46, color, size: rand(2, 6), type: undefined, angle: undefined });
+      this.particles.push(p);
     }
   }
 
   damageEnemy(target, amount, color = '#ffffff', heavy = false) {
     if (!target || target.hp <= 0) return;
+    if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
     target.hp -= amount;
     target.hitFlash = heavy ? 0.22 : 0.14;
     target.state = target.hp <= 0 ? 'death' : 'hit';
@@ -1346,77 +1714,93 @@ class Expedition {
   }
 
   spawnAoeEffect(x, y, radius, color) {
-    this.particles.push({
-      x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5,
-      color, size: radius, type: 'aoe'
-    });
+    const p = this.allocParticle();
+    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5,
+      color, size: radius, type: 'aoe' });
+    this.particles.push(p);
   }
 
   spawnSlashEffect(x, y, angle, color = '#ffffff', size = 50) {
-    this.particles.push({
-      x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2,
-      color, size, angle, type: 'slash'
-    });
+    const p = this.allocParticle();
+    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2,
+      color, size, angle, type: 'slash' });
+    this.particles.push(p);
   }
 
   spawnMuzzleEffect(x, y, angle, color) {
     for (let i = 0; i < 6; i++) {
       const spread = angle + rand(-0.32, 0.32);
-      this.particles.push({ x: x + Math.cos(angle) * 22, y: y + Math.sin(angle) * 22,
+      const p = this.allocParticle();
+      Object.assign(p, { x: x + Math.cos(angle) * 22, y: y + Math.sin(angle) * 22,
         vx: Math.cos(spread) * rand(65, 150), vy: Math.sin(spread) * rand(65, 150),
-        life: 0.22, maxLife: 0.22, color, size: rand(2, 5), type: 'spark' });
+        life: 0.22, maxLife: 0.22, color, size: rand(2, 5), type: 'spark', angle: undefined });
+      this.particles.push(p);
     }
   }
 
   spawnWeaponSwitchEffect() {
     const colors = ['#f2c45b', '#75dc68', '#7be5c4'];
-    colors.forEach((color, ring) => this.particles.push({ x: this.player.x, y: this.player.y,
-      vx: 0, vy: 0, life: 0.38 + ring * 0.08, maxLife: 0.38 + ring * 0.08,
-      color, size: 34 + ring * 10, type: 'weaponRing' }));
+    colors.forEach((color, ring) => {
+      const p = this.allocParticle();
+      Object.assign(p, { x: this.player.x, y: this.player.y,
+        vx: 0, vy: 0, life: 0.38 + ring * 0.08, maxLife: 0.38 + ring * 0.08,
+        color, size: 34 + ring * 10, type: 'weaponRing' });
+      this.particles.push(p);
+    });
   }
 
   spawnRadialBurst(x, y, color, count = 10) {
     for (let i = 0; i < count; i++) {
       const angle = Math.PI * 2 * i / count + rand(-0.1, 0.1);
-      this.particles.push({ x, y, vx: Math.cos(angle) * rand(100, 230), vy: Math.sin(angle) * rand(100, 230),
-        life: 0.48, maxLife: 0.48, color, size: rand(3, 7), type: 'chaff' });
+      const p = this.allocParticle();
+      Object.assign(p, { x, y, vx: Math.cos(angle) * rand(100, 230), vy: Math.sin(angle) * rand(100, 230),
+        life: 0.48, maxLife: 0.48, color, size: rand(3, 7), type: 'chaff', angle: undefined });
+      this.particles.push(p);
     }
   }
 
   spawnVineEffect(x, y, radius) {
     for (let i = 0; i < 9; i++) {
       const angle = Math.PI * 2 * i / 9;
-      this.particles.push({ x, y, vx: 0, vy: 0, life: 0.75, maxLife: 0.75,
+      const p = this.allocParticle();
+      Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.75, maxLife: 0.75,
         color: i % 2 ? '#89db67' : '#3f9d56', size: radius * rand(0.62, 1), angle, type: 'vine' });
+      this.particles.push(p);
     }
   }
 
   spawnDashTrail(x, y, angle, color) {
-    for (let i = 0; i < 7; i++) this.particles.push({
-      x: x - Math.cos(angle) * i * 22, y: y - Math.sin(angle) * i * 22,
-      vx: 0, vy: 0, life: 0.38 - i * 0.025, maxLife: 0.38,
-      color, size: 18 - i, angle, type: 'earthTrail'
-    });
+    for (let i = 0; i < 7; i++) {
+      const p = this.allocParticle();
+      Object.assign(p, { x: x - Math.cos(angle) * i * 22, y: y - Math.sin(angle) * i * 22,
+        vx: 0, vy: 0, life: 0.38 - i * 0.025, maxLife: 0.38,
+        color, size: 18 - i, angle, type: 'earthTrail' });
+      this.particles.push(p);
+    }
   }
 
   spawnSmokeEffect(x, y) {
     for (let i = 0; i < 18; i++) {
       const angle = rand(0, Math.PI * 2), speed = rand(22, 85);
-      this.particles.push({ x: x + rand(-20, 20), y: y + rand(-20, 20),
+      const p = this.allocParticle();
+      Object.assign(p, { x: x + rand(-20, 20), y: y + rand(-20, 20),
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
         life: rand(0.7, 1.15), maxLife: 1.15, color: i % 3 ? '#808c88' : '#b5c3ba',
-        size: rand(12, 28), type: 'smoke' });
+        size: rand(12, 28), type: 'smoke', angle: undefined });
+      this.particles.push(p);
     }
   }
 
   spawnDashParticles(x, y, angle) {
     for (let i = 0; i < 8; i++) {
-      this.particles.push({
+      const p = this.allocParticle();
+      Object.assign(p, {
         x: x - Math.cos(angle) * i * 15,
         y: y - Math.sin(angle) * i * 15,
         vx: rand(-30, 30), vy: rand(-30, 30),
-        life: 0.3, maxLife: 0.3, color: '#88ccff', size: rand(3, 6)
+        life: 0.3, maxLife: 0.3, color: '#88ccff', size: rand(3, 6), type: undefined, angle: undefined
       });
+      this.particles.push(p);
     }
   }
 
@@ -1430,6 +1814,9 @@ class Expedition {
     }
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
     this.pickupLoot();
+    // 植物防线：养分结晶刷新/拾取 + 植物行为
+    this.refreshNutrientCrystals(dt);
+    this.updatePlants(dt);
 
     // 倒计时
     this.timeLeft -= dt;
@@ -1554,7 +1941,31 @@ class Expedition {
       const d = dist(m, this.player);
       const canSee = this.beastWave.active || (this.player.stealth <= 0 && d < 400);
 
-      if (canSee) {
+      // 反制兵种（食草兽/厚甲猪）优先攻击植物防线
+      let plantTarget = null, plantDist = 0;
+      if (m.plantHate) {
+        plantDist = 280;
+        this.plants.forEach(p => {
+          const dd = dist(m, p);
+          if (dd < plantDist) { plantDist = dd; plantTarget = p; }
+        });
+      }
+
+      if (canSee && plantTarget) {
+        // 攻击植物
+        const pa = Math.atan2(plantTarget.y - m.y, plantTarget.x - m.x);
+        m.facing = pa;
+        if (plantDist > m.attackRange) {
+          m.state = 'move';
+          this.moveEntityWithCollisions(m, Math.cos(pa) * m.speed * dt, Math.sin(pa) * m.speed * dt);
+        } else if (m.attackCd <= 0) {
+          m.state = 'attack'; m.stateTimer = .28;
+          m.attackCd = m.attackCooldown;
+          this.damagePlant(plantTarget, m.damage);
+        } else {
+          m.state = 'idle';
+        }
+      } else if (canSee) {
         // 追击
         const angle = Math.atan2(this.player.y - m.y, this.player.x - m.x);
         m.facing = angle;
@@ -1566,12 +1977,15 @@ class Expedition {
           m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
           if (m.ranged) {
-            this.projectiles.push({
+            const p = this.allocProjectile();
+            Object.assign(p, {
               x: m.x, y: m.y,
               vx: Math.cos(angle) * 300, vy: Math.sin(angle) * 300,
               damage: m.damage, life: 2, fromMonster: true, radius: 6,
               monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644'
             });
+            p.hit = p.hit || []; p.hit.length = 0;
+            this.projectiles.push(p);
           } else {
             this.damagePlayer(m.damage);
           }
@@ -1601,6 +2015,10 @@ class Expedition {
         this.killCount++;
         this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff4444');
+        // 击杀掉落养分（普通+2 / 精英+8）
+        const nutrientGain = m.elite ? CONFIG.nutrients.eliteKill : CONFIG.nutrients.normalKill;
+        this.nutrient = Math.min(this.nutrientMax, this.nutrient + nutrientGain);
+        this.damageNumbers.push({ x: m.x, y: m.y - 22, value: `+${nutrientGain}`, color: '#ffe28a', life: .6, maxLife: .6, vx: 0, vy: -42, heavy: false });
         if (m.type === 'boss') {
           this.spawnGroundLoot({ type: 'material', name: '首领核心', amount: 2 + this.map.tier, icon: '◆' }, m.x + 18, m.y);
           this.spawnGroundLoot({ type: 'gold', name: '首领赏金', amount: 150 * this.map.tier, icon: '💰' }, m.x - 18, m.y);
@@ -1635,11 +2053,14 @@ class Expedition {
           r.y += Math.sin(angle) * r.speed * dt;
         } else if (r.attackCd <= 0) {
           r.attackCd = 1.5;
-          this.projectiles.push({
+          const p = this.allocProjectile();
+          Object.assign(p, {
             x: r.x, y: r.y,
             vx: Math.cos(angle) * 250, vy: Math.sin(angle) * 250,
             damage: r.damage, life: 2, fromMonster: true, radius: 6
           });
+          p.hit = p.hit || []; p.hit.length = 0;
+          this.projectiles.push(p);
         }
       } else {
         // 巡逻
@@ -1684,12 +2105,15 @@ class Expedition {
         if (nearest) {
           this.damageEnemy(nearest, t.damage * (this.beastWave.active ? 2.15 : 1), '#8affb5');
           t.attackCd = this.beastWave.active ? 0.42 : 0.72;
-          this.projectiles.push({
+          const p = this.allocProjectile();
+          Object.assign(p, {
             x: t.x, y: t.y,
             vx: (nearest.x - t.x) / minD * 400,
             vy: (nearest.y - t.y) / minD * 400,
             damage: 0, life: 0.3, fromTower: true, radius: 4, target: nearest
           });
+          p.hit = p.hit || []; p.hit.length = 0;
+          this.projectiles.push(p);
         }
       } else if (t.state === 'enemy') {
         // 攻击玩家
@@ -1700,48 +2124,78 @@ class Expedition {
       }
     });
 
-    // 子弹
-    this.projectiles = this.projectiles.filter(p => {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.life -= dt;
-      if (p.life <= 0) return false;
-      if (p.fromPlayer) {
-        for (const target of [...this.monsters, ...this.raiders]) {
-          if (target.hp <= 0 || p.hit.includes(target)) continue;
-          if (dist(p, target) < target.radius + p.radius) {
-            this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff');
-            target.visualVz = Math.max(target.visualVz || 0, p.weaponId === 'vine_staff' ? 82 : 52);
-            p.hit.push(target);
-            p.pierce--;
-            if (p.weaponId === 'vine_staff') target.stunned = Math.max(target.stunned || 0, 0.18);
-            if (p.pierce <= 0) return false;
-          }
-        }
-      }
-      if (p.fromMonster && dist(p, this.player) < this.player.collisionRadius + p.radius) {
-        this.damagePlayer(p.damage);
-        return false;
-      }
-      return true;
-    });
-
-    // 粒子
-    this.particles = this.particles.filter(p => {
-      p.life -= dt;
-      if (!['aoe', 'slash', 'weaponRing', 'vine', 'earthTrail'].includes(p.type)) {
+    // 子弹：原地更新 + 空间哈希邻近命中（消灭全量遍历与每帧 filter 数组）
+    {
+      const arr = this.projectiles;
+      const hash = this.entitySpatialHash;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const p = arr[i];
         p.x += p.vx * dt;
         p.y += p.vy * dt;
+        p.life -= dt;
+        let dead = p.life <= 0;
+        if (!dead && (p.fromPlayer || p.fromPlant)) {
+          const candidates = hash.queryCircle(p.x, p.y, 56);
+          for (let c = 0; c < candidates.length; c++) {
+            const target = candidates[c];
+            if (target.hp <= 0 || p.hit.includes(target)) continue;
+            const ddx = target.x - p.x, ddy = target.y - p.y;
+            const rr = target.radius + p.radius;
+            if (ddx * ddx + ddy * ddy <= rr * rr) {
+              this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff');
+              target.visualVz = Math.max(target.visualVz || 0, p.weaponId === 'vine_staff' ? 82 : 52);
+              p.hit.push(target);
+              p.pierce--;
+              if (p.weaponId === 'vine_staff') target.stunned = Math.max(target.stunned || 0, 0.18);
+              if (p.pierce <= 0) { dead = true; break; }
+              if (p.fromPlant) { dead = true; break; }
+            }
+          }
+        }
+        if (!dead && p.fromMonster) {
+          const ddx = this.player.x - p.x, ddy = this.player.y - p.y;
+          const rr = this.player.collisionRadius + p.radius;
+          if (ddx * ddx + ddy * ddy <= rr * rr) {
+            this.damagePlayer(p.damage);
+            dead = true;
+          }
+        }
+        if (dead) {
+          arr[i] = arr[arr.length - 1];
+          arr.pop();
+          this.projectilePool.push(p);
+        }
       }
-      return p.life > 0;
-    });
-    this.damageNumbers = this.damageNumbers.filter(number => {
-      number.life -= dt;
-      number.x += number.vx * dt;
-      number.y += number.vy * dt;
-      number.vy += 72 * dt;
-      return number.life > 0;
-    });
+    }
+
+    // 粒子：原地紧凑，死亡粒子回收到对象池（消灭每帧 filter 新数组）
+    {
+      const arr = this.particles;
+      let w = 0;
+      for (let i = 0; i < arr.length; i++) {
+        const p = arr[i];
+        p.life -= dt;
+        if (p.life <= 0) { this.particlePool.push(p); continue; }
+        if (!STATIC_SHAPE_TYPES.has(p.type)) { p.x += p.vx * dt; p.y += p.vy * dt; }
+        arr[w++] = p;
+      }
+      arr.length = w;
+    }
+    // 伤害跳字：原地紧凑
+    {
+      const arr = this.damageNumbers;
+      let w = 0;
+      for (let i = 0; i < arr.length; i++) {
+        const n = arr[i];
+        n.life -= dt;
+        if (n.life <= 0) continue;
+        n.x += n.vx * dt;
+        n.y += n.vy * dt;
+        n.vy += 72 * dt;
+        arr[w++] = n;
+      }
+      arr.length = w;
+    }
     this.killFlash = Math.max(0, this.killFlash - dt);
 
     // 撤离读条
@@ -1869,6 +2323,55 @@ class Expedition {
     ctx.restore();
   }
 
+  renderNutrientCrystals(ctx, cam) {
+    const nowSeconds = performance.now() / 1000;
+    this.nutrientCrystals.forEach(c => {
+      if (!this.isWorldVisible(c.x, c.y)) return;
+      const sx = c.x - cam.x, sy = c.y - cam.y + Math.sin(nowSeconds * 3 + c.bob) * 4;
+      const glow = ctx.createRadialGradient(sx, sy, 1, sx, sy, 20);
+      glow.addColorStop(0, 'rgba(255,226,138,.5)'); glow.addColorStop(1, 'rgba(255,226,138,0)');
+      ctx.fillStyle = glow; ctx.fillRect(sx - 22, sy - 22, 44, 44);
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(nowSeconds * 1.6 + c.bob);
+      ctx.fillStyle = '#ffe28a'; ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(8, 0); ctx.lineTo(0, 10); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  renderPlants(ctx, cam) {
+    // 植物只在增删时重排，避免每帧 slice().sort() 分配
+    if (this.plantsDirty || !this.plantsSorted) {
+      this.plantsSorted = [...this.plants].sort((a, b) => a.y - b.y);
+      this.plantsDirty = false;
+    }
+    this.plantsSorted.forEach(p => {
+      if (!this.isWorldVisible(p.x, p.y)) return;
+      const sx = p.x - cam.x, sy = p.y - cam.y;
+      // 血条 + 寿命条
+      const barW = 30, barY = sy - 30;
+      ctx.fillStyle = 'rgba(8,10,12,.7)'; ctx.beginPath(); ctx.roundRect(sx - barW / 2 - 2, barY - 2, barW + 4, 7, 3); ctx.fill();
+      ctx.fillStyle = '#7dff9a'; ctx.beginPath(); ctx.roundRect(sx - barW / 2, barY, barW * clamp(p.hp / p.maxHp, 0, 1), 3, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,226,138,.85)'; ctx.beginPath(); ctx.roundRect(sx - barW / 2, barY + 5, barW * clamp(p.life / p.maxLife, 0, 1), 2, 1); ctx.fill();
+      // 图标（受击闪烁）
+      const flash = p.hitFlash > 0 ? (Math.floor(p.hitFlash * 20) % 2 ? 0.4 : 1) : 1;
+      ctx.globalAlpha = flash;
+      ctx.font = `${p.type === 'ultimate' ? 36 : 28}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.icon, sx, sy + 9);
+      ctx.globalAlpha = 1;
+      // 攻击动画
+      if (p.attackAnim > 0) {
+        ctx.strokeStyle = '#a6ffc2'; ctx.lineWidth = 2;
+        ctx.globalAlpha = (p.attackAnim / .2) * .8;
+        ctx.beginPath(); ctx.arc(sx, sy, 20 + (1 - p.attackAnim / .2) * 14, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      if (p.starving) {
+        ctx.fillStyle = '#ffd37a'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('养分枯竭', sx, sy - 36);
+      }
+    });
+  }
+
   renderMissionHUD() {
     if (!this.objective) return;
     let panel = document.getElementById('missionHud');
@@ -1885,12 +2388,16 @@ class Expedition {
   }
 
   updateHUD() {
-    this.renderMissionHUD();
     // 血条能量条
     document.getElementById('hpBar').style.width = (this.player.hp / this.player.maxHp * 100) + '%';
     document.getElementById('hpText').textContent = `${Math.ceil(this.player.hp)}/${this.player.maxHp}`;
     document.getElementById('energyBar').style.width = (this.player.energy / this.player.maxEnergy * 100) + '%';
     document.getElementById('energyText').textContent = `${Math.ceil(this.player.energy)}/${this.player.maxEnergy}`;
+    // 养分
+    const nb = document.getElementById('nutrientBar');
+    const nt = document.getElementById('nutrientText');
+    if (nb) nb.style.width = clamp(this.nutrient / this.nutrientMax, 0, 1) * 100 + '%';
+    if (nt) nt.textContent = `${Math.floor(this.nutrient)}/${this.nutrientMax}`;
 
     // 计时器
     const mins = Math.floor(this.timeLeft / 60);
@@ -1900,6 +2407,13 @@ class Expedition {
     timerEl.className = 'timer-display' + (this.timeLeft < 30 ? ' critical' : (this.timeLeft < 180 ? ' pressure' : ''));
     document.getElementById('mapNameDisplay').textContent = `T${this.map.tier} · ${this.map.name} · ${this.map.danger}`;
     document.getElementById('lowHealthVignette').classList.toggle('active', this.player.hp / this.player.maxHp <= 0.3);
+
+    // 低频重量更新（250ms 节流）：任务面板/武器/技能/消耗品/背包/防线栏
+    // 这些模块每帧 innerHTML 重建会强制布局并产生大量 DOM/GC 开销。
+    this.hudTimer -= 1 / 60;
+    if (this.hudTimer > 0) return;
+    this.hudTimer = 0.25;
+    this.renderMissionHUD();
     const weaponDisplay = document.getElementById('weaponDisplay');
     if (weaponDisplay) {
       weaponDisplay.style.setProperty('--weapon-color', this.weapon.color);
@@ -1959,6 +2473,22 @@ class Expedition {
       <div class="bag-item">📦 ${this.bag.length}件</div>
       <div class="bag-item" style="border-color:#d7a83d;color:#f2d078;">🔐 安全箱 2格</div>
     `;
+
+    // 防线槽（本局可部署植物）
+    const defenseBar = document.getElementById('defenseBar');
+    if (defenseBar) {
+      const list = this.getPlantSeedList();
+      defenseBar.innerHTML = list.length === 0
+        ? `<div class="defense-slot empty">无防线种子 · 打开宝箱获取或出发前装备</div>`
+        : list.map((p, i) => {
+            const selected = this.selectedPlantId === p.id;
+            const avail = p.maxPerRun - p.deployed;
+            return `<div class="defense-slot${selected ? ' selected' : ''}${avail <= 0 ? ' spent' : ''}" title="${p.name}：预扣养分${p.deployCost}，每${p.sustain}维持/s，寿命${p.life}s，本局可再种${avail}株">
+              <span class="defense-key">${i + 5}</span><span class="defense-icon">${p.icon}</span>
+              <span class="defense-name">${p.name}</span><span class="defense-meta">养分${p.deployCost} · 剩余${avail}</span>
+            </div>`;
+          }).join('');
+    }
   }
 
   render(ctx) {
@@ -1981,8 +2511,10 @@ class Expedition {
     ctx.globalAlpha = 1;
 
     // 障碍物按 Y 轴分为玩家身后与身前两层，形成遮挡关系和俯视伪 3D 深度。
-    this.obstacles.filter(obstacle => obstacle.y <= this.player.y).sort((a, b) => a.y - b.y)
-      .forEach(obstacle => this.renderObstacle(ctx, obstacle, cam));
+    // 使用预排序数组，避免每帧 filter+sort 分配。
+    for (let i = 0; i < this.obstaclesByY.length && this.obstaclesByY[i].y <= this.player.y; i++) {
+      this.renderObstacle(ctx, this.obstaclesByY[i], cam);
+    }
 
     // 环境陷阱
     this.traps.forEach(trap => {
@@ -2026,6 +2558,9 @@ class Expedition {
         ctx.fillText(`自动拾取 ${item.name}`, sx, sy - 22);
       }
     });
+
+    // 养分结晶
+    this.renderNutrientCrystals(ctx, cam);
 
     // 撤离点
     this.extractPoints.forEach(ep => {
@@ -2088,6 +2623,9 @@ class Expedition {
         ctx.stroke();
       }
     });
+
+    // 植物防线
+    this.renderPlants(ctx, cam);
 
     // 怪物
     this.monsters.forEach(m => {
@@ -2165,8 +2703,35 @@ class Expedition {
 
     // Foreground geometry is drawn after the hero so trunks and ruins create real occlusion.
     // Nearby blockers fade through isBehindHero(), keeping the character readable.
-    this.obstacles.filter(obstacle => obstacle.y > this.player.y).sort((a, b) => a.y - b.y)
-      .forEach(obstacle => this.renderObstacle(ctx, obstacle, cam));
+    // 预排序数组 + 边界定位，避免每帧 filter+sort。
+    for (let i = 0; i < this.obstaclesByY.length; i++) {
+      if (this.obstaclesByY[i].y <= this.player.y) continue;
+      for (; i < this.obstaclesByY.length; i++) this.renderObstacle(ctx, this.obstaclesByY[i], cam);
+      break;
+    }
+
+    // 防线部署预览（选中植物时鼠标处显示半透明图标 + 可用性）
+    if (this.selectedPlantId) {
+      const selPlant = CONFIG.plants.find(p => p.id === this.selectedPlantId);
+      if (selPlant) {
+        const pmx = this.mouse.x, pmy = this.mouse.y;
+        const canPlace = this.canDeployHere(this.mouse.x + cam.x, this.mouse.y + cam.y, 18)
+          && dist(this.player, { x: this.mouse.x + cam.x, y: this.mouse.y + cam.y }) <= 240
+          && this.nutrient >= selPlant.deployCost;
+        ctx.globalAlpha = canPlace ? 0.72 : 0.28;
+        ctx.font = '30px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(selPlant.icon, pmx, pmy + 9);
+        ctx.strokeStyle = canPlace ? '#7dff9a' : '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(pmx, pmy, 20, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        if (!canPlace) {
+          ctx.fillStyle = '#ff8a8a'; ctx.font = '12px sans-serif';
+          ctx.fillText('不可部署', pmx, pmy + 34);
+        }
+      }
+    }
 
     // 粒子
     this.particles.forEach(p => {
@@ -2277,8 +2842,11 @@ class Expedition {
 
   updateWorldSystems(dt) {
     this.elapsed += dt;
-    const waveMonsters = this.monsters.filter(monster => monster.beastWave && monster.hp > 0);
-    this.beastWave.remaining = waveMonsters.length;
+    let waveMonsterCount = 0;
+    for (let i = 0; i < this.monsters.length; i++) {
+      if (this.monsters[i].beastWave && this.monsters[i].hp > 0) waveMonsterCount++;
+    }
+    this.beastWave.remaining = waveMonsterCount;
     if (this.beastWave.active) {
       if (waveMonsters.length === 0) {
         this.beastWave.active = false;
