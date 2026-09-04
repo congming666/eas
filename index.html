@@ -1363,23 +1363,105 @@
   .tips-title { font-size:13px; color:#8ac8d8; margin-bottom:6px; font-weight:bold; }
   .greenhouse-tips ul { margin:0; padding-left:16px; }
   .greenhouse-tips li { font-size:11px; color:#aaa; line-height:1.6; margin-bottom:2px; }
+  /* ============ 星云序章 · 主菜单粒子开场 ============ */
+  #nebulaBg {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 42%, #0b1322 0%, #050810 46%, #020308 100%);
+  }
+  #nebulaCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; display: block; }
+  #mainMenu {
+    background: rgba(2, 5, 11, 0.36) !important;
+  }
+  #mainMenu::before, #mainMenu::after { display: none !important; }
+  #mainMenu h1::after { content: none !important; }
+  .nebula-topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 26px;
+    background: rgba(8, 13, 26, 0.34);
+    backdrop-filter: blur(16px) saturate(1.35);
+    -webkit-backdrop-filter: blur(16px) saturate(1.35);
+    border-bottom: 1px solid rgba(150, 200, 255, 0.12);
+  }
+  .nebula-brand { font-size: 17px; letter-spacing: 2px; color: #dff2ff; font-weight: 600; text-shadow: 0 0 14px rgba(140, 190, 255, 0.35); }
+  .nebula-brand-meta { font-size: 12px; color: rgba(170, 205, 235, 0.75); letter-spacing: 1px; }
+  .nebula-card {
+    position: relative; z-index: 5;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 44px 64px 36px;
+    border-radius: 26px;
+    background: linear-gradient(160deg, rgba(13, 22, 44, 0.52), rgba(6, 10, 22, 0.60));
+    backdrop-filter: blur(22px) saturate(1.45);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    border: 1px solid rgba(160, 205, 255, 0.16);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 46px rgba(110, 170, 255, 0.10), inset 0 1px 0 rgba(255,255,255,0.06);
+    width: min(520px, 86%);
+  }
+  .nebula-eyebrow { font-size: 11px; letter-spacing: 7px; color: rgba(150, 205, 255, 0.72); margin-bottom: 10px; }
+  .nebula-title {
+    font-size: 52px; letter-spacing: 14px; color: #f2f8ff; margin-bottom: 6px;
+    text-shadow: 0 0 30px rgba(150, 200, 255, 0.45), 0 0 90px rgba(120, 160, 255, 0.25); font-weight: 700;
+  }
+  .nebula-sub { font-size: 14px; letter-spacing: 4px; color: rgba(168, 205, 236, 0.82); margin-bottom: 30px; }
+  #mainMenu .nebula-btn {
+    width: 300px; margin: 7px 0; padding: 15px 32px;
+    font-size: 19px; letter-spacing: 6px;
+    background: linear-gradient(135deg, rgba(24, 48, 78, 0.72), rgba(10, 20, 38, 0.82));
+    border: 1px solid rgba(150, 205, 255, 0.30);
+    border-radius: 14px;
+    color: #e9f5ff;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: all 0.22s ease;
+  }
+  #mainMenu .nebula-btn:hover {
+    background: linear-gradient(135deg, rgba(52, 96, 158, 0.88), rgba(20, 46, 88, 0.92));
+    border-color: rgba(150, 210, 255, 0.55);
+    box-shadow: 0 14px 40px rgba(60, 120, 220, 0.28), 0 0 26px rgba(120, 180, 255, 0.16), inset 0 1px 0 rgba(255,255,255,0.12);
+    transform: translateY(-3px);
+    color: #ffffff;
+  }
+  .nebula-ver { position: static; margin-top: 20px; font-size: 12px; color: rgba(150, 190, 225, 0.62); letter-spacing: 1px; }
+  .nebula-hint {
+    position: absolute; bottom: 14px; left: 0; right: 0; z-index: 5;
+    text-align: center; font-size: 12px; color: rgba(160, 200, 235, 0.55); letter-spacing: 2px;
+    pointer-events: none;
+  }
+  @media (max-width: 760px) {
+    .nebula-topbar { padding: 10px 14px; }
+    .nebula-brand { font-size: 14px; }
+    .nebula-brand-meta { display: none; }
+    .nebula-card { padding: 30px 26px 26px; }
+    .nebula-title { font-size: 36px; letter-spacing: 8px; }
+    #mainMenu .nebula-btn { width: 240px; }
+  }
 </style>
 </head>
 <body>
 <div id="gameContainer">
+  <div id="nebulaBg"></div>
+  <canvas id="nebulaCanvas"></canvas>
   <canvas id="gameCanvas" width="1280" height="720"></canvas>
   <div id="audioControl">
     <button id="musicToggle" type="button" onclick="AudioManager.toggle()">♫ 音乐：开</button>
     <input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)">
   </div>
 
-  <!-- 主菜单 -->
+  <!-- 主菜单 · 星云序章 -->
   <div id="mainMenu" class="overlay">
-    <h1>农庄牌</h1>
-    <div class="subtitle">荒 野 远 征</div>
-    <button class="menu-btn" onclick="Game.startGame()">开始游戏</button>
-    <button class="menu-btn" onclick="Game.showHelp()">游戏说明</button>
-    <div class="version-info">v1.8 Crop Rewards × Continuous Grass Terrain × Fog of War</div>
+    <div class="nebula-topbar">
+      <div class="nebula-brand">🌾 农庄牌 · 荒野远征</div>
+      <div class="nebula-brand-meta">星云序章 · 拖拽旋转 · 悬浮聚光</div>
+    </div>
+    <div class="nebula-card">
+      <div class="nebula-eyebrow">FARMBOUND EXPEDITION</div>
+      <h1 class="nebula-title">荒野远征</h1>
+      <p class="nebula-sub">星云之下 · 守望农场 · 远征在即</p>
+      <button class="menu-btn nebula-btn" onclick="Game.startGame()">开 始 游 戏</button>
+      <button class="menu-btn nebula-btn" onclick="Game.showHelp()">游 戏 说 明</button>
+      <div class="version-info nebula-ver">v1.9 · 植物防线 × 育种温室 × 物资仓库 · WebGL 星云引擎</div>
+    </div>
+    <div class="nebula-hint">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
 
   <!-- 农场界面 -->
@@ -1621,6 +1703,17 @@
   <script src="js/pixi-renderer.js"></script>
   <script src="js/expedition.js"></script>
   <script src="js/game.js"></script>
+
+  <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/Pass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/nebula.js"></script>
 
 </body>
 </html>
