@@ -1427,6 +1427,33 @@
     text-align: center; font-size: 12px; color: rgba(160, 200, 235, 0.55); letter-spacing: 2px;
     pointer-events: none;
   }
+  /* ============ 星云霓虹文字系统 ============ */
+  /* 主文字：青→紫→冰蓝渐变 + 辉光 */
+  .nebula-glow {
+    background: linear-gradient(115deg, #bdf4ff 0%, #e4d4ff 38%, #a8d8ff 72%, #cfe6ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 9px rgba(140, 195, 255, 0.50)) drop-shadow(0 0 26px rgba(120, 165, 255, 0.28));
+  }
+  /* 辅助文字：冰蓝辉光 */
+  .nebula-glow-soft {
+    color: #cfe9ff;
+    text-shadow: 0 0 7px rgba(140, 195, 255, 0.45), 0 0 20px rgba(120, 165, 255, 0.22);
+  }
+  #mainMenu .nebula-title.nebula-glow {
+    text-shadow: none;
+    filter: drop-shadow(0 0 12px rgba(150, 200, 255, 0.55)) drop-shadow(0 0 42px rgba(120, 165, 255, 0.35)) drop-shadow(0 0 90px rgba(110, 150, 255, 0.25));
+  }
+  #mainMenu .nebula-btn .nebula-glow { font-weight: 600; }
+  #mainMenu .nebula-btn:hover .nebula-glow {
+    filter: drop-shadow(0 0 10px rgba(160, 215, 255, 0.75)) drop-shadow(0 0 30px rgba(130, 180, 255, 0.45));
+  }
+  /* 第一页可见的全局控件文字（音乐开关） */
+  #audioControl #musicToggle {
+    color: #cfe9ff;
+    text-shadow: 0 0 7px rgba(140, 195, 255, 0.45), 0 0 20px rgba(120, 165, 255, 0.22);
+  }
   @media (max-width: 760px) {
     .nebula-topbar { padding: 10px 14px; }
     .nebula-brand { font-size: 14px; }
@@ -1450,18 +1477,18 @@
   <!-- 主菜单 · 星云序章 -->
   <div id="mainMenu" class="overlay">
     <div class="nebula-topbar">
-      <div class="nebula-brand">🌾 农庄牌 · 荒野远征</div>
-      <div class="nebula-brand-meta">星云序章 · 拖拽旋转 · 悬浮聚光</div>
+      <div class="nebula-brand nebula-glow">🌾 农庄牌 · 荒野远征</div>
+      <div class="nebula-brand-meta nebula-glow-soft">星云序章 · 拖拽旋转 · 悬浮聚光</div>
     </div>
     <div class="nebula-card">
-      <div class="nebula-eyebrow">FARMBOUND EXPEDITION</div>
-      <h1 class="nebula-title">荒野远征</h1>
-      <p class="nebula-sub">星云之下 · 守望农场 · 远征在即</p>
-      <button class="menu-btn nebula-btn" onclick="Game.startGame()">开 始 游 戏</button>
-      <button class="menu-btn nebula-btn" onclick="Game.showHelp()">游 戏 说 明</button>
-      <div class="version-info nebula-ver">v1.9 · 植物防线 × 育种温室 × 物资仓库 · WebGL 星云引擎</div>
+      <div class="nebula-eyebrow nebula-glow">FARMBOUND EXPEDITION</div>
+      <h1 class="nebula-title nebula-glow">荒野远征</h1>
+      <p class="nebula-sub nebula-glow-soft">星云之下 · 守望农场 · 远征在即</p>
+      <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
+      <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
+      <div class="version-info nebula-ver nebula-glow-soft">v1.9 · 植物防线 × 育种温室 × 物资仓库 · WebGL 星云引擎</div>
     </div>
-    <div class="nebula-hint">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
+    <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
 
   <!-- 农场界面 -->
@@ -1714,6 +1741,7 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
   <script src="js/nebula.js"></script>
+  <script src="js/nebula-text.js"></script>
 
 </body>
 </html>
