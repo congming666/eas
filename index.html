@@ -43,6 +43,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    justify-content: safe center;
+    overflow-y: auto;
+    overflow-x: hidden;
     z-index: 10;
   }
   .hidden { display: none !important; }
@@ -724,7 +727,7 @@
     border-radius: 12px;
     box-shadow: 0 8px 18px rgba(0,0,0,.18);
   }
-  .farm-content { top: 64px; padding: 16px; gap: 16px; }
+  .farm-content { top: 64px; padding: 16px; gap: 16px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
   .farm-grid-container, .panel {
     background: linear-gradient(145deg, rgba(13,35,28,.92), rgba(11,26,23,.84));
     border: 1px solid var(--line);
