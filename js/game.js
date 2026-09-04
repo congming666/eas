@@ -3,18 +3,38 @@ const Game = {
   animId: null,
 
   startGame() {
-    AudioManager.start('farm');
+    // 1) 立即切换界面：隐藏菜单、显示农场（保证点击后第一时间有画面反馈）
     document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('farmScreen').classList.remove('hidden');
     GameState.screen = 'farm';
-    SaveSystem.load();
-    Farm.init();
-    Farm.render();
-    if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
-      setTimeout(() => showToast('家园补给站有今日奖励可以领取', 'gold'), 450);
-    }
-    // 农场生长定时器
-    this.farmInterval = setInterval(() => Farm.render(), 1000);
+    // 隐藏星云/文字粒子合成层，释放 GPU 合成开销（返回菜单时恢复）
+    this.hideNebulaFX(true);
+    AudioManager.start('farm');
+
+    // 2) 分帧执行：存档加载 + 农场渲染延后到下一帧，
+    //    避免与界面切换/音频启动挤在同一帧造成低配机帧突刺（表现为"卡住"）
+    clearTimeout(this._farmTimer);
+    this._farmTimer = setTimeout(() => {
+      try {
+        SaveSystem.load();
+        Farm.init();
+        Farm.render();
+        if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
+          showToast('家园补给站有今日奖励可以领取', 'gold');
+        }
+      } catch (error) {
+        console.error('[Farm] 农场初始化失败（已兜底，不影响主流程）:', error);
+      }
+      // 农场生长定时器（渲染异常不中断游戏）
+      this._startFarmTimer();
+    }, 80);
+  },
+
+  hideNebulaFX(hidden) {
+    ['nebulaCanvas', 'nebulaTextFx'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.visibility = hidden ? 'hidden' : 'visible';
+    });
   },
 
   backToMenu() {
@@ -25,6 +45,8 @@ const Game = {
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('mainMenu').classList.remove('hidden');
     GameState.screen = 'menu';
+    // 恢复星云/文字粒子显示
+    this.hideNebulaFX(false);
   },
 
   showHelp() {
@@ -45,6 +67,7 @@ const Game = {
   openExpeditionPrep() {
     AudioManager.setScene('prep');
     SaveSystem.save();
+    clearInterval(this.farmInterval);
     document.getElementById('farmScreen').classList.add('hidden');
     document.getElementById('expeditionPrepScreen').classList.remove('hidden');
     GameState.screen = 'prep';
@@ -55,12 +78,20 @@ const Game = {
     CardSystem.renderBoostSelection();
   },
 
+  _startFarmTimer() {
+    if (this.farmInterval) return;
+    this.farmInterval = setInterval(() => {
+      try { Farm.render(); } catch (error) { console.error('[Farm] 定时渲染失败:', error); }
+    }, 1000);
+  },
+
   closeExpeditionPrep() {
     AudioManager.setScene('farm');
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('farmScreen').classList.remove('hidden');
     GameState.screen = 'farm';
     Farm.render();
+    this._startFarmTimer();
   },
 
   startExpedition() {
@@ -72,6 +103,7 @@ const Game = {
     GameState.gold -= map.entryFee;
     SaveSystem.save();
     AudioManager.setScene('expedition');
+    clearInterval(this.farmInterval);
     document.getElementById('farmScreen').classList.add('hidden');
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('expeditionHUD').classList.remove('hidden');
@@ -187,6 +219,7 @@ const Game = {
     Farm.renderMapSelect();
     Farm.renderLoadout();
     Farm.renderDefenseLoadout();
+    this._startFarmTimer();
     this.expedition = null;
   }
 };
