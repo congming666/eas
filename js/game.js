@@ -31,7 +31,9 @@ const Game = {
   },
 
   hideNebulaFX(hidden) {
-    ['nebulaCanvas', 'nebulaTextFx'].forEach(id => {
+    // nebulaBg（z-index:1 的深色星空背景层）必须与粒子层同进退，
+    // 否则它会盖在 gameCanvas（z-index:0）上方，导致远征画面被整块遮住（玩家/地形不可见）。
+    ['nebulaBg', 'nebulaCanvas', 'nebulaTextFx'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.visibility = hidden ? 'hidden' : 'visible';
     });
