@@ -202,7 +202,7 @@ const AudioManager = {
     osc.stop(now + duration + 0.08);
   },
 
-  playMonsterHit(kind = 'normal') {
+  playMonsterHit(kind = 'normal', weaponId = '') {
     if (!this.ctx || !this.enabled || !this.master) return;
     const now = this.ctx.currentTime;
     const minGap = kind === 'kill' ? 0 : 0.025;
@@ -245,8 +245,145 @@ const AudioManager = {
     noiseGain.gain.setValueAtTime(preset.noise, now);
     noiseGain.gain.exponentialRampToValueAtTime(.0001, now + preset.duration);
     noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(this.master);
+    // 武器专属命中音色：镰刃金属 / 豌豆闷响 / 藤杖电击
+    const flavors = {
+      harvest_sickle: { type: 'square', start: 380, end: 170, dur: .05, gain: .045 },
+      pea_repeater: { type: 'triangle', start: 320, end: 130, dur: .05, gain: .05 },
+      vine_staff: { type: 'sawtooth', start: 1500, end: 520, dur: .055, gain: .04 },
+    };
+    const fl = flavors[weaponId];
+    if (fl) {
+      const fo = this.ctx.createOscillator();
+      const fg = this.ctx.createGain();
+      fo.type = fl.type;
+      fo.frequency.setValueAtTime(fl.start * pitch, now);
+      fo.frequency.exponentialRampToValueAtTime(fl.end * pitch, now + fl.dur);
+      fg.gain.setValueAtTime(fl.gain, now);
+      fg.gain.exponentialRampToValueAtTime(.0001, now + fl.dur);
+      fo.connect(fg); fg.connect(this.master);
+      fo.start(now); fo.stop(now + fl.dur + .02);
+    }
+    // 暴击高音铃
+    if (kind === 'crit') {
+      const bell = this.ctx.createOscillator();
+      const bg = this.ctx.createGain();
+      bell.type = 'triangle';
+      bell.frequency.setValueAtTime(1240, now);
+      bell.frequency.exponentialRampToValueAtTime(880, now + .11);
+      bg.gain.setValueAtTime(.04, now);
+      bg.gain.exponentialRampToValueAtTime(.0001, now + .11);
+      bell.connect(bg); bg.connect(this.master);
+      bell.start(now); bell.stop(now + .13);
+    }
     osc.start(now); noise.start(now);
     osc.stop(now + preset.duration + .02); noise.stop(now + preset.duration + .02);
+  },
+
+  // 攻击起始音：近战挥砍风声 / 豌豆发射 / 藤杖施放
+  playAttack(kind = 'melee', combo = 0) {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    const pitch = combo === 0 ? 1 : combo === 1 ? 1.18 : 0.82;
+    if (kind === 'melee') {
+      const duration = .09;
+      const frames = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
+      const buf = this.ctx.createBuffer(1, frames, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < frames; i++) { const t = i / frames; data[i] = (Math.random() * 2 - 1) * Math.sin(t * Math.PI) * (0.5 + t * .5); }
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+      bp.frequency.setValueAtTime(420 * pitch, now);
+      bp.frequency.exponentialRampToValueAtTime(2100 * pitch, now + duration);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(.052, now);
+      g.gain.exponentialRampToValueAtTime(.0001, now + duration);
+      src.connect(bp); bp.connect(g); g.connect(this.master);
+      src.start(now); src.stop(now + duration + .02);
+    } else if (kind === 'pea') {
+      this.playTone(560 * pitch, .055, 'square', .045);
+      this.playTone(240 * pitch, .04, 'sine', .03);
+      this.playNoise(.03, .02, 2400, 'highpass');
+    } else { // vine
+      this.playTone(720 * pitch, .08, 'sine', .05, 6);
+      this.playTone(1180 * pitch, .05, 'triangle', .035, -8);
+      this.playNoise(.04, .018, 3600, 'highpass');
+    }
+  },
+
+  playCritHit() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    this.playTone(1568, .09, 'triangle', .05);
+    this.playTone(784, .12, 'sine', .04);
+    this.playNoise(.05, .02, 5200, 'highpass');
+  },
+
+  playBossHit() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(88, now);
+    osc.frequency.exponentialRampToValueAtTime(36, now + .26);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(.15, now);
+    g.gain.exponentialRampToValueAtTime(.0001, now + .26);
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320;
+    osc.connect(lp); lp.connect(g); g.connect(this.master);
+    osc.start(now); osc.stop(now + .3);
+    this.playNoise(.16, .05, 260, 'lowpass');
+  },
+
+  // 电击链：高频锯齿放电 + 高切噪声
+  playZap() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1900 + Math.random() * 300, now);
+    osc.frequency.exponentialRampToValueAtTime(420, now + 0.09);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.05, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.8;
+    osc.connect(bp); bp.connect(g); g.connect(this.master);
+    osc.start(now); osc.stop(now + 0.12);
+    this.playNoise(0.06, 0.025, 6000, 'highpass');
+  },
+
+  // 冻结碎裂：三音高频冰晶 + 高频噪声
+  playFrostShatter() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastFrostAt || 0) < 0.05) return;
+    this._lastFrostAt = now;
+    [1760, 2340, 3120].forEach((f, i) => {
+      const o = this.ctx.createOscillator(); o.type = 'triangle';
+      const startAt = now + i * 0.012;
+      o.frequency.setValueAtTime(f, startAt);
+      o.frequency.exponentialRampToValueAtTime(f * 0.6, startAt + 0.08);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.028, startAt);
+      g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.09);
+      o.connect(g); g.connect(this.master);
+      o.start(startAt); o.stop(startAt + 0.11);
+    });
+    this.playNoise(0.08, 0.03, 7200, 'highpass');
+  },
+
+  // 点燃：低切噪声呼响 + 低锯齿
+  playIgnite() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    this.playNoise(0.18, 0.05, 900, 'lowpass');
+    this.playTone(220, 0.14, 'sawtooth', 0.03);
+  },
+
+  // 灼烧跳伤：极轻噼啪声（节流）
+  playBurnTick() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastBurnAt || 0) < 0.12) return;
+    this._lastBurnAt = now;
+    this.playNoise(0.03, 0.014, 1800 + Math.random() * 1400, 'highpass');
   },
 
   tick() {

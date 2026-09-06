@@ -1,5 +1,11 @@
 // 静止形状粒子类型（不参与位移积分，仅缩放/旋转呈现）
-const STATIC_SHAPE_TYPES = new Set(['aoe', 'slash', 'weaponRing', 'vine', 'earthTrail']);
+const STATIC_SHAPE_TYPES = new Set(['aoe', 'slash', 'weaponRing', 'vine', 'earthTrail', 'impact', 'shock', 'trail', 'chain']);
+// 武器专属打击反馈：命中主色、火花色、碎片色与命中音色
+const WEAPON_FX = {
+  harvest_sickle: { impact: '#fff3c4', spark: '#ffe9a8', debris: '#d9a94e', sound: 'sickle' },
+  pea_repeater:   { impact: '#eaffd0', spark: '#d8ff9e', debris: '#6fae3f', sound: 'pea' },
+  vine_staff:     { impact: '#e2fff5', spark: '#d5fff1', debris: '#3fae8a', sound: 'vine' }
+};
 
 class Expedition {
   constructor(mapId) {
@@ -72,6 +78,10 @@ class Expedition {
     this.obstaclesByY = null;     // 障碍物按 y 预排序缓存（遮挡分层用）
     this.hitStop = 0;
     this.killFlash = 0;
+    this.attackCombo = 0;         // 近战连击序号：0 横扫 / 1 反手 / 2 突刺
+    this.weaponRecoil = 0;        // 武器后坐动画
+    this.playerDamageFlash = 0;   // 玩家受击红屏
+    this.critFlash = 0;           // 暴击金色闪屏
     this.extractPoints = [];
     this.bag = []; // 背包物资
     this.safeBox = []; // 安全箱（阵亡保留）
@@ -611,7 +621,7 @@ class Expedition {
     ctx.save();
     const lift = monster.visualZ || 0;
     this.renderCastShadow(ctx, monster.x, monster.y, 28 * scale, 28 * scale, 0.38, lift);
-    ctx.translate(sx, sy - lift);
+    ctx.translate(sx + (monster.knockX || 0), sy - lift + (monster.knockY || 0) * 0.45);
     if (monster.state === 'death') {
       ctx.globalAlpha = clamp((monster.deathTimer || 0) / .42, 0, 1);
       ctx.rotate((1 - ctx.globalAlpha) * .85);
@@ -772,6 +782,36 @@ class Expedition {
     if (monster.stunned > 0) { ctx.fillStyle='#ffe56b';ctx.font='15px sans-serif';ctx.textAlign='center';ctx.fillText('✦',sx,barY-12); }
   }
 
+  // 怪物状态光环：冰冻（青色冰环+碎霜）/ 燃烧（暖色辉光）
+  renderMonsterStatus(ctx, m, sx, sy) {
+    const t = m.animTime || 0;
+    if (m.slow > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.5 + Math.sin(t * 6) * 0.12;
+      ctx.strokeStyle = '#9fe4ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(sx, sy + 4, m.radius + 6, (m.radius + 6) * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#d8f6ff';
+      for (let i = 0; i < 3; i++) {
+        const a = t * 1.6 + i * 2.1;
+        const px = sx + Math.cos(a) * (m.radius + 4), py = sy + Math.sin(a * 1.3) * (m.radius * 0.5);
+        ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (m.burn) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.35 + Math.sin(t * 14) * 0.1;
+      const fg = ctx.createRadialGradient(sx, sy - 4, 2, sx, sy - 4, m.radius + 10);
+      fg.addColorStop(0, 'rgba(255,170,60,.5)');
+      fg.addColorStop(1, 'rgba(255,90,20,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(sx, sy - 4, m.radius + 10, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   collidesWithObstacle(x, y, radius = 0) {
     return this.obstacleSpatialHash.queryCircle(x, y, radius + 90).some(obstacle => {
       let dx = x - obstacle.x;
@@ -921,11 +961,71 @@ class Expedition {
       x:position.x, y:position.y, radius:46,
       hp:this.balance.bossHp, maxHp:this.balance.bossHp,
       damage:this.balance.bossDamage, speed:76 + this.map.tier * 5,
-      attackRange:70, attackCd:1.5, abilityCd:4, phase:1, stunned:0,
+      attackRange:70, attackCd:1.5, abilityCd:4, abilityIndex:0, phase:1, stunned:0,
       facing:0, animTime:0, hitFlash:0, elite:true, gold:100 * this.map.tier,
     };
     this.monsters.push(this.boss);
     showToast(`区域首领「${this.boss.name}」已现身`, 'warning');
+  }
+
+  castBossAbility(boss, d, angle) {
+    const phase2 = boss.phase === 2;
+    const idx = boss.abilityIndex % 4;
+    boss.abilityIndex++;
+    const dmgMul = phase2 ? 1.3 : 1;
+    if (idx === 0) {
+      // 地裂震荡：玩家脚下AOE + 冲击环
+      this.spawnAoeEffect(this.player.x, this.player.y, phase2 ? 110 : 88, '#d59aff');
+      this.spawnShockRing(this.player.x, this.player.y, '#d59aff', phase2 ? 110 : 88);
+      if (d < (phase2 ? 175 : 155)) this.damagePlayer(boss.damage * .72 * dmgMul);
+    } else if (idx === 1) {
+      // 狂暴冲锋：向玩家突进，路径拖尾 + 终点冲击
+      const dashDist = phase2 ? 170 : 140;
+      boss.x = clamp(boss.x + Math.cos(angle) * dashDist, 60, CONFIG.expedition.mapSize - 60);
+      boss.y = clamp(boss.y + Math.sin(angle) * dashDist, 60, CONFIG.expedition.mapSize - 60);
+      for (let i = 0; i < 10; i++) {
+        this.spawnDirectionalSparks(boss.x - Math.cos(angle) * i * 14, boss.y - Math.sin(angle) * i * 14, angle + Math.PI, '#ff9a3c', 1, 1);
+      }
+      this.spawnShockRing(boss.x, boss.y, '#ff9a3c', 72);
+      if (d < 115) this.damagePlayer(boss.damage * .9 * dmgMul);
+    } else if (idx === 2) {
+      // 召唤兽群
+      const count = phase2 ? 3 : 2;
+      const types = ['wolf', 'spider', 'bat'];
+      for (let i = 0; i < count; i++) {
+        const a = angle + (i - (count - 1) / 2) * 0.6;
+        const sx = clamp(boss.x + Math.cos(a) * 95, 60, CONFIG.expedition.mapSize - 60);
+        const sy = clamp(boss.y + Math.sin(a) * 95, 60, CONFIG.expedition.mapSize - 60);
+        this.spawnAoeEffect(sx, sy, 38, '#9affd5');
+        const type = types[randInt(0, types.length - 1)];
+        const data = CONFIG.monsters[type];
+        this.monsters.push({
+          type, ...data, x: sx, y: sy,
+          hp: Math.round(data.hp * this.balance.enemyHp * 0.6), maxHp: Math.round(data.hp * this.balance.enemyHp * 0.6),
+          damage: Math.max(2, Math.round(data.damage * this.balance.enemyDamage * 0.7)),
+          speed: data.speed * this.balance.enemySpeed,
+          attackCd: 0, stunned: 0, facing: a, animTime: 0, hitFlash: 0,
+          elite: false, abilityCd: rand(1, 3), packOffset: 0, beastWave: false, state: 'idle', stateTimer: 0
+        });
+      }
+    } else {
+      // 暗影弹幕：扇形投射物
+      const count = phase2 ? 8 : 6;
+      const color = phase2 ? '#ff6b9d' : '#d59aff';
+      for (let i = 0; i < count; i++) {
+        const a = angle + (i - (count - 1) / 2) * 0.18;
+        const p = this.allocProjectile();
+        Object.assign(p, {
+          x: boss.x + Math.cos(a) * 40, y: boss.y + Math.sin(a) * 40,
+          vx: Math.cos(a) * 260, vy: Math.sin(a) * 260,
+          damage: boss.damage * 0.45 * dmgMul, life: 2.2, radius: 9,
+          fromPlayer: false, color, pierce: 1
+        });
+        p.hit = p.hit || []; p.hit.length = 0;
+        this.projectiles.push(p);
+      }
+      this.spawnMuzzleEffect(boss.x, boss.y, angle, color);
+    }
   }
 
   spawnBeastWave() {
@@ -1067,12 +1167,16 @@ class Expedition {
     if (skill.id === 'straw_smash') {
       [...this.monsters, ...this.raiders].forEach(m => {
         if (dist(m, this.player) < skill.range) {
-          this.damageEnemy(m, skill.damage, '#f2c45b', true);
+          this.damageEnemy(m, skill.damage, '#f2c45b', true, {
+            x: m.x, y: m.y, angle: Math.atan2(m.y - this.player.y, m.x - this.player.x),
+            weaponId: '', fromPlayer: true
+          });
           m.stunned = 0.5;
         }
       });
       this.spawnAoeEffect(px, py, skill.range, '#f2c45b', 'ring');
       this.spawnRadialBurst(px, py, '#fff0a6', 12);
+      this.spawnShockRing(px, py, '#ffe9a0', skill.range * 0.8);
     } else if (skill.id === 'vine_bind') {
       [...this.monsters, ...this.raiders].forEach(m => {
         if (dist(m, this.player) < skill.range) {
@@ -1111,7 +1215,11 @@ class Expedition {
     } else if (id === 'thorn_storm') {
       [...this.monsters, ...this.raiders].forEach(m => {
         if (dist(m, this.player) < item.range) {
-          this.damageEnemy(m, item.damage, '#ff9a55', true);
+          this.damageEnemy(m, item.damage, '#ff9a55', true, {
+            x: m.x, y: m.y, angle: Math.atan2(m.y - this.player.y, m.x - this.player.x),
+            weaponId: '', fromPlayer: true
+          });
+          this.applyBurn(m, 22, 3);
         }
       });
       this.consumables[id]--;
@@ -1497,20 +1605,36 @@ class Expedition {
     const angle = Math.atan2(worldMouseY - this.player.y, worldMouseX - this.player.x);
     this.player.angle = angle;
     this.weaponPulse = 0.18;
-    this.attackAnim = 0.24;
+    this.attackAnim = 0.28;
+    // 连击序号循环：0 横扫 → 1 反手横斩 → 2 突刺终结
+    this.attackCombo = (this.attackCombo + 1) % 3;
+    const combo = this.attackCombo;
     if (this.weapon.mode === 'melee') {
+      // 突进：挥击瞬间沿攻击方向小位移，终结技位移更大
+      const lungePower = [10, 13, 17][combo];
+      this.player.lungeX = Math.cos(angle) * lungePower;
+      this.player.lungeY = Math.sin(angle) * lungePower;
+      let hitCount = 0;
       [...this.monsters, ...this.raiders].forEach(m => {
         const d = dist(m, this.player);
         if (d < this.weapon.range) {
           const mAngle = Math.atan2(m.y - this.player.y, m.x - this.player.x);
           const angleDiff = Math.abs(((mAngle - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
           if (angleDiff < Math.PI / 2) {
-            this.damageEnemy(m, this.weapon.damage, this.weapon.color, true); m.stunned = 0.2;
-            m.visualVz = Math.max(m.visualVz || 0, 105);
+            this.damageEnemy(m, this.weapon.damage, this.weapon.color, combo === 2, {
+              x: m.x, y: m.y, angle, weaponId: this.weapon.id, fromPlayer: true
+            });
+            m.stunned = Math.max(m.stunned || 0, combo === 2 ? 0.45 : 0.25);
+            m.visualVz = Math.max(m.visualVz || 0, combo === 2 ? 120 : 95);
+            hitCount++;
           }
         }
       });
-      this.spawnSlashEffect(this.player.x, this.player.y, angle, this.weapon.color, 64);
+      // 挥砍弧光按连击切换方向（1 为反手），突刺技弧更大
+      this.spawnSlashEffect(this.player.x, this.player.y, angle, this.weapon.color, combo === 2 ? 70 : 58, combo);
+      this.spawnSwingTrail(this.player.x + Math.cos(angle) * 30, this.player.y + Math.sin(angle) * 30, angle, this.weapon.color, combo === 1 ? -1 : 1, combo === 2 ? 1.05 : 1);
+      this.weaponRecoil = combo === 2 ? 0.75 : 0.5;
+      AudioManager.playAttack('melee', combo);
     } else {
       const p = this.allocProjectile();
       Object.assign(p, { x: this.player.x + Math.cos(angle) * 24, y: this.player.y + Math.sin(angle) * 24,
@@ -1520,6 +1644,8 @@ class Expedition {
       p.hit = p.hit || []; p.hit.length = 0;
       this.projectiles.push(p);
       this.spawnMuzzleEffect(this.player.x, this.player.y, angle, this.weapon.color);
+      this.weaponRecoil = 1;
+      AudioManager.playAttack(this.weapon.id === 'vine_staff' ? 'vine' : 'pea');
     }
   }
 
@@ -1688,43 +1814,230 @@ class Expedition {
     }
   }
 
-  damageEnemy(target, amount, color = '#ffffff', heavy = false) {
+  // 命中点光爆：亮斑 + 十字星芒
+  spawnImpact(x, y, color, scale = 1) {
+    const p = this.allocParticle();
+    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.22, maxLife: 0.22, color, size: 10 * scale, type: 'impact' });
+    this.particles.push(p);
+    const r = this.allocParticle();
+    Object.assign(r, { x, y, vx: 0, vy: 0, life: 0.28, maxLife: 0.28, color, size: 18 * scale, type: 'shock' });
+    this.particles.push(r);
+  }
+
+  // 定向火花：沿攻击反方向喷射、带阻力与重力
+  spawnDirectionalSparks(x, y, angle, color, count = 6, power = 1) {
+    for (let i = 0; i < count; i++) {
+      const spread = angle + Math.PI + rand(-0.7, 0.7);
+      const speed = rand(120, 300) * power;
+      const p = this.allocParticle();
+      Object.assign(p, {
+        x, y,
+        vx: Math.cos(spread) * speed, vy: Math.sin(spread) * speed,
+        life: rand(0.22, 0.42), maxLife: 0.42, color,
+        size: rand(1.5, 3.5), type: 'splat', drag: 5, grav: 60,
+        rot: rand(0, Math.PI * 2), spin: rand(-9, 9)
+      });
+      this.particles.push(p);
+    }
+  }
+
+  // 冲击环：重击/暴击/Boss 受击时的扩散圆环
+  spawnShockRing(x, y, color, size = 46) {
+    const p = this.allocParticle();
+    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.3, maxLife: 0.3, color, size, type: 'shock' });
+    this.particles.push(p);
+    const r = this.allocParticle();
+    Object.assign(r, { x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2, color: '#ffffff', size: size * 0.55, type: 'shock' });
+    this.particles.push(r);
+  }
+
+  // 拖尾刀光：三层错开的残留弧光，主层带白色亮芯
+  spawnSwingTrail(x, y, angle, color, dir = 1, scale = 1) {
+    for (let k = 0; k < 3; k++) {
+      const p = this.allocParticle();
+      Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.2 + k * 0.05, maxLife: 0.3, color,
+        size: (48 - k * 9) * scale, angle: angle + dir * k * 0.14, dir, layer: k, type: 'trail' });
+      this.particles.push(p);
+    }
+  }
+
+  // 冻结碎裂：冰晶碎片向四周飞溅（big 为死亡大碎裂）
+  spawnFrostShatter(x, y, big = false) {
+    const count = big ? 22 : 9;
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, Math.PI * 2), sp = rand(70, big ? 320 : 210);
+      const p = this.allocParticle();
+      Object.assign(p, { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        life: rand(0.35, 0.65), maxLife: 0.65,
+        color: ['#d8f6ff', '#a8e4ff', '#ffffff'][i % 3],
+        size: rand(3, big ? 9 : 6), type: 'ice', drag: 3.2, grav: 260,
+        rot: rand(0, Math.PI * 2), spin: rand(-12, 12) });
+      this.particles.push(p);
+    }
+    this.spawnShockRing(x, y, '#bfeeff', big ? 70 : 40);
+    if (big) this.spawnImpact(x, y, '#d8f6ff', 1.4);
+    AudioManager.playFrostShatter();
+  }
+
+  // 火焰粒子：向上飘升、带阻力的暖色火球
+  spawnFlame(x, y) {
+    const p = this.allocParticle();
+    Object.assign(p, { x: x + rand(-8, 8), y, vx: rand(-26, 26), vy: rand(-115, -60),
+      life: rand(0.3, 0.48), maxLife: 0.48, color: '#ff8a2c', size: rand(4, 8),
+      type: 'flame', drag: 1.6, grav: -40 });
+    this.particles.push(p);
+  }
+
+  // 施加灼烧：刷新持续时间，取更高 dps
+  applyBurn(target, dps = 14, duration = 2.5) {
+    if (!target || target.hp <= 0) return;
+    const cur = target.burn;
+    target.burn = { time: duration, dps: Math.max(cur ? cur.dps : 0, dps),
+      tick: cur ? Math.min(cur.tick, 0.2) : 0.1, fx: 0 };
+    this.spawnImpact(target.x, target.y, '#ff9a3c', 1.1);
+    AudioManager.playIgnite();
+  }
+
+  // 灼烧状态推进：火焰视觉 + 每 0.4s 一跳伤害（quiet，不击退不顿帧）
+  updateBurn(m, dt) {
+    if (!m.burn) return;
+    m.burn.time -= dt;
+    m.burn.fx -= dt;
+    if (m.burn.fx <= 0) { m.burn.fx = 0.06; this.spawnFlame(m.x + rand(-m.radius * 0.6, m.radius * 0.6), m.y - m.radius * 0.4); }
+    m.burn.tick -= dt;
+    if (m.burn.tick <= 0 && m.hp > 0) {
+      m.burn.tick = 0.4;
+      this.damageEnemy(m, m.burn.dps * 0.4, '#ff8a3c', false,
+        { x: m.x, y: m.y, angle: 0, weaponId: 'burn', fromPlayer: true, quiet: true, crit: false });
+      AudioManager.playBurnTick();
+    }
+    if (m.burn.time <= 0 || m.hp <= 0) m.burn = null;
+  }
+
+  // 闪电折线（世界坐标点列，静态粒子）
+  spawnLightningBolt(x1, y1, x2, y2, color = '#a9f5ff') {
+    const segments = 6;
+    const points = [{ x: x1, y: y1 }];
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const jitter = rand(-14, 14) * (i === 1 || i === segments - 1 ? 0.4 : 1);
+      points.push({ x: x1 + dx * t + nx * jitter, y: y1 + dy * t + ny * jitter });
+    }
+    points.push({ x: x2, y: y2 });
+    const p = this.allocParticle();
+    Object.assign(p, { x: (x1 + x2) / 2, y: (y1 + y2) / 2, vx: 0, vy: 0,
+      life: 0.2, maxLife: 0.2, color, size: 1, type: 'chain', points });
+    this.particles.push(p);
+  }
+
+  // 电击链：从命中目标向最近敌人跳跃，最多 jumps 次，每跳伤害衰减
+  lightningChainFrom(source, proj, hitSet, jumpsLeft, dmgRatio) {
+    if (jumpsLeft <= 0) return;
+    let nearest = null, bestD = 150 * 150;
+    for (const m of this.monsters) {
+      if (m.hp <= 0 || hitSet.includes(m)) continue;
+      const dd = (m.x - source.x) ** 2 + (m.y - source.y) ** 2;
+      if (dd < bestD) { bestD = dd; nearest = m; }
+    }
+    if (!nearest) return;
+    hitSet.push(nearest);
+    this.spawnLightningBolt(source.x, source.y, nearest.x, nearest.y);
+    this.spawnImpact(nearest.x, nearest.y, '#bff7ff', 1.1);
+    this.spawnDirectionalSparks(nearest.x, nearest.y,
+      Math.atan2(nearest.y - source.y, nearest.x - source.x), '#cdf9ff', 5, 0.9);
+    this.damageEnemy(nearest, (proj.damage || 10) * dmgRatio, '#a9f5ff', false, {
+      x: nearest.x, y: nearest.y,
+      angle: Math.atan2(nearest.y - source.y, nearest.x - source.x),
+      weaponId: 'vine_staff', fromPlayer: true, quiet: true, crit: false
+    });
+    nearest.visualVz = Math.max(nearest.visualVz || 0, 60);
+    AudioManager.playZap();
+    this.lightningChainFrom(nearest, proj, hitSet, jumpsLeft - 1, dmgRatio * 0.8);
+  }
+
+  damageEnemy(target, amount, color = '#ffffff', heavy = false, hitInfo = null) {
     if (!target || target.hp <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
+    const isBoss = target.type === 'boss';
+    const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;
+    // quiet：持续伤害/电击链不产生击退顿帧，避免抖动刷屏
+    const quiet = !!(hitInfo && hitInfo.quiet);
+    // 玩家来源伤害有 20% 暴击：1.8 倍伤害 + 金色大字 + 暴击点燃（2.5s 灼烧）
+    const isCrit = fromPlayer && hitInfo && hitInfo.crit !== false && Math.random() < 0.20;
+    if (isCrit) { amount *= 1.8; this.applyBurn(target, Math.max(10, amount * 0.35), 2.5); }
     target.hp -= amount;
     target.hitFlash = heavy ? 0.22 : 0.14;
     target.state = target.hp <= 0 ? 'death' : 'hit';
     target.stateTimer = target.hp <= 0 ? .4 : .18;
+    const dmgColor = isCrit ? '#ffd968' : color;
     this.damageNumbers.push({
       x: target.x + rand(-8, 8), y: target.y - target.radius - 8,
-      value: Math.round(amount), color, life: 0.72, maxLife: 0.72,
-      vx: rand(-10, 10), vy: heavy ? -64 : -48, heavy
+      value: Math.round(amount), color: dmgColor, life: isCrit ? 0.9 : 0.72, maxLife: isCrit ? 0.9 : 0.72,
+      vx: rand(-10, 10), vy: heavy ? -64 : -48, heavy: heavy || isCrit, crit: isCrit
     });
-    this.spawnHitParticles(target.x, target.y, color);
-    this.hitStop = Math.max(this.hitStop, heavy ? 0.065 : 0.032);
-    AudioManager.playMonsterHit(heavy ? 'heavy' : 'normal');
+    // 命中点光爆 + 沿攻击方向的定向火花 + 冲击环（重击/暴击/Boss）
+    const hitX = hitInfo ? hitInfo.x : target.x;
+    const hitY = hitInfo ? hitInfo.y : target.y;
+    const hitAngle = hitInfo ? hitInfo.angle : Math.atan2(target.y - this.player.y, target.x - this.player.x);
+    const weaponId = hitInfo ? hitInfo.weaponId : '';
+    // 武器专属配色：命中光爆与定向火花颜色随武器变化
+    const fx = WEAPON_FX[weaponId];
+    const impactColor = isCrit ? '#fff3b0' : (fx ? fx.impact : color);
+    const sparkColor = isCrit ? '#fff0a0' : (fx ? fx.spark : color);
+    this.spawnImpact(hitX, hitY, impactColor, isCrit ? 1.6 : 1);
+    this.spawnDirectionalSparks(hitX, hitY, hitAngle, sparkColor, heavy ? 12 : 8, isBoss ? 1.25 : 1);
+    if (heavy || isCrit || isBoss) this.spawnShockRing(hitX, hitY, isBoss ? '#ffd9a0' : impactColor, isBoss ? 84 : 52);
+    // 冻结碎裂：被寒冰藤减速（冰冻状态）的敌人受击时碎冰飞溅，死亡时大碎裂
+    if (target.slow > 0 && fromPlayer) this.spawnFrostShatter(hitX, hitY, target.hp <= 0);
+    if (!quiet) {
+      // 方向击退：Boss 只受轻微击退；暴击额外 ×1.7
+      const knockPower = (heavy ? 215 : 130) * (isBoss ? 0.3 : 1) * (isCrit ? 1.7 : 1);
+      target.knockX = (target.knockX || 0) + Math.cos(hitAngle) * knockPower;
+      target.knockY = (target.knockY || 0) + Math.sin(hitAngle) * knockPower;
+      this.hitStop = Math.max(this.hitStop, isCrit ? 0.14 : heavy ? 0.09 : 0.05);
+      if (isCrit || heavy) this.screenShake = Math.max(this.screenShake, isCrit ? 0.5 : 0.32);
+    }
+    if (isCrit) {
+      this.critFlash = Math.max(this.critFlash, 0.2);
+      AudioManager.playCritHit();
+    }
+    AudioManager.playMonsterHit(isBoss ? 'heavy' : (isCrit ? 'crit' : heavy ? 'heavy' : 'normal'), weaponId);
+    if (isBoss) AudioManager.playBossHit();
   }
 
   spawnKillFeedback(target) {
-    this.killFlash = Math.max(this.killFlash, target.type === 'boss' ? 0.22 : 0.11);
-    this.hitStop = Math.max(this.hitStop, target.type === 'boss' ? 0.13 : 0.07);
-    this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 1 : 0.65);
-    this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 30 : 18);
+    this.killFlash = Math.max(this.killFlash, target.type === 'boss' ? 0.10 : 0.06);
+    this.hitStop = Math.max(this.hitStop, target.type === 'boss' ? 0.07 : 0.05);
+    this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 0.45 : 0.35);
+    this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 18 : 14);
+    if (target.slow > 0) this.spawnFrostShatter(target.x, target.y, true);
+    if (target.burn) { this.spawnRadialBurst(target.x, target.y, '#ff9a3c', 14); this.spawnImpact(target.x, target.y, '#ffb05c', 1.3); }
+    this.spawnImpact(target.x, target.y, '#fff2c0', target.type === 'boss' ? 1.2 : 1.0);
+    this.spawnShockRing(target.x, target.y, target.type === 'boss' ? '#ffca7a' : '#ff9a6a', target.type === 'boss' ? 72 : 44);
     AudioManager.playMonsterHit('kill');
   }
 
   spawnAoeEffect(x, y, radius, color) {
     const p = this.allocParticle();
-    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5,
-      color, size: radius, type: 'aoe' });
+    Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5, color, size: radius, type: 'aoe' });
     this.particles.push(p);
+    const r = this.allocParticle();
+    Object.assign(r, { x, y, vx: 0, vy: 0, life: 0.35, maxLife: 0.35, color: '#ffffff', size: radius * 0.6, type: 'aoe' });
+    this.particles.push(r);
   }
 
-  spawnSlashEffect(x, y, angle, color = '#ffffff', size = 50) {
+  spawnSlashEffect(x, y, angle, color = '#ffffff', size = 50, combo = 0) {
     const p = this.allocParticle();
     Object.assign(p, { x, y, vx: 0, vy: 0, life: 0.2, maxLife: 0.2,
-      color, size, angle, type: 'slash' });
+      color, size, angle, dir: combo === 1 ? -1 : 1, type: 'slash' });
     this.particles.push(p);
+    const inner = this.allocParticle();
+    Object.assign(inner, { x, y, vx: 0, vy: 0, life: 0.14, maxLife: 0.14,
+      color: '#ffffff', size: size * 0.7, angle, dir: combo === 1 ? -1 : 1, type: 'slash' });
+    this.particles.push(inner);
   }
 
   spawnMuzzleEffect(x, y, angle, color) {
@@ -1855,6 +2168,15 @@ class Expedition {
     const previousY = this.player.y;
     this.player.x += dx * speed * dt;
     this.player.y += dy * speed * dt;
+    // 挥击突进：惯性位移随时间衰减
+    const lungeX = this.player.lungeX || 0, lungeY = this.player.lungeY || 0;
+    if (lungeX || lungeY) {
+      this.player.x += lungeX * dt;
+      this.player.y += lungeY * dt;
+      const lungeDecay = Math.max(0, 1 - 9 * dt);
+      this.player.lungeX = lungeX * lungeDecay;
+      this.player.lungeY = lungeY * lungeDecay;
+    }
     const size = CONFIG.expedition.mapSize;
     this.player.x = clamp(this.player.x, 20, size - 20);
     this.player.y = clamp(this.player.y, 20, size - 20);
@@ -1883,6 +2205,9 @@ class Expedition {
     this.player.slow = Math.max(0, this.player.slow - dt);
     this.weaponPulse = Math.max(0, this.weaponPulse - dt);
     this.attackAnim = Math.max(0, this.attackAnim - dt);
+    this.weaponRecoil = Math.max(0, this.weaponRecoil - dt * 9);
+    this.playerDamageFlash = Math.max(0, this.playerDamageFlash - dt * 3.2);
+    this.critFlash = Math.max(0, this.critFlash - dt * 6);
     this.screenShake = Math.max(0, this.screenShake - dt * 4.5);
     this.player.visualZ = Math.max(0, this.player.visualZ + this.player.visualVz * dt);
     this.player.visualVz -= 360 * dt;
@@ -1892,6 +2217,14 @@ class Expedition {
       monster.visualZ = Math.max(0, (monster.visualZ || 0) + (monster.visualVz || 0) * dt);
       monster.visualVz = (monster.visualVz || 0) - 330 * dt;
       if (monster.visualZ <= 0) { monster.visualZ = 0; monster.visualVz = 0; }
+      // 受击击退：位移 + 衰减
+      if (monster.knockX || monster.knockY) {
+        monster.x += (monster.knockX || 0) * dt;
+        monster.y += (monster.knockY || 0) * dt;
+        const kd = Math.max(0, 1 - 9 * dt);
+        monster.knockX *= kd; monster.knockY *= kd;
+        if (Math.abs(monster.knockX) < 1 && Math.abs(monster.knockY) < 1) { monster.knockX = 0; monster.knockY = 0; }
+      }
     });
     for (let i = 0; i < 4; i++) {
       this.skillCooldowns[i] = Math.max(0, this.skillCooldowns[i] - dt);
@@ -1934,8 +2267,11 @@ class Expedition {
       m.attackCd = Math.max(0, m.attackCd - dt);
       m.stunned = Math.max(0, m.stunned - dt);
       m.hitFlash = Math.max(0, (m.hitFlash || 0) - dt);
+      m.slow = Math.max(0, (m.slow || 0) - dt * 0.8);
       m.stateTimer = Math.max(0, (m.stateTimer || 0) - dt);
       m.animTime = (m.animTime || 0) + dt * (1.8 + m.speed / 120);
+      this.updateBurn(m, dt);
+      const slowMul = m.slow > 0 ? clamp(1 - m.slow, 0.35, 1) : 1;
       if (m.stunned > 0) return;
 
       const d = dist(m, this.player);
@@ -1957,7 +2293,7 @@ class Expedition {
         m.facing = pa;
         if (plantDist > m.attackRange) {
           m.state = 'move';
-          this.moveEntityWithCollisions(m, Math.cos(pa) * m.speed * dt, Math.sin(pa) * m.speed * dt);
+          this.moveEntityWithCollisions(m, Math.cos(pa) * m.speed * slowMul * dt, Math.sin(pa) * m.speed * slowMul * dt);
         } else if (m.attackCd <= 0) {
           m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
@@ -1971,7 +2307,7 @@ class Expedition {
         m.facing = angle;
         if (d > m.attackRange) {
           m.state = 'move';
-          this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * dt, Math.sin(angle) * m.speed * dt);
+          this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * slowMul * dt, Math.sin(angle) * m.speed * slowMul * dt);
         } else if (m.attackCd <= 0) {
           // 攻击
           m.state = 'attack'; m.stateTimer = .28;
@@ -1999,7 +2335,7 @@ class Expedition {
         }
         const angle = Math.atan2(m.wanderTarget.y - m.y, m.wanderTarget.x - m.x);
         m.facing = angle;
-        this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * 0.3 * dt, Math.sin(angle) * m.speed * 0.3 * dt);
+        this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * 0.3 * slowMul * dt, Math.sin(angle) * m.speed * 0.3 * slowMul * dt);
       }
     });
 
@@ -2042,6 +2378,12 @@ class Expedition {
       if (r.hp <= 0) return;
       r.attackCd = Math.max(0, r.attackCd - dt);
       r.stunned = Math.max(0, (r.stunned || 0) - dt);
+      if (r.knockX || r.knockY) {
+        r.x += (r.knockX || 0) * dt;
+        r.y += (r.knockY || 0) * dt;
+        const kd = Math.max(0, 1 - 9 * dt);
+        r.knockX *= kd; r.knockY *= kd;
+      }
       if (r.stunned > 0) return;
       const d = dist(r, this.player);
 
@@ -2103,7 +2445,10 @@ class Expedition {
           if (d < minD) { minD = d; nearest = r; }
         });
         if (nearest) {
-          this.damageEnemy(nearest, t.damage * (this.beastWave.active ? 2.15 : 1), '#8affb5');
+          this.damageEnemy(nearest, t.damage * (this.beastWave.active ? 2.15 : 1), '#8affb5', false, {
+            x: t.x, y: t.y, angle: Math.atan2(nearest.y - t.y, nearest.x - t.x),
+            weaponId: '', fromPlayer: false
+          });
           t.attackCd = this.beastWave.active ? 0.42 : 0.72;
           const p = this.allocProjectile();
           Object.assign(p, {
@@ -2142,11 +2487,19 @@ class Expedition {
             const ddx = target.x - p.x, ddy = target.y - p.y;
             const rr = target.radius + p.radius;
             if (ddx * ddx + ddy * ddy <= rr * rr) {
-              this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff');
+              this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff', {
+                x: p.x, y: p.y,
+                angle: Math.atan2(p.vy, p.vx),
+                weaponId: p.weaponId || '',
+                fromPlayer: !!p.fromPlayer
+              });
               target.visualVz = Math.max(target.visualVz || 0, p.weaponId === 'vine_staff' ? 82 : 52);
               p.hit.push(target);
               p.pierce--;
-              if (p.weaponId === 'vine_staff') target.stunned = Math.max(target.stunned || 0, 0.18);
+              if (p.weaponId === 'vine_staff') {
+                target.stunned = Math.max(target.stunned || 0, 0.18);
+                this.lightningChainFrom(target, p, p.hit, 2, 0.55);
+              }
               if (p.pierce <= 0) { dead = true; break; }
               if (p.fromPlant) { dead = true; break; }
             }
@@ -2177,6 +2530,9 @@ class Expedition {
         p.life -= dt;
         if (p.life <= 0) { this.particlePool.push(p); continue; }
         if (!STATIC_SHAPE_TYPES.has(p.type)) { p.x += p.vx * dt; p.y += p.vy * dt; }
+        if (p.grav) p.vy += p.grav * dt;
+        if (p.drag) { const d = Math.max(0, 1 - p.drag * dt); p.vx *= d; p.vy *= d; }
+        if (p.spin) p.rot = (p.rot || 0) + p.spin * dt;
         arr[w++] = p;
       }
       arr.length = w;
@@ -2223,7 +2579,9 @@ class Expedition {
     AudioManager.playPlayerHurt();
     this.damageTaken += amount;
     this.screenShake = Math.min(1, this.screenShake + 0.48);
+    this.playerDamageFlash = 0.38;
     this.spawnHitParticles(this.player.x, this.player.y, '#ff4444');
+    this.spawnShockRing(this.player.x, this.player.y, '#ff5544', 42);
     if (this.extracting) this.cancelExtract();
     if (this.player.hp <= 0) {
       this.player.hp = 0;
@@ -2299,13 +2657,18 @@ class Expedition {
       for (let j = 0; j < 4; j++) { const yy = -84 - j * 5; ctx.beginPath(); ctx.ellipse(x + 5 + i + j, yy, 3, 1.5, -0.6, 0, Math.PI * 2); ctx.fillStyle = '#e0a841'; ctx.fill(); } });
     ctx.strokeStyle = '#303534'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(24, -82); ctx.quadraticCurveTo(42, -82, 38, -66); ctx.lineTo(44, -63); ctx.stroke();
 
-    this.renderHeroWeapon(ctx, angle, swing);
+    this.renderHeroWeapon(ctx, angle, swing, this.attackCombo, this.weaponRecoil);
     ctx.restore();
   }
 
-  renderHeroWeapon(ctx, angle, swing) {
-    const localAngle = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle))) + swing * 0.8;
-    ctx.save(); ctx.translate(28, 6); ctx.rotate(localAngle * 0.45 - 0.25);
+  renderHeroWeapon(ctx, angle, swing, combo = 0, recoil = 0) {
+    const dir = combo === 1 ? -1 : 1;
+    const localAngle = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle))) * dir;
+    ctx.save();
+    // 后坐：开火/挥击后武器短暂后拉
+    ctx.translate(28 - recoil * 9, 6 + recoil * 3);
+    ctx.rotate(localAngle * 0.45 - 0.25 + swing * 0.8 * dir);
+    if (combo === 2) ctx.translate(swing * 16, 0); // 突刺：武器沿攻击方向前伸
     if (this.weapon.id === 'harvest_sickle') {
       ctx.strokeStyle = '#684328'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-5, 17); ctx.lineTo(30, -31); ctx.stroke();
       const blade = ctx.createLinearGradient(22, -38, 51, -22); blade.addColorStop(0, '#fff2bd'); blade.addColorStop(1, '#8c9c99');
@@ -2636,6 +2999,7 @@ class Expedition {
       /* health is rendered as part of the dimensional creature model */
       // 图标
       this.renderMonster(ctx, m, cam);
+      this.renderMonsterStatus(ctx, m, sx, sy);
       if (m.stunned > 0) {
         ctx.fillStyle = '#ffff00';
         ctx.font = '14px sans-serif';
@@ -2747,17 +3111,134 @@ class Expedition {
         ctx.stroke();
         ctx.globalAlpha = 1;
       } else if (p.type === 'slash') {
+        const dir = p.dir || 1;
         ctx.save();
         ctx.translate(sx, sy);
         ctx.rotate(p.angle);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        // 主弧
         ctx.strokeStyle = p.color;
         ctx.globalAlpha = alpha;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(0, 0, p.size, -Math.PI / 3, Math.PI / 3);
+        ctx.arc(0, 0, p.size, -Math.PI / 3 * dir, Math.PI / 3 * dir);
+        ctx.stroke();
+        // 外圈残影
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size * 0.88, -Math.PI / 2.6 * dir, Math.PI / 2.6 * dir);
+        ctx.stroke();
+        // 刀光尖端高亮
+        const tipAngle = Math.PI / 3 * dir;
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, tipAngle - 0.5 * dir, tipAngle);
         ctx.stroke();
         ctx.restore();
         ctx.globalAlpha = 1;
+      } else if (p.type === 'impact') {
+        const grow = p.size * (1.25 - alpha * .25);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, grow);
+        glow.addColorStop(0, p.color);
+        glow.addColorStop(0.45, p.color + 'aa');
+        glow.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(sx, sy, grow, 0, Math.PI * 2); ctx.fill();
+        // 十字星芒
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 2;
+        const m = grow * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(sx - m, sy); ctx.lineTo(sx + m, sy);
+        ctx.moveTo(sx, sy - m); ctx.lineTo(sx, sy + m);
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'shock') {
+        const r = p.size * (1 - alpha * alpha);
+        ctx.beginPath(); ctx.arc(sx, sy, Math.max(2, r), 0, Math.PI * 2);
+        ctx.strokeStyle = p.color; ctx.globalAlpha = alpha * 0.85;
+        ctx.lineWidth = 2 + alpha * 3; ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'trail') {
+        const dir = p.dir || 1;
+        const layer = p.layer || 0;
+        const sweep = (1 - alpha) * 1.9;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(p.angle);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha * (layer === 0 ? 0.85 : 0.4);
+        ctx.lineWidth = layer === 0 ? 5 : 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, -sweep * dir * 0.5, sweep * dir * 0.5);
+        ctx.stroke();
+        if (layer === 0) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.globalAlpha = alpha * 0.75;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size * 0.96, -sweep * dir * 0.42, sweep * dir * 0.42);
+          ctx.stroke();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'splat') {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, p.size * alpha), 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'ice') {
+        ctx.save();
+        ctx.translate(sx, sy); ctx.rotate(p.rot || 0);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        const isz = p.size * (0.5 + alpha * 0.5);
+        ctx.beginPath(); ctx.moveTo(0, -isz); ctx.lineTo(isz * 0.5, 0); ctx.lineTo(0, isz); ctx.lineTo(-isz * 0.5, 0); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'flame') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const fs = p.size * (0.6 + alpha * 0.7);
+        const fg = ctx.createRadialGradient(sx, sy, 0, sx, sy, fs);
+        fg.addColorStop(0, '#fff2b0');
+        fg.addColorStop(0.45, p.color);
+        fg.addColorStop(1, 'rgba(255,90,20,0)');
+        ctx.fillStyle = fg; ctx.globalAlpha = alpha;
+        ctx.beginPath(); ctx.arc(sx, sy, fs, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      } else if (p.type === 'chain') {
+        if (p.points && p.points.length > 1) {
+          const trace = (width, color, a) => {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = color; ctx.globalAlpha = a; ctx.lineWidth = width;
+            ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            ctx.beginPath();
+            p.points.forEach((pt, i) => { const px = pt.x - cam.x, py = pt.y - cam.y; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+            ctx.stroke();
+            ctx.restore();
+          };
+          trace(8, 'rgba(90,200,255,.55)', alpha * 0.5);
+          trace(3.4, '#7fe9ff', alpha * 0.9);
+          trace(1.5, '#ffffff', alpha);
+          ctx.globalAlpha = 1;
+        }
       } else if (p.type === 'weaponRing') {
         ctx.beginPath(); ctx.arc(sx, sy, p.size * (1.25 - alpha * .25), 0, Math.PI * 2);
         ctx.strokeStyle = p.color; ctx.globalAlpha = alpha * .65; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1;
@@ -2789,14 +3270,20 @@ class Expedition {
     this.damageNumbers.forEach(number => {
       const sx = number.x - cam.x, sy = number.y - cam.y;
       const alpha = clamp(number.life / number.maxLife, 0, 1);
+      const crit = number.crit;
+      const scale = crit ? 1 + (1 - alpha) * 0.15 : 1;
+      const label = (crit ? '✧ ' : '') + `-${number.value}`;
       ctx.save();
       ctx.globalAlpha = alpha;
+      ctx.translate(sx, sy);
+      ctx.scale(scale, scale);
       ctx.font = `${number.heavy ? 'bold 20px' : 'bold 15px'} sans-serif`;
       ctx.textAlign = 'center'; ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(18,12,12,.85)';
-      ctx.strokeText(`-${number.value}`, sx, sy);
+      ctx.strokeText(label, 0, 0);
       ctx.fillStyle = number.color;
-      ctx.fillText(`-${number.value}`, sx, sy);
+      ctx.fillText(label, 0, 0);
+      if (crit) { ctx.strokeStyle = 'rgba(255,240,180,.6)'; ctx.lineWidth = 1.5; ctx.strokeText(label, 0, 0); }
       ctx.restore();
     });
 
@@ -2805,6 +3292,25 @@ class Expedition {
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = clamp(this.killFlash * 4.2, 0, .42);
       ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+      ctx.restore();
+    }
+
+    // 玩家受击红屏：边缘红色渐晕
+    if (this.playerDamageFlash > 0) {
+      const da = clamp(this.playerDamageFlash, 0, 1) * 0.5;
+      const vg = ctx.createRadialGradient(CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, CONFIG.canvas.height * 0.32, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2, CONFIG.canvas.height * 0.75);
+      vg.addColorStop(0, 'rgba(255,40,30,0)');
+      vg.addColorStop(1, `rgba(255,45,35,${da})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+    }
+    // 暴击金色闪屏
+    if (this.critFlash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = clamp(this.critFlash * 3.4, 0, 0.16);
+      ctx.fillStyle = '#ffe9a0';
       ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
       ctx.restore();
     }
@@ -2848,7 +3354,7 @@ class Expedition {
     }
     this.beastWave.remaining = waveMonsterCount;
     if (this.beastWave.active) {
-      if (waveMonsters.length === 0) {
+      if (waveMonsterCount === 0) {
         this.beastWave.active = false;
         this.beastWave.nextIn = Math.max(58, 92 - this.map.tier * 4);
         GameState.gold += 20 * this.beastWave.wave * this.map.tier;
@@ -2892,9 +3398,8 @@ class Expedition {
         this.spawnAoeEffect(monster.x, monster.y, 42, '#e9a15e');
       } else if (monster.type === 'boss' && monster.abilityCd <= 0) {
         monster.phase = monster.hp / monster.maxHp < .5 ? 2 : 1;
-        monster.abilityCd = monster.phase === 2 ? 2.7 : 4.2;
-        this.spawnAoeEffect(this.player.x, this.player.y, 88, '#d59aff');
-        if (d < 155) this.damagePlayer(monster.damage * .72);
+        monster.abilityCd = monster.phase === 2 ? 2.6 : 4.0;
+        this.castBossAbility(monster, d, angle);
       }
     });
   }
