@@ -649,6 +649,21 @@ class Expedition {
       ctx.restore();
 
       ctx.save();
+      // Boss 攻击动作：挥击前倾 / 技能蓄力下压抖动发光 / 释放瞬间前扑
+      if (monster.attackAnim > 0) {
+        const k = Math.sin((monster.attackAnim / 0.34) * Math.PI);
+        ctx.translate(Math.cos(monster.facing || 0) * 7 * k, 0);
+        ctx.rotate(k * 0.14);
+      } else if (monster.castState === 'windup') {
+        const w = Math.sin(monster.castTimer * 26);
+        ctx.translate(w * 2.4, -5 + w * 2);
+        ctx.rotate(w * 0.05);
+        ctx.shadowColor = '#ff9a4a';
+        ctx.shadowBlur = 16 + (Math.sin(monster.castTimer * 30) + 1) * 10;
+        ctx.globalAlpha = .93;
+      } else if (monster.castState === 'cast') {
+        ctx.translate(Math.cos(monster.facing || 0) * 6, 0);
+      }
       ctx.translate(0, Math.sin(monster.animTime * 2.2) * 1.5);
       if (monster.hitFlash > 0) {
         ctx.shadowColor = this.map.tier === 2 ? '#8aeaff' : '#fff4cf';
@@ -963,6 +978,7 @@ class Expedition {
       damage:this.balance.bossDamage, speed:76 + this.map.tier * 5,
       attackRange:70, attackCd:1.5, abilityCd:4, abilityIndex:0, phase:1, stunned:0,
       facing:0, animTime:0, hitFlash:0, elite:true, gold:100 * this.map.tier,
+      castState:'idle', castTimer:0, castIndex:0, attackAnim:0,
     };
     this.monsters.push(this.boss);
     showToast(`区域首领「${this.boss.name}」已现身`, 'warning');
@@ -970,8 +986,8 @@ class Expedition {
 
   castBossAbility(boss, d, angle) {
     const phase2 = boss.phase === 2;
-    const idx = boss.abilityIndex % 4;
-    boss.abilityIndex++;
+    const idx = boss.castIndex || 0;
+    boss.castIndex++;
     const dmgMul = phase2 ? 1.3 : 1;
     if (idx === 0) {
       // 地裂震荡：玩家脚下AOE + 冲击环
@@ -1026,6 +1042,18 @@ class Expedition {
       }
       this.spawnMuzzleEffect(boss.x, boss.y, angle, color);
     }
+  }
+
+  // Boss 技能前摇预警：脚下蓄力圈（颜色随技能）+ 头顶警示脉冲由 renderMonster 表现
+  spawnBossTelegraph(boss) {
+    const colors = ['#d59aff', '#ff9a3c', '#9affd5', '#d59aff'];
+    const color = colors[boss.castIndex % 4];
+    const p = this.allocParticle();
+    Object.assign(p, { x: boss.x, y: boss.y, vx: 0, vy: 0, life: 0.55, maxLife: 0.55, color, size: 74, type: 'aoe' });
+    this.particles.push(p);
+    const w = this.allocParticle();
+    Object.assign(w, { x: boss.x, y: boss.y - 40, vx: 0, vy: -6, life: 0.5, maxLife: 0.5, color: '#fff6d8', size: 14, type: 'warn' });
+    this.particles.push(w);
   }
 
   spawnBeastWave() {
@@ -1997,8 +2025,8 @@ class Expedition {
       const knockPower = (heavy ? 215 : 130) * (isBoss ? 0.3 : 1) * (isCrit ? 1.7 : 1);
       target.knockX = (target.knockX || 0) + Math.cos(hitAngle) * knockPower;
       target.knockY = (target.knockY || 0) + Math.sin(hitAngle) * knockPower;
-      this.hitStop = Math.max(this.hitStop, isCrit ? 0.14 : heavy ? 0.09 : 0.05);
-      if (isCrit || heavy) this.screenShake = Math.max(this.screenShake, isCrit ? 0.5 : 0.32);
+      if (target.hp > 0) this.hitStop = Math.max(this.hitStop, isCrit ? 0.14 : heavy ? 0.09 : 0.05);
+      if (target.hp > 0 && (isCrit || heavy)) this.screenShake = Math.max(this.screenShake, isCrit ? 0.5 : 0.32);
     }
     if (isCrit) {
       this.critFlash = Math.max(this.critFlash, 0.2);
@@ -2009,14 +2037,14 @@ class Expedition {
   }
 
   spawnKillFeedback(target) {
-    this.killFlash = Math.max(this.killFlash, target.type === 'boss' ? 0.10 : 0.06);
-    this.hitStop = Math.max(this.hitStop, target.type === 'boss' ? 0.07 : 0.05);
-    this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 0.45 : 0.35);
-    this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 18 : 14);
+    this.killFlash = 0;
+    // 击杀不触发时间停顿/重抖屏，避免"卡顿感"
+    this.screenShake = Math.max(this.screenShake, target.type === 'boss' ? 0.16 : 0.10);
+    this.spawnRadialBurst(target.x, target.y, target.type === 'boss' ? '#ffe8a0' : '#ff7868', target.type === 'boss' ? 12 : 9);
     if (target.slow > 0) this.spawnFrostShatter(target.x, target.y, true);
-    if (target.burn) { this.spawnRadialBurst(target.x, target.y, '#ff9a3c', 14); this.spawnImpact(target.x, target.y, '#ffb05c', 1.3); }
-    this.spawnImpact(target.x, target.y, '#fff2c0', target.type === 'boss' ? 1.2 : 1.0);
-    this.spawnShockRing(target.x, target.y, target.type === 'boss' ? '#ffca7a' : '#ff9a6a', target.type === 'boss' ? 72 : 44);
+    if (target.burn) this.spawnRadialBurst(target.x, target.y, '#ff9a3c', 8);
+    this.spawnShockRing(target.x, target.y, target.type === 'boss' ? '#ffca7a' : '#ff9a6a', target.type === 'boss' ? 64 : 40);
+    this.spawnShockRing(target.x, target.y, target.type === 'boss' ? '#ffca7a' : '#ff9a6a', target.type === 'boss' ? 64 : 40);
     AudioManager.playMonsterHit('kill');
   }
 
@@ -2265,6 +2293,7 @@ class Expedition {
     this.monsters.forEach(m => {
       if (m.hp <= 0) return;
       m.attackCd = Math.max(0, m.attackCd - dt);
+      m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt);
       m.stunned = Math.max(0, m.stunned - dt);
       m.hitFlash = Math.max(0, (m.hitFlash || 0) - dt);
       m.slow = Math.max(0, (m.slow || 0) - dt * 0.8);
@@ -2312,6 +2341,7 @@ class Expedition {
           // 攻击
           m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
+          if (m.type === 'boss') { m.attackAnim = 0.34; this.spawnSlashEffect(m.x + Math.cos(angle) * 46, m.y, angle, '#ffd9a0', 62); }
           if (m.ranged) {
             const p = this.allocProjectile();
             Object.assign(p, {
@@ -2350,7 +2380,7 @@ class Expedition {
         m.state = 'death';
         this.killCount++;
         this.spawnKillFeedback(m);
-        this.spawnHitParticles(m.x, m.y, '#ff4444');
+        this.spawnHitParticles(m.x, m.y, '#ff8868');
         // 击杀掉落养分（普通+2 / 精英+8）
         const nutrientGain = m.elite ? CONFIG.nutrients.eliteKill : CONFIG.nutrients.normalKill;
         this.nutrient = Math.min(this.nutrientMax, this.nutrient + nutrientGain);
@@ -3141,6 +3171,17 @@ class Expedition {
         ctx.stroke();
         ctx.restore();
         ctx.globalAlpha = 1;
+      } else if (p.type === 'warn') {
+        // Boss 蓄力警示：头顶上浮闪烁的感叹号
+        ctx.save();
+        ctx.translate(sx, sy);
+        const blink = 0.55 + Math.sin(p.life * 26) * 0.45;
+        ctx.globalAlpha = alpha * blink;
+        ctx.fillStyle = p.color;
+        ctx.font = 'bold 20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('!', 0, 0);
+        ctx.restore();
       } else if (p.type === 'impact') {
         const grow = p.size * (1.25 - alpha * .25);
         ctx.save();
@@ -3287,7 +3328,7 @@ class Expedition {
       ctx.restore();
     });
 
-    if (this.killFlash > 0) {
+    if (false) { // 击杀白闪已移除：避免击杀瞬间"闪一下屏幕"
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = clamp(this.killFlash * 4.2, 0, .42);
@@ -3384,7 +3425,7 @@ class Expedition {
     this.monsters.forEach(monster => {
       monster.abilityCd = Math.max(0, (monster.abilityCd || 0) - dt);
       const d = dist(monster, this.player);
-      if (this.player.stealth > 0 || d > 430 || monster.stunned > 0) return;
+      if (this.player.stealth > 0 || monster.stunned > 0 || (d > 430 && monster.type !== 'boss')) return;
       const angle = Math.atan2(this.player.y - monster.y, this.player.x - monster.x);
       if (monster.type === 'locust' && d < 115) {
         monster.x -= Math.cos(angle) * monster.speed * .42 * dt;
@@ -3396,10 +3437,29 @@ class Expedition {
         monster.x += Math.cos(angle) * 64;
         monster.y += Math.sin(angle) * 64;
         this.spawnAoeEffect(monster.x, monster.y, 42, '#e9a15e');
-      } else if (monster.type === 'boss' && monster.abilityCd <= 0) {
+      } else if (monster.type === 'boss') {
         monster.phase = monster.hp / monster.maxHp < .5 ? 2 : 1;
-        monster.abilityCd = monster.phase === 2 ? 2.6 : 4.0;
-        this.castBossAbility(monster, d, angle);
+        if (monster.castState === 'idle') {
+          monster.castState = 'windup';
+          monster.castTimer = 0.55;
+          monster.castIndex = (monster.castIndex || 0) % 4;
+          monster.abilityCd = (monster.phase === 2 ? 2.6 : 4.0) + 0.8;
+          this.spawnBossTelegraph(monster);
+        } else if (monster.castState === 'windup') {
+          monster.castTimer -= dt;
+          if (monster.castTimer <= 0) {
+            monster.castState = 'cast';
+            monster.castTimer = 0.3;
+            const dd = dist(monster, this.player);
+            const aa = Math.atan2(this.player.y - monster.y, this.player.x - monster.x);
+            this.castBossAbility(monster, dd, aa);
+            this.spawnShockRing(monster.x, monster.y, '#ffd9a0', 96);
+            this.spawnImpact(monster.x, monster.y, '#fff2c0', 1.5);
+          }
+        } else if (monster.castState === 'cast') {
+          monster.castTimer -= dt;
+          if (monster.castTimer <= 0) monster.castState = 'idle';
+        }
       }
     });
   }
