@@ -83,7 +83,12 @@ const Game = {
   _startFarmTimer() {
     if (this.farmInterval) return;
     this.farmInterval = setInterval(() => {
-      try { Farm.render(); } catch (error) { console.error('[Farm] 定时渲染失败:', error); }
+      try {
+        if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.tick(1);
+        if (typeof FarmProcessingSystem !== 'undefined') FarmProcessingSystem.tick(1);
+        if (typeof FarmDecorationSystem !== 'undefined') FarmDecorationSystem.tick(1);
+        Farm.render();
+      } catch (error) { console.error('[Farm] 定时渲染失败:', error); }
     }, 1000);
   },
 

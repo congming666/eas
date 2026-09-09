@@ -34,17 +34,35 @@ const SaveSystem = {
         GameState.farmPlots = data.farmPlots.map(plot => ({
           crop: plot.cropId ? CONFIG.crops.find(crop => crop.id === plot.cropId) || null : null,
           plantedAt: Number(plot.plantedAt) || 0,
-          status: ['drought', 'pest', 'weeds'].includes(plot.status) ? plot.status : null,
+          status: ['drought', 'pest', 'weeds', 'burn', 'beast'].includes(plot.status) ? plot.status : null,
           ready: false,
+          moisture: Number.isFinite(plot.moisture) ? plot.moisture : 80,
+          quality: ['common','fine','rare','legendary'].includes(plot.quality) ? plot.quality : 'common',
+          harvestCount: Number(plot.harvestCount) || 0,
+          fertilized: !!plot.fertilized,
         }));
       }
       // 确保 farmPlots 始终为 36 格（修复存档损坏或首次加载时空数组的问题）
       if (!Array.isArray(GameState.farmPlots) || GameState.farmPlots.length !== 36) {
         GameState.farmPlots = [];
         for (let i = 0; i < 36; i++) {
-          GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null });
+          GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null, moisture: 80, quality: 'common', harvestCount: 0, fertilized: false });
         }
       }
+      // v2.0 农场大更新字段
+      GameState.weather = ['sunny','rain','fog','storm'].includes(data.weather) ? data.weather : 'sunny';
+      GameState.weatherTimer = Number.isFinite(data.weatherTimer) ? data.weatherTimer : 120;
+      GameState.season = ['spring','summer','autumn','winter'].includes(data.season) ? data.season : 'spring';
+      GameState.seasonDay = clamp(Number(data.seasonDay) || 1, 1, 7);
+      GameState.workshopLevel = clamp(Number(data.workshopLevel) || 1, 1, 3);
+      GameState.processingQueue = Array.isArray(data.processingQueue) ? data.processingQueue : [];
+      GameState.cropCollection = (data.cropCollection && typeof data.cropCollection === 'object') ? data.cropCollection : {};
+      GameState.decorations = Array.isArray(data.decorations) ? data.decorations : [];
+      GameState.farmBeauty = Number(data.farmBeauty) || 0;
+      GameState.visitorState = ['none','visiting'].includes(data.visitorState) ? data.visitorState : 'none';
+      GameState.visitorTimer = Number.isFinite(data.visitorTimer) ? data.visitorTimer : 120;
+      GameState.visitorName = data.visitorName || '';
+      GameState.waterCooldown = Number.isFinite(data.waterCooldown) ? data.waterCooldown : 0;
       // 加载物资仓库
       if (data.warehouse && typeof data.warehouse === 'object') {
         GameState.warehouse = {
@@ -118,7 +136,24 @@ const SaveSystem = {
           cropId: plot.crop?.id || null,
           plantedAt: plot.plantedAt || 0,
           status: plot.status || null,
+          moisture: plot.moisture !== undefined ? plot.moisture : 80,
+          quality: plot.quality || 'common',
+          harvestCount: plot.harvestCount || 0,
+          fertilized: !!plot.fertilized,
         })),
+        weather: GameState.weather || 'sunny',
+        weatherTimer: GameState.weatherTimer || 120,
+        season: GameState.season || 'spring',
+        seasonDay: GameState.seasonDay || 1,
+        workshopLevel: GameState.workshopLevel || 1,
+        processingQueue: GameState.processingQueue || [],
+        cropCollection: GameState.cropCollection || {},
+        decorations: GameState.decorations || [],
+        farmBeauty: GameState.farmBeauty || 0,
+        visitorState: GameState.visitorState || 'none',
+        visitorTimer: GameState.visitorTimer || 120,
+        visitorName: GameState.visitorName || '',
+        waterCooldown: GameState.waterCooldown || 0,
         warehouse: GameState.warehouse || { capacity: 50, items: {} },
         greenhouse: {
           plots: (GameState.greenhouse?.plots || []).map(plot => ({

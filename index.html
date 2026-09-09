@@ -1757,6 +1757,18 @@
           <span class="resource-icon" style="background:#ff8800;">📦</span>
           <span id="materialDisplay">0</span>
         </div>
+        <div class="resource-item" id="weatherDisplay" style="cursor:default;" title="当前天气">
+          <span class="resource-icon" style="background:#88ccff;">☀️</span>
+          <span id="weatherText">晴朗</span>
+        </div>
+        <div class="resource-item" id="seasonDisplay" style="cursor:default;" title="当前季节">
+          <span class="resource-icon" style="background:#ffaa88;">🌸</span>
+          <span id="seasonText">春季</span>
+        </div>
+        <div class="resource-item" id="beautyDisplay" style="cursor:default;" title="农场美观度">
+          <span class="resource-icon" style="background:#ddaaff;">✨</span>
+          <span id="beautyText">0</span>
+        </div>
       </div>
       <button class="menu-btn" style="width:auto;padding:8px 20px;font-size:14px;" onclick="Game.backToMenu()">返回菜单</button>
     </div>
@@ -1776,6 +1788,15 @@
             <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
             <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">种植稀有植物 · 获取道具</div></div>
             <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">🌱 农场新功能</div>
+          <div class="facility-grid">
+            <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">🏭</div><div class="facility-name">加工工坊</div><div class="facility-state" id="workshopLevelState">Lv.1 · 作物加工</div></div>
+            <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">📖</div><div class="facility-name">作物图鉴</div><div class="facility-state">收集品质 · 全局buff</div></div>
+            <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">🎨</div><div class="facility-name">装饰商店</div><div class="facility-state">美观度 · 金币加成</div></div>
+            <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">🚶</div><div class="facility-name" id="visitorName">访客</div><div class="facility-state">点击互动获得奖励</div></div>
           </div>
         </div>
         <div class="panel support-panel">
@@ -1972,6 +1993,7 @@
   <script src="js/ui.js"></script>
   <script src="js/card.js"></script>
   <script src="js/farm.js"></script>
+  <script src="js/farm-expansion.js"></script>
   <script src="js/warehouse.js"></script>
   <script src="js/greenhouse.js"></script>
   <script src="js/performance.js"></script>
@@ -1991,6 +2013,169 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
   <script src="js/nebula.js"></script>
   <script src="js/nebula-text.js"></script>
+
+  <!-- v2.0 农场大更新弹窗 -->
+  <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">🏭 加工工坊 <span id="processingLevel" style="font-size:14px;color:#ffd700;">Lv.1</span>
+        <button class="modal-close" onclick="FarmUI.closeModal('processingModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="processingQueue" style="margin-bottom:12px;padding:8px;background:#1a2a1a;border-radius:6px;min-height:36px;color:#aaccaa;font-size:13px;">加工队列：空闲</div>
+        <div id="recipeList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="margin-top:12px;text-align:center;">
+          <button class="supply-btn" onclick="FarmProcessingSystem.upgradeWorkshop();FarmUI.renderProcessing();" style="padding:8px 20px;">升级工坊 (<span id="workshopUpgradeCost">100</span>金)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="collectionModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('collectionModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">📖 作物图鉴
+        <button class="modal-close" onclick="FarmUI.closeModal('collectionModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="collectionProgress" style="margin-bottom:12px;color:#aaccaa;font-size:14px;"></div>
+        <div id="collectionGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="decorationModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('decorationModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">🎨 装饰商店
+        <button class="modal-close" onclick="FarmUI.closeModal('decorationModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="decorationBeauty" style="margin-bottom:12px;color:#ffd700;font-size:14px;"></div>
+        <div id="decorationGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;}
+    .modal-overlay.hidden{display:none;}
+    .modal-panel{background:#0d1117;border:1px solid #2a3a2a;border-radius:12px;max-height:80vh;overflow-y:auto;width:90%;}
+    .modal-title{padding:14px 18px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid #2a3a2a;display:flex;justify-content:space-between;align-items:center;}
+    .modal-close{background:#3a1a1a;border:none;color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:14px;}
+    .modal-body{padding:16px 18px;}
+    .recipe-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#121a14;border-radius:6px;border:1px solid #1f2f22;}
+    .recipe-row.locked{opacity:0.5;}
+    .recipe-info{font-size:13px;color:#ddd;}
+    .recipe-btn{background:#1f3a25;border:none;color:#fff;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px;}
+    .recipe-btn:hover{background:#2a4a30;}
+    .collection-card{padding:10px;background:#121a14;border-radius:6px;border:1px solid #1f2f22;font-size:12px;color:#ddd;}
+    .collection-card.locked{opacity:0.4;text-align:center;}
+    .deco-card{padding:10px;background:#121a14;border-radius:6px;border:1px solid #1f2f22;font-size:12px;color:#ddd;text-align:center;}
+    .deco-card button{margin-top:6px;background:#2a1f3a;border:none;color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;}
+    .moisture-bar{pointer-events:none;}
+  </style>
+
+  <script>
+  const FarmUI = {
+    openProcessing(){ document.getElementById('processingModal').classList.remove('hidden'); this.renderProcessing(); },
+    openCollection(){ document.getElementById('collectionModal').classList.remove('hidden'); this.renderCollection(); },
+    openDecoration(){ document.getElementById('decorationModal').classList.remove('hidden'); this.renderDecoration(); },
+    closeModal(id){ document.getElementById(id).classList.add('hidden'); },
+
+    renderProcessing(){
+      document.getElementById('processingLevel').textContent = 'Lv.' + GameState.workshopLevel;
+      document.getElementById('workshopUpgradeCost').textContent = GameState.workshopLevel * 100;
+      // 队列
+      const q = document.getElementById('processingQueue');
+      if (GameState.processingQueue.length === 0) q.textContent = '加工队列：空闲';
+      else q.innerHTML = '加工队列：' + GameState.processingQueue.map(j => {
+        const r = FarmRecipes.find(x => x.id === j.recipeId);
+        return r ? `${r.icon}${r.name} ${j.remaining.toFixed(0)}s` : '';
+      }).join(' · ');
+      // 配方
+      const list = document.getElementById('recipeList');
+      list.innerHTML = '';
+      FarmRecipes.forEach(r => {
+        const locked = r.workshopLevel > GameState.workshopLevel;
+        const have = Warehouse.getCount(r.inputCrop);
+        const can = !locked && have >= r.inputQty;
+        const row = document.createElement('div');
+        row.className = 'recipe-row' + (locked ? ' locked' : '');
+        row.innerHTML = `<div class="recipe-info">${r.icon} ${r.name} — ${r.inputQty} ${r.inputCrop} → ${r.outputQty} ${r.outputName} (${r.time}s) ${locked?'🔒需Lv.'+r.workshopLevel:''} <span style="color:#888;">[库存${have}]</span></div>`;
+        if (!locked) {
+          const btn = document.createElement('button');
+          btn.className = 'recipe-btn';
+          btn.textContent = can ? '加工' : '原料不足';
+          btn.disabled = !can;
+          btn.style.opacity = can ? 1 : 0.5;
+          btn.onclick = () => { FarmProcessingSystem.startProcessing(r.id); this.renderProcessing(); };
+          row.appendChild(btn);
+        }
+        list.appendChild(row);
+      });
+    },
+
+    renderCollection(){
+      const total = CONFIG.crops.length;
+      const got = Object.keys(GameState.cropCollection).length;
+      const bonus = ((FarmCollectionSystem.collectionBonus() - 1) * 100).toFixed(0);
+      document.getElementById('collectionProgress').textContent = `收集进度：${got}/${total}  ·  全局生长 +${bonus}%`;
+      const grid = document.getElementById('collectionGrid');
+      grid.innerHTML = '';
+      CONFIG.crops.forEach(c => {
+        const found = GameState.cropCollection[c.id];
+        const card = document.createElement('div');
+        card.className = 'collection-card' + (found ? '' : ' locked');
+        if (found) {
+          const qColor = FarmCollectionSystem.qualityColor(found);
+          card.innerHTML = `<div style="font-size:16px;color:${qColor}">${c.icon} ${c.name}</div><div style="color:${qColor};margin-top:2px;">品质：${FarmCollectionSystem.qualityName(found)}</div><div style="color:#888;margin-top:2px;font-size:11px;">${FarmTraitSystem.traitDesc(c.trait)}</div>`;
+        } else {
+          card.innerHTML = `<div style="font-size:16px;">❓ ???</div><div style="color:#666;margin-top:2px;">未发现</div>`;
+        }
+        grid.appendChild(card);
+      });
+    },
+
+    renderDecoration(){
+      const bonus = ((FarmDecorationSystem.beautyGoldBonus() - 1) * 100).toFixed(0);
+      document.getElementById('decorationBeauty').textContent = `✨ 当前美观度：${GameState.farmBeauty}  ·  金币加成 +${bonus}%`;
+      const grid = document.getElementById('decorationGrid');
+      grid.innerHTML = '';
+      DecoShopItems.forEach(d => {
+        const card = document.createElement('div');
+        card.className = 'deco-card';
+        card.innerHTML = `<div style="font-size:20px;">${d.icon}</div><div style="font-weight:600;margin:2px 0;">${d.name}</div><div style="color:#888;font-size:11px;">${d.desc}</div><button onclick="FarmDecorationSystem.buyDecoration('${d.id}');FarmUI.renderDecoration();">购买 (${d.cost}金)</button>`;
+        grid.appendChild(card);
+      });
+    }
+  };
+
+  // 扩展 Farm.render 更新天气/季节/美观/访客显示
+  const _origFarmRender = Farm.render.bind(Farm);
+  Farm.render = function() {
+    _origFarmRender();
+    if (typeof FarmCareSystem !== 'undefined') {
+      const wEl = document.getElementById('weatherText');
+      if (wEl) wEl.textContent = FarmCareSystem.weatherName(GameState.weather);
+      const wIcon = document.querySelector('#weatherDisplay .resource-icon');
+      if (wIcon) wIcon.textContent = FarmCareSystem.weatherIcon(GameState.weather);
+      const sEl = document.getElementById('seasonText');
+      if (sEl) sEl.textContent = FarmCareSystem.seasonName(GameState.season) + ' D' + GameState.seasonDay;
+      const sIcon = document.querySelector('#seasonDisplay .resource-icon');
+      if (sIcon) sIcon.textContent = FarmCareSystem.seasonIcon(GameState.season);
+    }
+    const bEl = document.getElementById('beautyText');
+    if (bEl) bEl.textContent = GameState.farmBeauty || 0;
+    const ws = document.getElementById('workshopLevelState');
+    if (ws) ws.textContent = 'Lv.' + (GameState.workshopLevel || 1) + ' · 作物加工';
+    const vf = document.getElementById('visitorFacility');
+    if (vf) {
+      if (GameState.visitorState === 'visiting') {
+        vf.style.display = '';
+        const vn = document.getElementById('visitorName');
+        if (vn) vn.textContent = GameState.visitorName || '访客';
+      } else vf.style.display = 'none';
+    }
+  };
+  </script>
 
 </body>
 </html>

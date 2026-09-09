@@ -3,14 +3,25 @@ const Farm = {
     if (GameState.farmPlots.length === 36) return;
     GameState.farmPlots = [];
     for (let i = 0; i < 36; i++) {
-      GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null });
+      GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null, moisture: 80, quality: 'common', harvestCount: 0, fertilized: false });
     }
+    if (!GameState.weather) { GameState.weather = 'sunny'; GameState.weatherTimer = 120; }
+    if (!GameState.season) { GameState.season = 'spring'; GameState.seasonDay = 1; }
+    if (!GameState.workshopLevel) GameState.workshopLevel = 1;
+    if (!GameState.processingQueue) GameState.processingQueue = [];
+    if (!GameState.cropCollection) GameState.cropCollection = {};
+    if (!GameState.decorations) GameState.decorations = [];
+    if (!GameState.farmBeauty) GameState.farmBeauty = 0;
+    if (!GameState.visitorState) { GameState.visitorState = 'none'; GameState.visitorTimer = 120; GameState.visitorName = ''; }
+    if (GameState.waterCooldown === undefined) GameState.waterCooldown = 0;
     // 初始种一些
     for (let i = 0; i < 3; i++) {
       const idx = randInt(0, GameState.unlockedPlots - 1);
       if (!GameState.farmPlots[idx].crop) {
         GameState.farmPlots[idx].crop = CONFIG.crops[0];
         GameState.farmPlots[idx].plantedAt = Date.now() - rand(5000, 20000);
+        GameState.farmPlots[idx].moisture = 80;
+        GameState.farmPlots[idx].quality = 'common';
       }
     }
     SaveSystem.save();
@@ -36,14 +47,18 @@ const Farm = {
       }
       if (plot.crop) {
         const elapsed = (now - plot.plantedAt) / 1000;
-        const statusFactor = plot.status === 'drought' ? 0.55 : (plot.status === 'pest' ? 0.72 : (plot.status === 'weeds' ? 0.82 : 1));
-        const progress = clamp((elapsed * statusFactor) / plot.crop.growTime, 0, 1);
+        const traitMul = (typeof FarmTraitSystem !== 'undefined') ? FarmTraitSystem.growSpeedMultiplier(idx) : 1;
+        const statusFactor = plot.status === 'drought' ? 0.55 : (plot.status === 'pest' ? 0.72 : (plot.status === 'weeds' ? 0.82 : (plot.status === 'burn' ? 0.4 : 1)));
+        const progress = clamp((elapsed * statusFactor * traitMul) / plot.crop.growTime, 0, 1);
         plot.ready = progress >= 1;
         cell.classList.add(plot.ready ? 'ready' : 'planted');
         cell.classList.add(`rarity-${plot.crop.rarity || 'common'}`);
-        const statusIcons = { drought: '🍂', pest: '🐛', weeds: '🌿' };
-        cell.innerHTML = `${plot.crop.icon}${plot.status ? `<div class="plot-status">${statusIcons[plot.status]}</div>` : ''}<div class="growth-bar"><div class="growth-fill" style="width:${progress*100}%"></div></div>`;
-        cell.title = plot.status ? `状态：${{drought:'干旱',pest:'虫害',weeds:'杂草'}[plot.status]}，点击照料` : (plot.ready ? '点击收获' : '生长中');
+        const qColor = (typeof FarmCollectionSystem !== 'undefined') ? FarmCollectionSystem.qualityColor(plot.quality) : '#fff';
+        const statusIcons = { drought: '🍂', pest: '🐛', weeds: '🌿', burn: '🔥', beast: '🐗' };
+        const moistureBar = plot.moisture !== undefined ? `<div class="moisture-bar" style="position:absolute;bottom:2px;left:4px;right:4px;height:3px;background:#1a2a1a;border-radius:2px;"><div style="height:100%;width:${plot.moisture}%;background:${plot.moisture<30?'#ff6644':'#44aaff'};border-radius:2px;"></div></div>` : '';
+        cell.innerHTML = `<span style="color:${qColor}">${plot.crop.icon}</span>${plot.status ? `<div class="plot-status">${statusIcons[plot.status]}</div>` : ''}<div class="growth-bar"><div class="growth-fill" style="width:${progress*100}%"></div></div>${moistureBar}`;
+        const statusNames = { drought:'干旱', pest:'虫害', weeds:'杂草', burn:'烧苗', beast:'野兽偷食' };
+        cell.title = plot.status ? `状态：${statusNames[plot.status]||plot.status}，点击照料` : (plot.ready ? '点击收获' : `生长中 · 湿度${Math.floor(plot.moisture||0)}%`);
         cell.onclick = () => plot.status ? Farm.tend(idx) : Farm.harvest(idx);
       } else {
         cell.innerHTML = '';
@@ -89,10 +104,15 @@ const Farm = {
     GameState.farmPlots[idx].crop = crop;
     GameState.farmPlots[idx].plantedAt = Date.now();
     GameState.farmPlots[idx].ready = false;
+    GameState.farmPlots[idx].moisture = 80;
+    GameState.farmPlots[idx].harvestCount = 0;
+    GameState.farmPlots[idx].fertilized = false;
+    GameState.farmPlots[idx].quality = (typeof FarmCollectionSystem !== 'undefined') ? FarmCollectionSystem.rollQuality(crop) : 'common';
     const ailmentRoll = Math.random();
     GameState.farmPlots[idx].status = ailmentRoll < 0.08 ? 'drought' : (ailmentRoll < 0.14 ? 'pest' : (ailmentRoll < 0.21 ? 'weeds' : null));
     Warehouse.removeItem('seeds', 1);
-    showToast(`种下了${crop.name}`, 'success');
+    const qText = GameState.farmPlots[idx].quality !== 'common' ? `（${FarmCollectionSystem.qualityName(GameState.farmPlots[idx].quality)}品质）` : '';
+    showToast(`种下了${crop.name}${qText}`, 'success');
     SaveSystem.save();
     this.render();
   },
@@ -104,8 +124,14 @@ const Farm = {
       return;
     }
     const crop = plot.crop;
+    // 特性系统：产量倍率
+    const yieldQty = (typeof FarmTraitSystem !== 'undefined') ? FarmTraitSystem.harvestYield(idx) : 1;
+    // 变异尝试
+    if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.tryMutate(idx);
+    // 收集记录
+    if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.recordCollection(crop.id, plot.quality);
     // 作物存入仓库
-    const added = Warehouse.addItem(crop.id, 1);
+    const added = Warehouse.addItem(crop.id, yieldQty);
     let rewardText = `${crop.name} ×${added} 已入仓`;
     // 30% 概率额外获得种子，存入仓库
     if (Math.random() < 0.3) {
@@ -148,10 +174,21 @@ const Farm = {
     } else {
       CardSystem.tryDrop(crop);
     }
-    showToast(`收获${crop.name}，${rewardText}`, 'gold');
-    plot.crop = null;
-    plot.ready = false;
-    plot.status = null;
+    // 反复收获特性
+    const canReharvest = (typeof FarmTraitSystem !== 'undefined') && FarmTraitSystem.shouldRemainAfterHarvest(idx);
+    if (canReharvest) {
+      plot.harvestCount = (plot.harvestCount || 0) + 1;
+      plot.ready = false;
+      plot.plantedAt = Date.now() - plot.crop.growTime * 1000 * 0.7;
+      showToast(`收获${crop.name}，${rewardText}（可再收${3-plot.harvestCount}次）`, 'gold');
+    } else {
+      showToast(`收获${crop.name}，${rewardText}`, 'gold');
+      plot.crop = null;
+      plot.ready = false;
+      plot.status = null;
+      plot.harvestCount = 0;
+      plot.fertilized = false;
+    }
     SaveSystem.save();
     this.render();
   },
@@ -159,15 +196,33 @@ const Farm = {
   tend(idx) {
     const plot = GameState.farmPlots[idx];
     if (!plot?.status) return;
-    const names = { drought: '浇水', pest: '除虫', weeds: '除草' };
+    const names = { drought: '浇水', pest: '除虫', weeds: '除草', burn: '抢救烧苗', beast: '驱赶野兽' };
+    if (plot.status === 'beast') {
+      if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.chaseBeast(idx);
+      else { plot.status = null; showToast('驱赶野兽成功', 'success'); }
+      SaveSystem.save();
+      this.render();
+      return;
+    }
     if (GameState.gold < 4) {
       showToast('需要4金币购买基础农具', 'warning');
       return;
     }
     GameState.gold -= 4;
-    showToast(`${names[plot.status]}完成，作物恢复正常生长`, 'success');
+    if (plot.status === 'drought' && typeof FarmCareSystem !== 'undefined') plot.moisture = 100;
+    showToast(`${names[plot.status] || '照料'}完成，作物恢复正常生长`, 'success');
     plot.status = null;
     SaveSystem.save();
+    this.render();
+  },
+
+  water(idx) {
+    if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.waterPlot(idx);
+    this.render();
+  },
+
+  fertilize(idx, premium) {
+    if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.fertilizePlot(idx, premium);
     this.render();
   },
 
