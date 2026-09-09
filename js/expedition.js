@@ -155,6 +155,7 @@ class Expedition {
 
     this.generateTerrain();
     this.spawnEntities();
+    if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
     this.obstacleSpatialHash.rebuild(this.obstacles);
     this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
@@ -922,6 +923,12 @@ class Expedition {
         facing: rand(0, Math.PI * 2), animTime: rand(0, 10), hitFlash: 0,
         elite, abilityCd: rand(1, 4), packOffset: rand(-1, 1), state: 'idle', stateTimer: 0
       });
+      // v0.6.0 分配AI类型 + 精英强化
+      const _m = this.monsters[this.monsters.length - 1];
+      if (typeof CombatEnhancement !== 'undefined') {
+        CombatEnhancement.assignAIType(_m);
+        if (elite) CombatEnhancement.makeElite(_m);
+      }
     }
     // 宝箱
     for (let i = 0; i < this.map.chestCount; i++) {
@@ -1113,6 +1120,14 @@ class Expedition {
   }
 
   setupInput() {
+    // Losing focus should never leave movement/attack held or let the expedition
+    // continue running in the background. This also makes alt-tab/mobile focus
+    // changes safe and predictable.
+    this.blurHandler = () => {
+      Object.keys(this.keys).forEach(k => { this.keys[k] = false; });
+      this.mouse.down = false;
+      if (!this.gameOver) this.paused = true;
+    };
     this.keydownHandler = (e) => {
       this.keys[e.key.toLowerCase()] = true;
       if (e.key === 'Escape') this.paused = !this.paused;
@@ -1127,6 +1142,10 @@ class Expedition {
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
       if (e.key.toLowerCase() === 'r') this.useConsumable('thorn_storm');
       if (e.key.toLowerCase() === 'e') this.useConsumable('signal_flare');
+      if (e.key === ' ' || e.key === 'Shift') { e.preventDefault(); if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryDodge(); }
+      if (e.key.toLowerCase() === 'f') { if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryUltimate(); }
+      if (e.key.toLowerCase() === 'g') { if (typeof CombatEnhancement !== 'undefined') { const ex = this.monsters.find(m => CombatEnhancement.canExecute(m)); if (ex) CombatEnhancement.tryExecute(ex); } }
+      if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive) { if (e.key === '1') CombatEnhancement.chooseBranch(0); if (e.key === '2') CombatEnhancement.chooseBranch(1); if (e.key === '3') CombatEnhancement.chooseBranch(2); }
     };
     this.keyupHandler = (e) => { this.keys[e.key.toLowerCase()] = false; };
     this.mousemoveHandler = (e) => {
@@ -1146,6 +1165,7 @@ class Expedition {
 
     window.addEventListener('keydown', this.keydownHandler);
     window.addEventListener('keyup', this.keyupHandler);
+    window.addEventListener('blur', this.blurHandler);
     canvas.addEventListener('mousemove', this.mousemoveHandler);
     canvas.addEventListener('mousedown', this.mousedownHandler);
     canvas.addEventListener('mouseup', this.mouseupHandler);
@@ -1156,6 +1176,7 @@ class Expedition {
   cleanup() {
     window.removeEventListener('keydown', this.keydownHandler);
     window.removeEventListener('keyup', this.keyupHandler);
+    window.removeEventListener('blur', this.blurHandler);
     canvas.removeEventListener('mousemove', this.mousemoveHandler);
     canvas.removeEventListener('mousedown', this.mousedownHandler);
     canvas.removeEventListener('mouseup', this.mouseupHandler);
@@ -1991,12 +2012,24 @@ class Expedition {
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
     const isBoss = target.type === 'boss';
     const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;
+    if (fromPlayer && typeof CombatEnhancement !== 'undefined') {
+      amount *= CombatEnhancement.getComboMul();
+      if (CombatEnhancement.nextAttackCrit) { CombatEnhancement.nextAttackCrit = false; amount *= 2.0; if (hitInfo) hitInfo.crit = true; }
+      CombatEnhancement.onEnemyHit();
+      if (hitInfo && hitInfo.x !== undefined) CombatEnhancement.damageDestructible(hitInfo.x, hitInfo.y, amount);
+    }
     // quiet：持续伤害/电击链不产生击退顿帧，避免抖动刷屏
     const quiet = !!(hitInfo && hitInfo.quiet);
     // 玩家来源伤害有 20% 暴击：1.8 倍伤害 + 金色大字 + 暴击点燃（2.5s 灼烧）
     const isCrit = fromPlayer && hitInfo && hitInfo.crit !== false && Math.random() < 0.20;
     if (isCrit) { amount *= 1.8; this.applyBurn(target, Math.max(10, amount * 0.35), 2.5); }
+    const _prevSeg = typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 ? Math.min(CombatEnhancement.getSegments(target), Math.ceil((target.hp/target.maxHp)*CombatEnhancement.getSegments(target))) : 0;
     target.hp -= amount;
+    if (typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 && target.hp > 0) {
+      const seg = CombatEnhancement.getSegments(target);
+      const curSeg = Math.min(seg, Math.ceil((target.hp/target.maxHp)*seg));
+      if (curSeg < _prevSeg) CombatEnhancement.onSegmentBreak(target);
+    }
     target.hitFlash = heavy ? 0.22 : 0.14;
     target.state = target.hp <= 0 ? 'death' : 'hit';
     target.stateTimer = target.hp <= 0 ? .4 : .18;
@@ -2147,6 +2180,7 @@ class Expedition {
 
   update(dt) {
     if (this.paused || this.gameOver) return;
+    if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.update(dt);
     this.updateWorldSystems(dt);
     this.fogUpdateTimer -= dt;
     if (this.fogUpdateTimer <= 0) {
@@ -2316,6 +2350,10 @@ class Expedition {
         });
       }
 
+      if (canSee && !plantTarget && m.aiType && m.aiType !== 'chaser' && m.type !== 'boss') {
+        if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.updateMonsterAI(m, dt);
+        return;
+      }
       if (canSee && plantTarget) {
         // 攻击植物
         const pa = Math.atan2(plantTarget.y - m.y, plantTarget.x - m.x);
@@ -2381,6 +2419,7 @@ class Expedition {
         this.killCount++;
         this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff8868');
+        if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.onEliteDeath(m);
         // 击杀掉落养分（普通+2 / 精英+8）
         const nutrientGain = m.elite ? CONFIG.nutrients.eliteKill : CONFIG.nutrients.normalKill;
         this.nutrient = Math.min(this.nutrientMax, this.nutrient + nutrientGain);
@@ -2599,6 +2638,7 @@ class Expedition {
 
   damagePlayer(amount) {
     if (this.player.invuln > 0) return;
+    if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.checkPerfectDodge()) return;
     const defendingTower = this.towers.find(t => t.state === 'player' && dist(t, this.player) <= t.range);
     if (this.beastWave.active) {
       amount *= defendingTower ? 0.38 : 1.45;
@@ -2612,6 +2652,11 @@ class Expedition {
     this.playerDamageFlash = 0.38;
     this.spawnHitParticles(this.player.x, this.player.y, '#ff4444');
     this.spawnShockRing(this.player.x, this.player.y, '#ff5544', 42);
+    if (typeof CombatEnhancement !== 'undefined') {
+      CombatEnhancement.onPlayerHit();
+      const attacker = this.monsters.find(m => m.hp > 0 && Math.sqrt((m.x-this.player.x)**2+(m.y-this.player.y)**2) < 60);
+      if (attacker) CombatEnhancement.onEliteHitPlayer(attacker);
+    }
     if (this.extracting) this.cancelExtract();
     if (this.player.hp <= 0) {
       this.player.hp = 0;
@@ -2902,6 +2947,19 @@ class Expedition {
     ctx.globalAlpha = 0.82;
     ctx.strokeRect(-cam.x, -cam.y, size, size);
     ctx.globalAlpha = 1;
+
+    if (this.paused) {
+      ctx.fillStyle = 'rgba(8, 14, 18, 0.68)';
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#f4d58a';
+      ctx.font = '700 34px sans-serif';
+      ctx.fillText('游戏已暂停', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 8);
+      ctx.fillStyle = '#d7e2e5';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('按 ESC 继续', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 28);
+      ctx.textAlign = 'left';
+    }
 
     // 障碍物按 Y 轴分为玩家身后与身前两层，形成遮挡关系和俯视伪 3D 深度。
     // 使用预排序数组，避免每帧 filter+sort 分配。
@@ -3358,6 +3416,10 @@ class Expedition {
 
     // 战争迷雾：只保留已探索格与当前视野，未到达区域不显示实体信息。
     this.renderFogOfWar(ctx);
+    if (typeof CombatEnhancement !== 'undefined') {
+      CombatEnhancement.renderDestructibles(ctx, this.camera);
+      CombatEnhancement.renderHUD(ctx, this.camera);
+    }
 
     // 撤离读条UI
     if (this.extracting) {
