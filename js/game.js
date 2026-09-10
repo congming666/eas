@@ -78,6 +78,7 @@ const Game = {
     Farm.renderDefenseLoadout();
     Farm.renderSkillPreview();
     CardSystem.renderBoostSelection();
+    if (typeof DifficultySystem !== 'undefined') { DifficultySystem.renderDifficultySelect(); DifficultySystem.renderHeatSelect(); }
   },
 
   _startFarmTimer() {

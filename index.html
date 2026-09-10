@@ -1000,6 +1000,15 @@
   .prep-map-panel { flex: 1; }
   .prep-map-panel .map-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .prep-map-panel .map-option { min-height: 112px; padding: 15px; display: flex; flex-direction: column; justify-content: center; }
+  .diff-btn { padding:10px 6px; border:2px solid rgba(255,255,255,0.15); border-radius:10px; background:rgba(0,0,0,0.3); color:#cdd; cursor:pointer; text-align:center; font-size:11px; transition:all 0.2s; }
+  .diff-btn:hover { border-color:rgba(255,255,255,0.4); }
+  .diff-btn.active { border-color:#ffd700; background:rgba(255,215,0,0.15); color:#ffd700; }
+  .diff-btn .diff-icon { font-size:20px; display:block; }
+  .diff-btn .diff-name { font-weight:700; margin-top:2px; }
+  .heat-item { display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-size:11px;color:#aab; }
+  .heat-item:hover { border-color:rgba(255,255,255,0.3); }
+  .heat-item.active { border-color:#ff6b4a; background:rgba(255,107,74,0.1); color:#ff9a7a; }
+  .heat-item input { accent-color:#ff6b4a; }
   .prep-skill-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .prep-skill {
     padding: 10px 7px;
@@ -1842,6 +1851,10 @@
           <div class="map-select" id="mapSelect"></div>
         </div>
         <div class="prep-panel">
+          <div class="panel-title">⚙️ 难度选择</div>
+          <div id="difficultySelect" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+        </div>
+        <div class="prep-panel">
           <div class="panel-title">🃏 本次常驻技能</div>
           <div class="prep-skill-grid" id="prepSkillGrid"></div>
         </div>
@@ -1858,6 +1871,10 @@
         <div class="prep-panel">
           <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
           <div class="boost-card-grid" id="boostCardGrid"></div>
+        </div>
+        <div class="prep-panel">
+          <div class="panel-title">🔥 Heat 修改器（可选，增加奖励）</div>
+          <div id="heatSelect" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <div class="prep-panel">
           <div class="panel-title">📡 区域提示</div>
@@ -2000,6 +2017,7 @@
   <script src="vendor/pixi.min.js"></script>
   <script src="js/pixi-renderer.js"></script>
   <script src="js/expedition.js"></script>
+  <script src="js/difficulty-system.js"></script>
   <script src="js/combat-enhancement.js"></script>
   <script src="js/game.js"></script>
 

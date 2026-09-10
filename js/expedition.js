@@ -153,6 +153,13 @@ class Expedition {
     this.gameOver = false;
     this.result = null;
 
+    // v0.7.0 难度系统初始化
+    if (typeof DifficultySystem !== 'undefined') {
+      DifficultySystem.applyDifficulty(GameState.difficulty || 'normal', GameState.heatModifiers || [], this.map.tier);
+      const _ds = DifficultySystem.get();
+      this.visionRadius = 360 * _ds.visionMul;
+      this.beastWave.nextIn = DifficultySystem.getTierMechanic(this.map.tier).beastWaveInterval || 48;
+    }
     this.generateTerrain();
     this.spawnEntities();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
@@ -225,14 +232,16 @@ class Expedition {
 
   getBalanceProfile() {
     const tier = this.map.tier;
+    const _ds = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {hpMul:1, dmgMul:1, rewardMul:1, speedMulExtra:1};
+    const _tierM = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.getTierMechanic(tier) : {eliteChanceBonus:0};
     return {
-      enemyHp: 1 + (tier - 1) * 0.32,
-      enemyDamage: 1 + (tier - 1) * 0.22,
-      enemySpeed: 1 + (tier - 1) * 0.055,
-      reward: 1 + (tier - 1) * 0.48,
-      eliteChance: tier < 3 ? 0 : 0.08 + tier * 0.025,
-      bossHp: 520 + tier * 260,
-      bossDamage: 14 + tier * 5,
+      enemyHp: (1 + (tier - 1) * 0.32) * _ds.hpMul,
+      enemyDamage: (1 + (tier - 1) * 0.22) * _ds.dmgMul,
+      enemySpeed: (1 + (tier - 1) * 0.055) * (_ds.speedMulExtra || 1),
+      reward: (1 + (tier - 1) * 0.48) * _ds.rewardMul * ((typeof DifficultySystem !== 'undefined') ? DifficultySystem.getHeatRewardMultiplier() : 1),
+      eliteChance: (tier < 3 ? 0 : 0.08 + tier * 0.025) + (_tierM.eliteChanceBonus || 0),
+      bossHp: (520 + tier * 260) * _ds.hpMul,
+      bossDamage: (14 + tier * 5) * _ds.dmgMul,
     };
   }
 
@@ -2181,6 +2190,7 @@ class Expedition {
   update(dt) {
     if (this.paused || this.gameOver) return;
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.update(dt);
+    if (typeof DifficultySystem !== 'undefined') { DifficultySystem.tick(dt, this); DifficultySystem.tickPoison(dt, this); }
     this.updateWorldSystems(dt);
     this.fogUpdateTimer -= dt;
     if (this.fogUpdateTimer <= 0) {
@@ -2392,6 +2402,7 @@ class Expedition {
             this.projectiles.push(p);
           } else {
             this.damagePlayer(m.damage);
+          if (typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
           }
         } else {
           m.state = 'idle';

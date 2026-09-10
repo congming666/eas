@@ -55,7 +55,7 @@
     },
     getComboMul() {
       // 每层+5%伤害，上限+100%
-      return 1 + Math.min(this.combo * 0.05, 1.0);
+      const _cap = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get().comboCap : 1.0; return 1 + Math.min(this.combo * 0.05, _cap);
     },
 
     // ===== 系统2：完美闪避 =====
@@ -75,7 +75,7 @@
       p.x = clamp(p.x + dx/len * dodgeDist, 30, CONFIG.expedition.mapSize - 30);
       p.y = clamp(p.y + dy/len * dodgeDist, 30, CONFIG.expedition.mapSize - 30);
       p.invuln = Math.max(p.invuln, 0.35);
-      this.perfectDodgeWindow = 0.2; // 200ms完美闪避窗口
+      this.perfectDodgeWindow = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get().dodgeWindow / 1000 : 0.2;
       this.dodgeCd = 1.2;
       this.exp.spawnAoeEffect(p.x, p.y, 30, '#88ddff');
       return true;
@@ -85,7 +85,7 @@
       if (this.perfectDodgeWindow > 0) {
         this.perfectDodgeWindow = 0;
         this.slowMotion = 0.3; // 慢动作0.3秒
-        this.nextAttackCrit = true; // 下次攻击必暴击
+        const _diff = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {dodgeCrit:true, dodgeCritDmg:2.0}; this.nextAttackCrit = _diff.dodgeCrit; this.nextAttackCritMul = _diff.dodgeCrit ? 2.0 : _diff.dodgeCritDmg;
         this.addRage(15);
         showToast('完美闪避！下次攻击必暴击', 'gold');
         this.exp.spawnRadialBurst(this.exp.player.x, this.exp.player.y, '#88ffff', 16);
@@ -248,27 +248,47 @@
       { id: 'berserk', name: '狂暴', desc: '血量<30%时攻速翻倍' },
       { id: 'swift', name: '迅捷', desc: '移速+50%' },
       { id: 'vampiric', name: '吸血', desc: '命中玩家回血' },
-      { id: 'splitting', name: '分裂', desc: '死亡分裂成2只小怪' }
+      { id: 'splitting', name: '分裂', desc: '死亡分裂成2只小怪' },
+      { id: 'shield', name: '护盾', desc: '开场带30%护盾，不破不硬直', minTier: 3 },
+      { id: 'thorns', name: '反弹', desc: '受击反弹15%伤害', minTier: 3 },
+      { id: 'summoner', name: '召唤', desc: '每10秒召唤2只小怪', minTier: 4 },
+      { id: 'immune', name: '免疫', desc: '免疫一种伤害类型', minTier: 4 }
     ],
     makeElite(m) {
       m.elite = true;
       m.maxHp *= 2.5; m.hp = m.maxHp;
       m.damage *= 1.3;
       m.radius = (m.radius || 20) * 1.2;
-      // 随机1-2个词缀
-      const count = Math.random() < 0.4 ? 2 : 1;
+      // v0.7.0 词缀数量由难度决定，高层词缀按层级解锁
+      const _maxA = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get().maxAffixes : 2;
+      const _tier = this.exp ? this.exp.map.tier : 1;
+      const count = Math.max(1, Math.min(_maxA, 1 + Math.floor(Math.random() * _maxA)));
       m.affixes = [];
-      const pool = [...this.AFFIXES];
+      const pool = this.AFFIXES.filter(a => !a.minTier || a.minTier <= _tier);
       for (let i = 0; i < count && pool.length > 0; i++) {
         const idx = Math.floor(Math.random() * pool.length);
         m.affixes.push(pool.splice(idx, 1)[0].id);
       }
+      // 护盾词缀：加护盾值
+      if (m.affixes.includes('shield')) { m.shield = m.maxHp * 0.3; m.maxHpWithShield = m.maxHp + m.shield; }
+      // 免疫词缀：随机免疫类型
+      if (m.affixes.includes('immune')) { m.immuneType = ['physical', 'magic', 'element'][Math.floor(Math.random()*3)]; }
       // 应用迅捷词缀
       if (m.affixes.includes('swift')) m.speed *= 1.5;
       m.eliteGlow = 0;
     },
     applyEliteEffects(m, dt) {
       if (!m.elite || !m.affixes) return;
+      // 召唤词缀：每10秒召唤小怪
+      if (m.affixes.includes('summoner')) {
+        m.summonTimer = (m.summonTimer || 10) - dt;
+        if (m.summonTimer <= 0 && this.exp) {
+          m.summonTimer = 10;
+          for (let i = 0; i < 2; i++) {
+            this.exp.monsters.push({ type: m.type, x: m.x + (Math.random()-0.5)*40, y: m.y + (Math.random()-0.5)*40, hp: m.maxHp*0.2, maxHp: m.maxHp*0.2, damage: m.damage*0.5, speed: m.speed*1.2, radius: m.radius*0.7, elite: false, aiType: 'chaser', facing: 0, state: 'idle', stateTimer: 0, stunned: 0, hitFlash: 0 });
+          }
+        }
+      }
       m.eliteGlow = (m.eliteGlow || 0) + dt * 3;
       // 狂暴：血量<30%攻速翻倍（通过减少attackCd实现）
       if (m.affixes.includes('berserk') && m.hp < m.maxHp * 0.3) {
@@ -346,7 +366,7 @@
       });
       // 伤害玩家（如果在范围内）
       const pd = Math.sqrt((this.exp.player.x-d.x)**2 + (this.exp.player.y-d.y)**2);
-      if (pd < d.explodeRadius) this.exp.damagePlayer(d.explodeDamage * 0.5);
+      const _em = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get().envPlayerMul : 0.5; if (pd < d.explodeRadius) this.exp.damagePlayer(d.explodeDamage * _em);
       showToast(`${d.name}爆炸！`, 'warning');
     },
 
@@ -371,7 +391,7 @@
         if (m.hp <= 0) return;
         const d = Math.sqrt((m.x-p.x)**2 + (m.y-p.y)**2);
         if (d < 400) {
-          const dmg = m.type === 'boss' ? m.maxHp * 0.25 : 999;
+          const _ud = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {ultBossDmg:0.25, ultEliteDmg:0.99, ultDisabled:false}; if(_ud.ultDisabled){showToast('无头修改器：超杀已禁用','warning');return false;} const dmg = m.type === 'boss' ? m.maxHp * _ud.ultBossDmg : (m.elite ? m.maxHp * _ud.ultEliteDmg : 999);
           this.exp.damageEnemy(m, dmg, '#ffdd44', true, { x:m.x, y:m.y, angle:0, weaponId:'ult', fromPlayer:true });
         }
       });
@@ -497,7 +517,7 @@
       this.execTimer -= dt;
       if (this.execTimer <= 0 && this.execTarget) {
         // 处决完成
-        this.execTarget.hp = 0;
+        const _ed = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {executeKill:true, executeDmg:1.0}; if(_ed.executeKill) this.execTarget.hp = 0; else this.execTarget.hp = Math.max(1, this.execTarget.hp * (1 - _ed.executeDmg));
         this.addRage(40);
         GameState.gold += 30;
         this.exp.spawnAoeEffect(this.execTarget.x, this.execTarget.y, 60, '#ff2222');

@@ -256,6 +256,8 @@ const GameState = {
   selectedBoostCards: [],
   selectedMap: 't1',
   selectedWeapon: 'harvest_sickle',
+  difficulty: 'normal',
+  heatModifiers: [],
   loadout: { herb_kit: 2, thorn_storm: 1, signal_flare: 0 },
   farmItems: { growth_catalyst: 0 },
   warehouse: { capacity: 50, items: {} },
