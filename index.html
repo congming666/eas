@@ -1805,6 +1805,8 @@
             <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">🏭</div><div class="facility-name">加工工坊</div><div class="facility-state" id="workshopLevelState">Lv.1 · 作物加工</div></div>
             <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">📖</div><div class="facility-name">作物图鉴</div><div class="facility-state">收集品质 · 全局buff</div></div>
             <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">🎨</div><div class="facility-name">装饰商店</div><div class="facility-state">美观度 · 金币加成</div></div>
+            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">👥</div><div class="facility-name">NPC访客</div><div class="facility-state" id="npcCountState">4位访客 · 对话/送礼</div></div>
+            <div class="facility" onclick="TechSystemUI.open()"><div class="facility-icon">🏗️</div><div class="facility-name">建筑科技</div><div class="facility-state" id="techPointState">0科技点 · 升级建筑</div></div>
             <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">🚶</div><div class="facility-name" id="visitorName">访客</div><div class="facility-state">点击互动获得奖励</div></div>
           </div>
         </div>
@@ -2018,6 +2020,9 @@
   <script src="js/pixi-renderer.js"></script>
   <script src="js/expedition.js"></script>
   <script src="js/difficulty-system.js"></script>
+  <script src="js/npc-system.js"></script>
+  <script src="js/tech-system.js"></script>
+  <script src="js/v080-ui.js"></script>
   <script src="js/combat-enhancement.js"></script>
   <script src="js/game.js"></script>
 
@@ -2196,5 +2201,103 @@
   };
   </script>
 
+  <!-- v0.8.0 NPC模态 -->
+  <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">
+    <div class="modal-window npc-modal">
+      <div class="modal-header"><span>👥 NPC 访客</span><button onclick="NpcSystemUI.close()" class="modal-close">✕</button></div>
+      <div class="npc-modal-body">
+        <div class="npc-list" id="npcList"></div>
+        <div class="npc-detail" id="npcDetail"><div style="color:#888;text-align:center;padding:40px;">选择左侧 NPC 开始对话</div></div>
+      </div>
+      <div class="modal-footer"><button onclick="DiaryUI.open()" class="modal-btn">📜 日记残页 (0/5)</button></div>
+    </div>
+  </div>
+
+  <!-- v0.8.0 建筑科技模态 -->
+  <div id="techModal" class="modal-overlay hidden" onclick="if(event.target===this)TechSystemUI.close()">
+    <div class="modal-window tech-modal">
+      <div class="modal-header"><span>🏗️ 建筑升级 + 科技树</span><button onclick="TechSystemUI.close()" class="modal-close">✕</button></div>
+      <div class="tech-modal-body">
+        <div class="building-list" id="buildingList"></div>
+        <div class="tech-tree-container" id="techTreeContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.8.0 日记模态 -->
+  <div id="diaryModal" class="modal-overlay hidden" onclick="if(event.target===this)DiaryUI.close()">
+    <div class="modal-window diary-modal">
+      <div class="modal-header"><span>📜 日记残页 - 荒野之谜</span><button onclick="DiaryUI.close()" class="modal-close">✕</button></div>
+      <div class="diary-container" id="diaryContainer"></div>
+    </div>
+  </div>
+
+  <style>
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;}
+  .modal-window{background:linear-gradient(180deg,#1a2a1e,#0f1a14);border:2px solid #3a5a40;border-radius:16px;max-width:900px;width:90%;max-height:85vh;overflow-y:auto;}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #3a5a40;color:#f0d58f;font-size:18px;font-weight:700;}
+  .modal-close{background:none;border:none;color:#888;font-size:20px;cursor:pointer;}
+  .modal-close:hover{color:#fff;}
+  .modal-footer{padding:12px 20px;border-top:1px solid #3a5a40;}
+  .modal-btn{padding:8px 20px;background:#2a4a30;border:1px solid #4a7a50;border-radius:8px;color:#f0d58f;cursor:pointer;font-size:14px;}
+  .modal-btn:hover{background:#3a5a40;}
+  .npc-modal-body{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px;}
+  .npc-list{display:flex;flex-direction:column;gap:10px;}
+  .npc-card{display:flex;align-items:center;gap:12px;padding:12px;background:rgba(0,0,0,0.3);border:1px solid #3a5a40;border-radius:10px;}
+  .npc-icon{font-size:32px;}
+  .npc-info{flex:1;}
+  .npc-name{color:#f0d58f;font-weight:700;font-size:14px;}
+  .npc-desc{color:#888;font-size:11px;margin-top:2px;}
+  .npc-aff-bar{height:6px;background:#222;border-radius:3px;margin-top:6px;overflow:hidden;}
+  .npc-aff-fill{height:100%;background:linear-gradient(90deg,#ff6b9d,#ffd700);transition:width 0.3s;}
+  .npc-aff-text{font-size:10px;color:#aaa;margin-top:2px;}
+  .npc-talk-btn{padding:8px 16px;background:#2a4a30;border:1px solid #4a7a50;border-radius:8px;color:#fff;cursor:pointer;font-size:12px;}
+  .npc-talk-btn:hover{background:#3a5a40;}
+  .npc-detail{background:rgba(0,0,0,0.2);border:1px solid #3a5a40;border-radius:10px;padding:16px;min-height:300px;}
+  .npc-detail-header{display:flex;gap:12px;align-items:center;margin-bottom:16px;}
+  .npc-icon-large{font-size:48px;}
+  .npc-name-large{color:#f0d58f;font-size:18px;font-weight:700;}
+  .npc-dialogue-box{background:rgba(0,0,0,0.4);border-left:3px solid #4a7a50;padding:16px;border-radius:0 8px 8px 0;margin-bottom:16px;}
+  .npc-dialogue-text{color:#e0e0e0;font-size:14px;line-height:1.6;font-style:italic;}
+  .npc-dialogue-cat{color:#666;font-size:11px;margin-top:8px;}
+  .npc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .npc-action-btn{padding:8px 14px;background:#2a4a30;border:1px solid #4a7a50;border-radius:8px;color:#fff;cursor:pointer;font-size:12px;}
+  .npc-action-btn:hover{background:#3a5a40;}
+  .npc-quest-btn{background:#4a3a20;border-color:#7a6a40;}
+  .npc-rewards-title{color:#f0d58f;font-size:12px;margin-bottom:8px;}
+  .npc-reward-item{font-size:11px;color:#666;padding:4px 0;}
+  .npc-reward-item.unlocked{color:#7fff7f;}
+  .tech-modal-body{padding:20px;}
+  .tech-points-display{color:#f0d58f;font-size:16px;font-weight:700;margin-bottom:12px;}
+  .building-list{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;}
+  .building-card{display:flex;gap:12px;padding:12px;background:rgba(0,0,0,0.3);border:1px solid #3a5a40;border-radius:10px;align-items:center;}
+  .building-icon{font-size:32px;}
+  .building-info{flex:1;}
+  .building-name{color:#f0d58f;font-weight:700;font-size:13px;}
+  .building-desc{color:#888;font-size:10px;margin-top:2px;}
+  .building-effect{color:#7fff7f;font-size:10px;margin-top:4px;}
+  .building-upgrade-btn{padding:8px 12px;background:#2a4a30;border:1px solid #4a7a50;border-radius:8px;color:#fff;cursor:pointer;font-size:11px;line-height:1.4;}
+  .building-upgrade-btn:hover{background:#3a5a40;}
+  .building-max{color:#666;font-size:12px;}
+  .tech-tree-tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tech-tab{padding:8px 16px;background:rgba(0,0,0,0.3);border:2px solid #3a5a40;border-radius:8px;color:#aaa;cursor:pointer;font-size:13px;}
+  .tech-tab.active{background:rgba(255,255,255,0.1);color:#fff;}
+  .tech-nodes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .tech-node{padding:12px;background:rgba(0,0,0,0.3);border:2px solid #3a5a40;border-radius:10px;cursor:pointer;transition:all 0.2s;}
+  .tech-node:hover{transform:translateY(-2px);}
+  .tech-node.unlocked{border-color:#7fff7f;background:rgba(127,255,127,0.1);}
+  .tech-node.available{border-color:#ffd700;}
+  .tech-node.locked{opacity:0.4;cursor:not-allowed;}
+  .tech-node-name{color:#f0d58f;font-weight:700;font-size:13px;}
+  .tech-node-desc{color:#aaa;font-size:11px;margin-top:4px;line-height:1.4;}
+  .tech-node-cost{color:#ffd700;font-size:11px;margin-top:8px;}
+  .diary-container{padding:20px;display:flex;flex-direction:column;gap:12px;}
+  .diary-page{padding:16px;background:rgba(0,0,0,0.3);border:1px solid #3a5a40;border-radius:10px;}
+  .diary-page.locked{opacity:0.4;}
+  .diary-title{color:#f0d58f;font-weight:700;font-size:15px;margin-bottom:8px;}
+  .diary-content{color:#ccc;font-size:13px;line-height:1.7;font-style:italic;}
+  .diary-source{color:#666;font-size:11px;margin-top:8px;}
+  @media(max-width:768px){.npc-modal-body{grid-template-columns:1fr;}.building-list{grid-template-columns:1fr;}.tech-nodes{grid-template-columns:1fr;}}
+  </style>
 </body>
 </html>
