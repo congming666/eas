@@ -22,6 +22,7 @@ const Game = {
         // v0.8.0 初始化NPC和科技系统
         if (typeof NpcSystem !== 'undefined') NpcSystem.init();
         if (typeof TechSystem !== 'undefined') TechSystem.init();
+        if (typeof CropExpansion !== 'undefined') { CropExpansion.registerCrops(); CropExpansion.CropBuffSystem.init(); }
         if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
           showToast('家园补给站有今日奖励可以领取', 'gold');
         }
@@ -82,6 +83,15 @@ const Game = {
     Farm.renderSkillPreview();
     CardSystem.renderBoostSelection();
     if (typeof DifficultySystem !== 'undefined') { DifficultySystem.renderDifficultySelect(); DifficultySystem.renderHeatSelect(); }
+    // v0.9.0 渲染作物buff
+    if (typeof CropExpansion !== 'undefined') {
+      const buffs = CropExpansion.CropBuffSystem.getAllBuffs();
+      const el = document.getElementById('cropBuffsDisplay');
+      if (el) {
+        if (buffs.length === 0) el.innerHTML = '暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得';
+        else el.innerHTML = buffs.map(b => `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.1);">🌿 ${CropExpansion.CropBuffSystem._buffName(b.type)}：+${Math.round(b.value*100)}%（剩余${b.duration}场）</div>`).join('');
+      }
+    }
   },
 
   _startFarmTimer() {
@@ -119,6 +129,8 @@ const Game = {
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('expeditionHUD').classList.remove('hidden');
     GameState.screen = 'expedition';
+    // v0.9.0 作物buff持续时间-1
+    if (typeof CropExpansion !== 'undefined') CropExpansion.CropBuffSystem.onExpeditionStart();
 
     this.expedition = new Expedition(GameState.selectedMap);
     PixiEffects.init();

@@ -150,6 +150,7 @@ const CONFIG = {
     { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen', trait: 'carve' },
     { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary' }
   ],
+  // v0.9.0 新作物在crop-expansion.js中动态注册
   // 仓库物品定义
   warehouseItems: {
     // 作物类
@@ -261,6 +262,8 @@ const GameState = {
   // v0.8.0 NPC+建筑+科技
   npcData: null, diaryPages: [], npcRewards: {}, npcEvents: {},
   buildings: null, techPoints: 0, unlockedTech: [], labUnlocked: false,
+  // v0.9.0 作物系统
+  cropBuffs: [],
   loadout: { herb_kit: 2, thorn_storm: 1, signal_flare: 0 },
   farmItems: { growth_catalyst: 0 },
   warehouse: { capacity: 50, items: {} },

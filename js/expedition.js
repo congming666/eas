@@ -36,6 +36,10 @@ class Expedition {
     if (this.weaponIndex < 0) this.weaponIndex = 0;
     this.weapon = CONFIG.weapons[this.weaponIndex];
     this.weaponPulse = 0;
+    // v0.9.0 作物buff缓存
+    this.cropBuffs = (typeof CropExpansion !== 'undefined') ? CropExpansion.CropBuffSystem.getAllBuffs() : [];
+    this.attackBuffMult = this._getCropBuffMult('attack');
+    this.cdrBuffMult = 1 - this._getCropBuffMult('cooldown_reduction');
     this.consumableFlashes = {};
     this.skillBoosts = CardSystem.getSelectedBoosts();
     this.consumables = { ...GameState.loadout };
@@ -1679,7 +1683,8 @@ class Expedition {
           const mAngle = Math.atan2(m.y - this.player.y, m.x - this.player.x);
           const angleDiff = Math.abs(((mAngle - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
           if (angleDiff < Math.PI / 2) {
-            this.damageEnemy(m, this.weapon.damage, this.weapon.color, combo === 2, {
+            const dmg = this.weapon.damage * (1 + this.attackBuffMult);
+            this.damageEnemy(m, dmg, this.weapon.color, combo === 2, {
               x: m.x, y: m.y, angle, weaponId: this.weapon.id, fromPlayer: true
             });
             m.stunned = Math.max(m.stunned || 0, combo === 2 ? 0.45 : 0.25);
@@ -1697,7 +1702,7 @@ class Expedition {
       const p = this.allocProjectile();
       Object.assign(p, { x: this.player.x + Math.cos(angle) * 24, y: this.player.y + Math.sin(angle) * 24,
         vx: Math.cos(angle) * this.weapon.projectileSpeed, vy: Math.sin(angle) * this.weapon.projectileSpeed,
-        damage: this.weapon.damage, life: this.weapon.range / this.weapon.projectileSpeed, radius: 7,
+        damage: this.weapon.damage * (1 + this.attackBuffMult), life: this.weapon.range / this.weapon.projectileSpeed, radius: 7,
         fromPlayer: true, weaponId: this.weapon.id, pierce: this.weapon.pierce || 1, color: this.weapon.color });
       p.hit = p.hit || []; p.hit.length = 0;
       this.projectiles.push(p);
@@ -1862,6 +1867,12 @@ class Expedition {
       keptItems, lostItems,
       plantGrowth: this.growthSummary || []
     });
+  }
+
+  // v0.9.0 获取作物buff倍率
+  _getCropBuffMult(type) {
+    const buff = this.cropBuffs.find(b => b.type === type);
+    return buff ? buff.value : 0;
   }
 
   allocParticle() { return this.particlePool.length ? this.particlePool.pop() : {}; }
@@ -2304,7 +2315,7 @@ class Expedition {
       }
     });
     for (let i = 0; i < 4; i++) {
-      this.skillCooldowns[i] = Math.max(0, this.skillCooldowns[i] - dt);
+      this.skillCooldowns[i] = Math.max(0, this.skillCooldowns[i] - dt * (1 + this._getCropBuffMult('cooldown_reduction')));
       this.skillFlashes[i] = Math.max(0, this.skillFlashes[i] - dt);
     }
     Object.keys(this.consumableFlashes).forEach(id => {

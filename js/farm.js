@@ -58,6 +58,10 @@ const Farm = {
         const moistureBar = plot.moisture !== undefined ? `<div class="moisture-bar" style="position:absolute;bottom:2px;left:4px;right:4px;height:3px;background:#1a2a1a;border-radius:2px;"><div style="height:100%;width:${plot.moisture}%;background:${plot.moisture<30?'#ff6644':'#44aaff'};border-radius:2px;"></div></div>` : '';
         cell.innerHTML = `<span style="color:${qColor}">${plot.crop.icon}</span>${plot.status ? `<div class="plot-status">${statusIcons[plot.status]}</div>` : ''}<div class="growth-bar"><div class="growth-fill" style="width:${progress*100}%"></div></div>${moistureBar}`;
         const statusNames = { drought:'干旱', pest:'虫害', weeds:'杂草', burn:'烧苗', beast:'野兽偷食' };
+        // v0.9.0 使用扩展渲染（4阶段+品质+组合）
+        if (typeof CropRenderExt !== 'undefined' && plot.crop) {
+          CropRenderExt.renderPlot(plot, idx, cell);
+        }
         cell.title = plot.status ? `状态：${statusNames[plot.status]||plot.status}，点击照料` : (plot.ready ? '点击收获' : `生长中 · 湿度${Math.floor(plot.moisture||0)}%`);
         cell.onclick = () => plot.status ? Farm.tend(idx) : Farm.harvest(idx);
       } else {
@@ -124,6 +128,13 @@ const Farm = {
       return;
     }
     const crop = plot.crop;
+    // v0.9.0 品质roll（如果还没有）
+    if (!plot.quality || plot.quality === 'common') {
+      const combo = (typeof CropExpansion !== 'undefined') ? CropExpansion.ComboSystem.getComboBonus(idx) : { qualityBonus: 0 };
+      plot.quality = (typeof CropExpansion !== 'undefined') ? CropExpansion.QualitySystem.rollQuality(crop.rarity, combo.qualityBonus) : 'common';
+    }
+    // v0.9.0 品质收获特效
+    if (typeof CropRenderExt !== 'undefined') CropRenderExt.playHarvestEffect(plot, idx);
     // 特性系统：产量倍率
     const yieldQty = (typeof FarmTraitSystem !== 'undefined') ? FarmTraitSystem.harvestYield(idx) : 1;
     // 变异尝试
@@ -173,6 +184,26 @@ const Farm = {
       rewardText = `一次性技能卡：${card.name} x1`;
     } else {
       CardSystem.tryDrop(crop);
+    }
+    // v0.9.0 作物buff系统
+    if (typeof CropExpansion !== 'undefined' && crop.buffType) {
+      const qualityMult = CropExpansion.QualitySystem.getQualityMultiplier(plot.quality);
+      const buffValue = (crop.buffValue || 0.1) * qualityMult;
+      CropExpansion.CropBuffSystem.addBuff(crop.buffType, buffValue, crop.buffDuration || 1, crop.id, plot.quality);
+    }
+    // v0.9.0 稀有事件（千年人参等）
+    if (typeof CropExpansion !== 'undefined') {
+      const event = CropExpansion.RareEventSystem.triggerHarvestEvent(crop.id, plot.quality);
+      if (event) {
+        const bonusGold = Math.floor(crop.sellPrice * (event.priceMultiplier || 1));
+        GameState.gold += bonusGold;
+        rewardText += `，${event.name}！金币+${bonusGold}`;
+        if (event.npcAffectionAll && typeof NpcSystem !== 'undefined') {
+          Object.keys(NpcSystem.NPCS).forEach(id => NpcSystem.addAffection(id, event.npcAffectionAll));
+          rewardText += '，所有NPC好感+' + event.npcAffectionAll;
+        }
+        showToast(`🌟 ${event.name}！`, 'gold');
+      }
     }
     // 反复收获特性
     const canReharvest = (typeof FarmTraitSystem !== 'undefined') && FarmTraitSystem.shouldRemainAfterHarvest(idx);
