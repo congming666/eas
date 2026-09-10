@@ -1843,6 +1843,11 @@ class Expedition {
       });
     }
 
+    // v0.8.0 远征通关给科技点（仅成功时）
+    if (this.result === 'success' && typeof TechSystem !== 'undefined') {
+      TechSystem.onExpeditionComplete(this.map.tier, GameState.difficulty);
+    }
+
     SaveSystem.save();
 
     // 显示结算

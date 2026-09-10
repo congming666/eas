@@ -133,8 +133,6 @@ const Game = {
       SaveSystem.save();
     }
     this.expedition.updateHUD();
-    // v0.8.0 远征通关给科技点
-    if (typeof TechSystem !== 'undefined') TechSystem.onExpeditionComplete(this.expedition.map.tier, GameState.difficulty);
     this.lastTime = performance.now();
     this.accumulator = 0;
     this.gameLoop();
