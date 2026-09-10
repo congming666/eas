@@ -19,6 +19,9 @@ const Game = {
         SaveSystem.load();
         Farm.init();
         Farm.render();
+        // v0.8.0 初始化NPC和科技系统
+        if (typeof NpcSystem !== 'undefined') NpcSystem.init();
+        if (typeof TechSystem !== 'undefined') TechSystem.init();
         if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
           showToast('家园补给站有今日奖励可以领取', 'gold');
         }
@@ -75,8 +78,6 @@ const Game = {
     GameState.screen = 'prep';
     Farm.renderMapSelect();
     Farm.renderLoadout();
-    if (typeof NpcSystem !== 'undefined') NpcSystem.init();
-    if (typeof TechSystem !== 'undefined') TechSystem.init();
     Farm.renderDefenseLoadout();
     Farm.renderSkillPreview();
     CardSystem.renderBoostSelection();
