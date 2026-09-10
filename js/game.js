@@ -129,6 +129,8 @@ const Game = {
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('expeditionHUD').classList.remove('hidden');
     GameState.screen = 'expedition';
+    // 隐藏星云背景层，避免遮住远征画面（玩家/地形不可见）
+    this.hideNebulaFX(true);
     // v0.9.0 作物buff持续时间-1
     if (typeof CropExpansion !== 'undefined') CropExpansion.CropBuffSystem.onExpeditionStart();
 
