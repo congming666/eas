@@ -113,9 +113,9 @@ const Game = {
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
       const isSelected = GameState.loadoutWeaponUid === inst.uid;
       const div = document.createElement('div');
-      div.style.cssText = `padding:10px 14px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;min-width:110px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
-      div.innerHTML = `<div style="font-size:24px;">${wpn.icon}</div>
-        <div style="font-size:12px;color:#e6bd54;font-weight:bold;">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
+      div.style.cssText = `padding:8px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;width:120px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
+      div.innerHTML = `<img src="${wpn.img}" style="width:80px;height:80px;object-fit:contain;border-radius:6px;" onerror="this.style.display='none'">
+        <div style="font-size:12px;color:#e6bd54;font-weight:bold;margin-top:4px;">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
         <div style="font-size:10px;color:#999;">伤害${stats?stats.damage:wpn.damage}</div>
         <div style="font-size:9px;color:#666;">${inst.uid}</div>`;
       div.onclick = () => {
@@ -317,11 +317,12 @@ const Game = {
       if (!wpn) return;
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
       const cost = LoadoutSystem.getUpgradeCost(inst.uid);
-      html += `<div style="padding:10px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div><span style="font-size:18px;">${wpn.icon}</span> <span style="color:#e6bd54;font-weight:bold;">${wpn.name}</span>
+      html += `<div style="padding:8px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;"><img src="${wpn.img}" style="width:40px;height:40px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'">
+        <div><span style="color:#e6bd54;font-weight:bold;">${wpn.name}</span>
         <span style="color:${inst.level>=10?'#ffd700':'#7fff7f'};"> Lv.${inst.level}</span>
         <span style="color:#888;font-size:11px;"> 伤害${stats?stats.damage:wpn.damage}</span>
-        <span style="color:#555;font-size:10px;margin-left:8px;">${inst.uid}</span></div>`;
+        <span style="color:#555;font-size:10px;margin-left:8px;">${inst.uid}</span></div></div>`;
       if (cost) {
         const matStr = Object.entries(cost.materials).map(([m,n]) => {
           const mat = CONFIG.materials[m];
@@ -343,7 +344,7 @@ const Game = {
       if (!owned) return;
       const count = LoadoutSystem.getWeaponCount(w.id);
       html += `<div style="padding:6px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;">
-        <span><span style="font-size:16px;">${w.icon}</span> ${w.name} <span style="color:#888;font-size:11px;">(现有×${count})</span></span>
+        <span style="display:flex;align-items:center;gap:8px;"><img src="${w.img}" style="width:32px;height:32px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'"> ${w.name} <span style="color:#888;font-size:11px;">(现有×${count})</span></span>
         <button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.craftWeapon('${w.id}');Game.openBlacksmith()">打造</button>
       </div>`;
     });

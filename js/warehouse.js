@@ -228,7 +228,7 @@ const Warehouse = {
         const stats = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getInstanceStats(inst.uid) : wpn;
         html += `
           <div class="warehouse-item ${inst.level>=5?'rare':''}">
-            <div class="item-icon">${wpn.icon}</div>
+            <img src="${wpn.img}" style="width:48px;height:48px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'">
             <div class="item-name">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
             <div class="item-count">伤害 ${stats?stats.damage:wpn.damage}</div>
             <div style="font-size:10px;color:#888;">${inst.uid}</div>

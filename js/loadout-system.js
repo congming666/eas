@@ -7,6 +7,8 @@ const LoadoutSystem = {
     if (!GameState.safeSlots) GameState.safeSlots = 1;
     if (!GameState.safeBox) GameState.safeBox = [];
     if (!GameState.forgedWeapons) GameState.forgedWeapons = [];
+    // v1.2 强制金币10万
+    GameState.gold = 100000;
     // v1.1 旧存档迁移：weaponInventory → weaponInstances
     if (!GameState.weaponInstances) {
       GameState.weaponInstances = [];

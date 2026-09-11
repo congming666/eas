@@ -8,16 +8,16 @@ const CONFIG = {
     energyRegen: 15
   },
   weapons: [
-    { id: 'harvest_sickle', name: '丰收镰刃', shortName: '镰刃', icon: '镰', mode: 'melee',
+    { id: 'harvest_sickle', name: '丰收镰刃', shortName: '镰刃', icon: '镰', img: 'docs/art/weapons/harvest_sickle.png', mode: 'melee',
       damage: 18, range: 82, cooldown: 0.46, color: '#f2c45b', description: '宽幅近战，可短暂打断敌人' },
-    { id: 'pea_repeater', name: '豌豆连弩', shortName: '连弩', icon: '弩', mode: 'ranged',
+    { id: 'pea_repeater', name: '豌豆连弩', shortName: '连弩', icon: '弩', img: 'docs/art/weapons/pea_repeater.png', mode: 'ranged',
       damage: 11, range: 470, cooldown: 0.28, projectileSpeed: 620, color: '#75dc68', description: '快速远射，适合持续压制' },
-    { id: 'vine_staff', name: '藤芯法杖', shortName: '法杖', icon: '杖', mode: 'pierce',
+    { id: 'vine_staff', name: '藤芯法杖', shortName: '法杖', icon: '杖', img: 'docs/art/weapons/vine_staff.png', mode: 'pierce',
       damage: 24, range: 390, cooldown: 0.72, projectileSpeed: 440, pierce: 2, color: '#7be5c4', description: '灵藤波可贯穿多个目标' },
     // v1.0 蓝图武器（成就/Boss解锁）
-    { id: 'throwing_knife', name: '飞刃', shortName: '飞刃', icon: '刃', mode: 'ranged', blueprint: true,
+    { id: 'throwing_knife', name: '飞刃', shortName: '飞刃', icon: '刃', img: 'docs/art/weapons/throwing_knife.png', mode: 'ranged', blueprint: true,
       damage: 16, range: 520, cooldown: 0.35, projectileSpeed: 800, color: '#c0c0e0', description: '高初速远程，攻速极快' },
-    { id: 'flame_bow', name: '烈焰长弓', shortName: '火弓', icon: '弓', mode: 'ranged', blueprint: true,
+    { id: 'flame_bow', name: '烈焰长弓', shortName: '火弓', icon: '弓', img: 'docs/art/weapons/flame_bow.png', mode: 'ranged', blueprint: true,
       damage: 32, range: 600, cooldown: 0.85, projectileSpeed: 550, color: '#ff6b35', description: '火焰箭矢，命中爆炸AOE' }
   ],
   materials: {
