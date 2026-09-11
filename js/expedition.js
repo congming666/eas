@@ -165,8 +165,8 @@ class Expedition {
       this.beastWave.nextIn = DifficultySystem.getTierMechanic(this.map.tier).beastWaveInterval || 48;
     }
     this.generateTerrain();
-    this.spawnEntities();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
+    this.spawnEntities();
     this.obstacleSpatialHash.rebuild(this.obstacles);
     this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
