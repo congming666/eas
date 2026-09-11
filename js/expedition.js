@@ -160,6 +160,24 @@ class Expedition {
         this.monsterSprites[type][state] = sprite;
       });
     });
+    // v1.7 新怪物贴图
+    const newMobs = {
+      treant: 'docs/art/enemies/treant_v2.png',
+      gargoyle: 'docs/art/enemies/gargoyle_v2.png',
+      shadow_demon: 'docs/art/enemies/shadow_demon_v2.png'
+    };
+    for (const [type, src] of Object.entries(newMobs)) {
+      this.monsterSprites[type] = {};
+      const img = new Image();
+      img.src = src;
+      this.monsterSprites[type].idle = img;
+      this.monsterSprites[type].attack = img;
+      this.monsterSprites[type].hit = img;
+      this.monsterSprites[type].death = img;
+    }
+    this.fxSprites = { slash: new Image(), hit: new Image() };
+    this.fxSprites.slash.src = 'docs/art/effects/fire_slash.png';
+    this.fxSprites.hit.src = 'docs/art/effects/hit_spark.png';
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -2488,6 +2506,9 @@ class Expedition {
     const sparkColor = isCrit ? '#fff0a0' : (fx ? fx.spark : color);
     this.spawnImpact(hitX, hitY, impactColor, isCrit ? 1.6 : 1);
     this.spawnDirectionalSparks(hitX, hitY, hitAngle, sparkColor, heavy ? 12 : 8, isBoss ? 1.25 : 1);
+    const hp = this.allocParticle();
+    Object.assign(hp, { x: hitX, y: hitY, vx: 0, vy: 0, life: 0.22, maxLife: 0.22, type: 'hitImg', size: isCrit ? 90 : 60 });
+    this.particles.push(hp);
     if (heavy || isCrit || isBoss) this.spawnShockRing(hitX, hitY, isBoss ? '#ffd9a0' : impactColor, isBoss ? 84 : 52);
     // 冻结碎裂：被寒冰藤减速（冰冻状态）的敌人受击时碎冰飞溅，死亡时大碎裂
     if (target.slow > 0 && fromPlayer) this.spawnFrostShatter(hitX, hitY, target.hp <= 0);
@@ -3681,36 +3702,46 @@ class Expedition {
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.globalAlpha = 1;
+      } else if (p.type === 'hitImg') {
+        const hitImg = this.fxSprites && this.fxSprites.hit;
+        if (hitImg && hitImg.naturalWidth) {
+          ctx.save();
+          ctx.translate(sx, sy);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = alpha;
+          const dw = p.size;
+          const dh = dw * hitImg.naturalHeight / hitImg.naturalWidth;
+          ctx.drawImage(hitImg, -dw/2, -dh/2, dw, dh);
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
       } else if (p.type === 'slash') {
-        const dir = p.dir || 1;
-        ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(p.angle);
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.lineCap = 'round';
-        // 主弧
-        ctx.strokeStyle = p.color;
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.size, -Math.PI / 3 * dir, Math.PI / 3 * dir);
-        ctx.stroke();
-        // 外圈残影
-        ctx.strokeStyle = p.color;
-        ctx.globalAlpha = alpha * 0.35;
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.size * 0.88, -Math.PI / 2.6 * dir, Math.PI / 2.6 * dir);
-        ctx.stroke();
-        // 刀光尖端高亮
-        const tipAngle = Math.PI / 3 * dir;
-        ctx.strokeStyle = '#ffffff';
-        ctx.globalAlpha = alpha * 0.9;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.size, tipAngle - 0.5 * dir, tipAngle);
-        ctx.stroke();
-        ctx.restore();
+        const slashImg = this.fxSprites && this.fxSprites.slash;
+        if (slashImg && slashImg.naturalWidth) {
+          ctx.save();
+          ctx.translate(sx, sy);
+          ctx.rotate(p.angle);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = alpha;
+          const dw = p.size * 2.4;
+          const dh = dw * slashImg.naturalHeight / slashImg.naturalWidth;
+          ctx.drawImage(slashImg, -dw/2, -dh/2, dw, dh);
+          ctx.restore();
+        } else {
+          const dir = p.dir || 1;
+          ctx.save();
+          ctx.translate(sx, sy);
+          ctx.rotate(p.angle);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = p.color;
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size, -Math.PI / 3 * dir, Math.PI / 3 * dir);
+          ctx.stroke();
+          ctx.restore();
+        }
         ctx.globalAlpha = 1;
       } else if (p.type === 'warn') {
         // Boss 蓄力警示：头顶上浮闪烁的感叹号
