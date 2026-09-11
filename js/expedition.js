@@ -1260,7 +1260,7 @@ class Expedition {
   toggleInventory() {
     const existing = document.getElementById('inventoryOverlay');
     if (existing) { existing.remove(); return; }
-    const inv = this.inventory || [];
+    const inv = this.bag || [];
     const safe = (GameState.safeBox || []);
     let html = `<div style="width:480px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -2876,16 +2876,26 @@ class Expedition {
         }
         // v1.0 击杀计数成就
         if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill');
-        // 掉落
-        if (Math.random() < 0.3) {
-          this.spawnGroundLoot({ type: 'gold', name: '金币', amount: m.gold || 5, icon: '💰' }, m.x, m.y);
+        // 掉落 v1.6 丰富
+        if (Math.random() < 0.5) {
+          this.spawnGroundLoot({ type: 'gold', name: '金币', amount: (m.gold || 5) + randInt(0, 5), icon: '💰' }, m.x, m.y);
         }
-        // v1.0 材料掉落
-        if (Math.random() < 0.2) {
-          this.spawnGroundLoot({ type: 'material', name: '铁块', amount: randInt(1,3), icon: '⛓️', matId: 'iron' }, m.x+10, m.y);
+        const dropTable = [
+          { type: 'consumable', name: '草药包', id: 'herb_kit', icon: '💊', weight: 0.15 },
+          { type: 'consumable', name: '信号弹', id: 'signal_flare', icon: '🔥', weight: 0.08 },
+          { type: 'consumable', name: '荆棘狂潮', id: 'thorn_storm', icon: '🌵', weight: 0.06 },
+          { type: 'material', name: '硬木', matId: 'wood', icon: '🪵', amount: randInt(1,2), weight: 0.25 },
+          { type: 'material', name: '铁块', matId: 'iron', icon: '⛓️', amount: randInt(1,3), weight: 0.2 },
+          { type: 'material', name: '灵晶', matId: 'crystal', icon: '💎', amount: 1, weight: 0.08 }
+        ];
+        for (const d of dropTable) {
+          if (Math.random() < d.weight) {
+            this.spawnGroundLoot({ type: d.type, name: d.name, icon: d.icon, id: d.id, matId: d.matId, amount: d.amount||1 }, m.x + rand(-15,15), m.y + rand(-15,15));
+          }
         }
-        if (m.elite && Math.random() < 0.35) {
-          this.spawnGroundLoot({ type: 'material', name: '灵晶', amount: 1, icon: '💎', matId: 'crystal' }, m.x-10, m.y);
+        if (m.elite) {
+          if (Math.random() < 0.5) this.spawnGroundLoot({ type: 'gold', name: '精英赏金', amount: randInt(30,80), icon: '💰' }, m.x, m.y-10);
+          if (Math.random() < 0.3) this.spawnGroundLoot({ type: 'material', name: '灵晶', amount: randInt(1,2), icon: '💎', matId: 'crystal' }, m.x+10, m.y+10);
         }
         // v1.0 精英/Boss 掉临时武器
         if (m.elite && Math.random() < 0.5 && typeof LoadoutSystem !== 'undefined') {
@@ -3084,8 +3094,11 @@ class Expedition {
 
     // 撤离读条
     if (this.extracting) {
+      if (this.extractType === 'fixed') {
+        const inPoint = this.extractPoints.some(ep => dist(this.player, ep) < ep.radius);
+        if (!inPoint) { this.cancelExtract(); showToast('离开了撤离点，撤离取消', 'warning'); }
+      }
       const extractTime = this.extractType === 'signal' ? CONFIG.expedition.signalExtractTime : CONFIG.expedition.extractTime;
-      // 检查是否被攻击打断（受到伤害时打断）
       this.extractProgress += dt;
       if (this.extractProgress >= extractTime) {
         this.completeExtract();

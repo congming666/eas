@@ -555,8 +555,8 @@
       // Boss阶段
       const boss = this.exp.monsters.find(m => m.type === 'boss' && m.hp > 0);
       if (boss) this.updateBossPhase(boss);
-      // 每60秒触发一次岔路选择
-      if (this.elapsed > 60 && !this.branchActive && Math.floor(this.elapsed) % 60 === 0) {
+      // 每2分钟触发一次岔路选择
+      if (this.elapsed > 120 && !this.branchActive && Math.floor(this.elapsed) % 120 === 0) {
         this.triggerBranch();
       }
     },
