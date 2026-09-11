@@ -1809,10 +1809,13 @@ class Expedition {
       this.spawnAoeEffect(x, y, 30, '#a5e675');
       showToast('回收植物残骸，培育损失减半', 'gold');
     } else if (item.type === 'seed_pickup') {
-      GameState.seeds = GameState.seeds || {};
-      GameState.seeds[item.seedId] = (GameState.seeds[item.seedId] || 0) + 1;
+      // v3.2 种子进背包，撤离才入库
+      const seedItem = { type: 'seed_item', id: 'seed_'+item.seedId, seedId: item.seedId, name: item.name, icon: item.icon, amount: 1, slots: 1 };
+      const existing = this.bag.find(b => b.id === seedItem.id);
+      if (existing) existing.amount += 1;
+      else this.bag.push(seedItem);
       this.spawnAoeEffect(x, y, 40, '#ffd968');
-      showToast(`已获得种子：${item.name}`, 'gold');
+      showToast(`拾取种子：${item.name}（需撤离保留）`, 'gold');
     } else if (item.type === 'weapon_drop') {
       // v1.0 临时武器拾取（自动切换）
       this.tempWeapons = this.tempWeapons || [];
@@ -2333,6 +2336,12 @@ class Expedition {
       });
       this.bag.filter(i => i.type === 'farm_item').forEach(i => {
         Warehouse.addItem(i.id, i.amount);
+      });
+      // v3.2 种子入农场仓库
+      this.bag.filter(i => i.type === 'seed_item').forEach(i => {
+        GameState.seeds = GameState.seeds || {};
+        GameState.seeds[i.seedId] = (GameState.seeds[i.seedId] || 0) + (i.amount || 1);
+        showToast(`🌱 收获种子：${i.name} ×${i.amount}`, 'success');
       });
     } else {
       // v1.0 失败：安全箱内物品必保留，其余全掉
