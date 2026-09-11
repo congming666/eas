@@ -677,6 +677,38 @@ class Expedition {
     const sx = monster.x - cam.x, sy = monster.y - cam.y;
     const cullMargin = monster.type === 'boss' ? 180 : 90;
     if (sx < -cullMargin || sx > CONFIG.canvas.width + cullMargin || sy < -cullMargin || sy > CONFIG.canvas.height + cullMargin) return;
+    // v3.3 攻击前摇可视化
+    if (monster.windupT > 0) {
+      const prog = 1 - monster.windupT / (monster.windupDur || 0.4);
+      ctx.save();
+      if (monster.windupKind === 'ranged') {
+        // 抬手白光
+        ctx.globalAlpha = 0.5 + 0.4 * Math.sin(prog * Math.PI * 4);
+        ctx.fillStyle = '#ffdd88';
+        ctx.beginPath(); ctx.arc(sx + Math.cos(monster.windupAngle || 0) * 22, sy - 14, 8, 0, Math.PI * 2); ctx.fill();
+      } else if (monster.windupKind === 'bomb') {
+        // 身体变红 + 倒计时
+        ctx.globalAlpha = 0.4 + 0.3 * Math.sin(this.elapsed * 18);
+        ctx.fillStyle = '#ff3322';
+        ctx.beginPath(); ctx.arc(sx, sy, (monster.radius || 20) * (1.2 + prog), 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(Math.ceil(monster.windupT).toString(), sx - 4, sy + 4);
+      } else {
+        // 近战：武器发光（白）+ 面前半圆预警区
+        ctx.globalAlpha = 0.35 + 0.3 * prog;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(sx + Math.cos(monster.windupAngle || 0) * 26, sy + Math.sin(monster.windupAngle || 0) * 26, 7, 0, Math.PI * 2); ctx.fill();
+        // 红色扇形
+        ctx.globalAlpha = 0.18 + 0.15 * prog;
+        ctx.fillStyle = '#ff4433';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.arc(sx, sy, monster.attackRange || 36, (monster.windupAngle || 0) - 0.6, (monster.windupAngle || 0) + 0.6);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
     const scale = (monster.elite ? 1.18 : 1) * (monster.radius / 18) * this.getDepthScale(monster.y);
     const stride = Math.sin(monster.animTime || 0);
     const hpPct = clamp(monster.hp / monster.maxHp, 0, 1);
@@ -2546,6 +2578,17 @@ class Expedition {
     this.lightningChainFrom(nearest, proj, hitSet, jumpsLeft - 1, dmgRatio * 0.8);
   }
 
+  explodeBomber(m) {
+    if (!m || m.hp <= 0) return;
+    const R = 80;
+    this.spawnShockRing(m.x, m.y, '#ff5533', R);
+    this.spawnImpact(m.x, m.y, '#ffaa33', 1.6);
+    const d = dist(m, this.player);
+    if (d < R) this.damagePlayer(m.damage || 20);
+    this.monsters.forEach(o => { if (o !== m && o.hp > 0 && dist(o, m) < R) this.damageEnemy(o, (m.damage || 20) * 0.6, '#ff6644', false, { quiet: true }); });
+    m.hp = 0;
+  }
+
   damageEnemy(target, amount, color = '#ffffff', heavy = false, hitInfo = null) {
     if (!target || target.hp <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
@@ -2570,6 +2613,13 @@ class Expedition {
       if (curSeg < _prevSeg) CombatEnhancement.onSegmentBreak(target);
     }
     target.hitFlash = heavy ? 0.22 : 0.14;
+    // v3.3 攻击打断：命中正在前摇的非精英/Boss 怪，20% 概率打断
+    if (target.windupT > 0 && !target.elite && target.type !== 'boss' && fromPlayer && Math.random() < 0.20) {
+      target.windupT = 0; target.windupKind = null;
+      target.stunned = Math.max(target.stunned || 0, 0.6);
+      this.spawnImpact(target.x, target.y, '#aaffcc', 1.2);
+      showToast('打断！', 'success');
+    }
     target.state = target.hp <= 0 ? 'death' : 'hit';
     target.stateTimer = target.hp <= 0 ? .4 : .18;
     const dmgColor = isCrit ? '#ffd968' : color;
@@ -2749,6 +2799,11 @@ class Expedition {
       return;
     }
 
+    // v3.3 受击硬直期间禁止移动
+    if (this.player.hitStun > 0) {
+      this.player.hitStun -= dt;
+      dt *= 0.25; // 时间整体减速
+    }
     // 玩家移动
     let dx = 0, dy = 0;
     if (this.keys['w']) dy -= 1;
@@ -2882,6 +2937,34 @@ class Expedition {
       m.stateTimer = Math.max(0, (m.stateTimer || 0) - dt);
       m.animTime = (m.animTime || 0) + dt * (1.8 + m.speed / 120);
       this.updateBurn(m, dt);
+      // v3.3 攻击前摇（telegraph）
+      if (m.windupT > 0) {
+        m.windupT -= dt;
+        m.animTime += dt * 0.6;
+        if (m.windupT <= 0) {
+          // 前摇结束，真正出手
+          const wa = m.windupAngle || 0;
+          if (m.windupKind === 'ranged') {
+            const p = this.allocProjectile();
+            Object.assign(p, { x: m.x, y: m.y, vx: Math.cos(wa) * 320, vy: Math.sin(wa) * 320, damage: m.damage, life: 2, fromMonster: true, radius: 6, monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644' });
+            p.hit = p.hit || []; p.hit.length = 0;
+            this.projectiles.push(p);
+            m.attackAnim = 0.3;
+          } else if (m.windupKind === 'bomb') {
+            this.explodeBomber(m);
+          } else {
+            if (m.type === 'boss') { m.attackAnim = 0.34; this.spawnSlashEffect(m.x + Math.cos(wa) * 46, m.y, wa, '#ffd9a0', 62); }
+            if (m.windupTarget === 'plant' && m.windupPlant && m.windupPlant.hp > 0) {
+              this.damagePlant(m.windupPlant, m.damage);
+            } else {
+              this.damagePlayer(m.damage);
+              if (typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
+            }
+          }
+          m.windupT = 0; m.windupKind = null; m.windupPlant = null;
+        }
+        return; // 前摇期间不移动
+      }
       const slowMul = m.slow > 0 ? clamp(1 - m.slow, 0.35, 1) : 1;
       if (m.stunned > 0) return;
 
@@ -2910,9 +2993,9 @@ class Expedition {
           m.state = 'move';
           this.moveEntityWithCollisions(m, Math.cos(pa) * m.speed * slowMul * dt, Math.sin(pa) * m.speed * slowMul * dt);
         } else if (m.attackCd <= 0) {
-          m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
-          this.damagePlant(plantTarget, m.damage);
+          m.windupT = 0.35; m.windupDur = 0.35; m.windupAngle = pa; m.windupKind = 'melee'; m.windupTarget = 'plant'; m.windupPlant = plantTarget;
+          m.state = 'windup';
         } else {
           m.state = 'idle';
         }
@@ -2924,24 +3007,14 @@ class Expedition {
           m.state = 'move';
           this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * slowMul * dt, Math.sin(angle) * m.speed * slowMul * dt);
         } else if (m.attackCd <= 0) {
-          // 攻击
-          m.state = 'attack'; m.stateTimer = .28;
           m.attackCd = m.attackCooldown;
-          if (m.type === 'boss') { m.attackAnim = 0.34; this.spawnSlashEffect(m.x + Math.cos(angle) * 46, m.y, angle, '#ffd9a0', 62); }
-          if (m.ranged) {
-            const p = this.allocProjectile();
-            Object.assign(p, {
-              x: m.x, y: m.y,
-              vx: Math.cos(angle) * 300, vy: Math.sin(angle) * 300,
-              damage: m.damage, life: 2, fromMonster: true, radius: 6,
-              monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644'
-            });
-            p.hit = p.hit || []; p.hit.length = 0;
-            this.projectiles.push(p);
-          } else {
-            this.damagePlayer(m.damage);
-          if (typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
-          }
+          let wdur = 0.35, wkind = 'melee';
+          if (m.ranged) { wdur = 0.5; wkind = 'ranged'; }
+          else if (m.aiType === 'bomber' || m.aiType === 'self_destruct' || m.type === 'bomber') { wdur = 1.2; wkind = 'bomb'; }
+          else if (m.aiType === 'charger' || m.aiType === 'charge') { wdur = 0.6; wkind = 'melee'; }
+          else if (m.type === 'boss') { wdur = 0.8; wkind = 'melee'; }
+          m.windupT = wdur; m.windupDur = wdur; m.windupAngle = angle; m.windupKind = wkind; m.windupTarget = 'player';
+          m.state = 'windup';
         } else {
           m.state = 'idle';
         }
@@ -3239,6 +3312,7 @@ class Expedition {
       amount *= 0.76;
     }
     this.player.hp -= amount;
+    this.player.hitStun = 0.15; // v3.3 受击硬直
     AudioManager.playPlayerHurt();
     this.damageTaken += amount;
     this.screenShake = Math.min(1, this.screenShake + 0.48);
@@ -3572,6 +3646,25 @@ class Expedition {
     // 养分结晶
     this.renderNutrientCrystals(ctx, cam);
 
+    // v3.3 低血量心跳脉冲 + 受击红边
+    if (this.player.hp > 0 && this.player.maxHp > 0 && this.player.hp < this.player.maxHp * 0.25) {
+      const beat = (Math.sin(this.elapsed * 6) + 1) / 2;
+      ctx.save();
+      const grad = ctx.createRadialGradient(CONFIG.canvas.width/2, CONFIG.canvas.height/2, CONFIG.canvas.height*0.3, CONFIG.canvas.width/2, CONFIG.canvas.height/2, CONFIG.canvas.height*0.75);
+      grad.addColorStop(0, 'rgba(180,0,0,0)');
+      grad.addColorStop(1, 'rgba(180,0,0,' + (0.18 + 0.22 * beat) + ')');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+      ctx.restore();
+    }
+    if (this.playerDamageFlash > 0) {
+      this.playerDamageFlash -= 0.016;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,40,40,' + Math.min(0.8, this.playerDamageFlash * 2) + ')';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+      ctx.restore();
+    }
     // 撤离点
     this.extractPoints.forEach(ep => {
       if (!this.isWorldVisible(ep.x, ep.y)) return;

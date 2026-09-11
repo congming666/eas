@@ -78,6 +78,16 @@
       this.perfectDodgeWindow = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get().dodgeWindow / 1000 : 0.2;
       this.dodgeCd = 1.2;
       this.exp.spawnAoeEffect(p.x, p.y, 30, '#88ddff');
+      // v3.3 闪避过程中碰到自爆怪 → 提前引爆（玩家在无敌帧内）
+      if (this.exp.monsters) {
+        for (const m of this.exp.monsters) {
+          if (m.hp <= 0) continue;
+          if ((m.aiType === 'bomber' || m.aiType === 'self_destruct' || m.type === 'bomber') && m.windupT > 0) {
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < 60 && typeof this.exp.explodeBomber === 'function') this.exp.explodeBomber(m);
+          }
+        }
+      }
       return true;
     },
     // 玩家受伤前调用，返回true表示完美闪避成功（免伤）

@@ -16,14 +16,14 @@
       id: 'normal', name: '普通', icon: '⚔️',
       hpMul: 1.0, dmgMul: 1.0,
       maxAffixes: 2, supplyMul: 1.0, torchMul: 1.0, rewardMul: 1.0,
-      comboCap: 0.6, dodgeWindow: 200, dodgeCrit: true,
+      comboCap: 0.6, dodgeWindow: 180, dodgeCrit: true,
       ultBossDmg: 0.25, ultEliteDmg: 0.99, executeKill: true, envPlayerMul: 0.5
     },
     hard: {
       id: 'hard', name: '困难', icon: '🔥',
       hpMul: 1.4, dmgMul: 1.3,
       maxAffixes: 2, supplyMul: 0.7, torchMul: 1.5, rewardMul: 1.5,
-      comboCap: 0.4, dodgeWindow: 150, dodgeCrit: false, dodgeCritDmg: 1.5,
+      comboCap: 0.4, dodgeWindow: 130, dodgeCrit: false, dodgeCritDmg: 1.5,
       ultBossDmg: 0.15, ultEliteDmg: 0.5, executeKill: false, executeDmg: 0.8, envPlayerMul: 1.0
     },
     nightmare: {
