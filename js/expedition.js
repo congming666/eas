@@ -1808,6 +1808,11 @@ class Expedition {
       if (record) record.recovered = true;
       this.spawnAoeEffect(x, y, 30, '#a5e675');
       showToast('回收植物残骸，培育损失减半', 'gold');
+    } else if (item.type === 'seed_pickup') {
+      GameState.seeds = GameState.seeds || {};
+      GameState.seeds[item.seedId] = (GameState.seeds[item.seedId] || 0) + 1;
+      this.spawnAoeEffect(x, y, 40, '#ffd968');
+      showToast(`已获得种子：${item.name}`, 'gold');
     } else if (item.type === 'weapon_drop') {
       // v1.0 临时武器拾取（自动切换）
       this.tempWeapons = this.tempWeapons || [];
@@ -2999,6 +3004,18 @@ class Expedition {
         }
         if (m.type !== 'boss' && Math.random() < 0.055) {
           this.spawnGroundLoot({ type: 'invincible', name: '无敌核心', amount: 1, icon: '🛡️', duration: 5 }, m.x, m.y);
+        }
+        // v3.1 极低概率掉特殊作物种子（精英/Boss 更高）
+        const seedChance = m.elite ? 0.08 : (m.type === 'boss' ? 0.5 : 0.012);
+        if (Math.random() < seedChance && CONFIG.wildPlants) {
+          const pool = CONFIG.wildPlants.filter(w => w.tier <= this.map.tier);
+          const wp = pool[Math.floor(Math.random() * pool.length)];
+          if (wp) {
+            GameState.seeds = GameState.seeds || {};
+            GameState.seeds[wp.givesSeed] = (GameState.seeds[wp.givesSeed] || 0) + 1;
+            this.spawnGroundLoot({ type: 'seed_pickup', name: wp.name + '种子', icon: wp.icon, seedId: wp.givesSeed, amount: 1 }, m.x, m.y);
+            showToast(`🌟 稀有掉落：${wp.name}种子！`, 'gold');
+          }
         }
         return true;
       }
