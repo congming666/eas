@@ -87,8 +87,11 @@ const AchievementSystem = {
       case 'hidden_extract': return s.hiddenExtracts >= 1;
       case 'weapon_owner': return (GameState.forgedWeapons || []).length >= 3;
       case 'npc_all': {
-        if (typeof NpcSystem === 'undefined') return false;
-        return Object.values(NpcSystem.NPCS).every(n => NpcSystem.getAffection(n.id) >= 100);
+        if (typeof NpcSystem === 'undefined' || !NpcSystem.NPCS) return false;
+        return Object.keys(NpcSystem.NPCS).every(id => {
+          const st = NpcSystem.getNpcState(id);
+          return st && st.affection >= 100;
+        });
       }
       default: return false;
     }
