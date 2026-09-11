@@ -185,6 +185,7 @@ class Expedition {
     this.fxSprites.boar.src = 'docs/art/mobfx/boar_charge.png';
     this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
     this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
+    this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -2591,7 +2592,7 @@ class Expedition {
     if (isBoss) AudioManager.playBossHit();
     if (this.fxSprites && this.fxSprites.hitBlood) {
       this.fxParticles = this.fxParticles || [];
-      this.fxParticles.push({ img: this.fxSprites.hitBlood, x: hitX, y: hitY, life: 0.35, maxLife: 0.35, size: 60 });
+      this.fxParticles.push({ img: this.fxSprites.hitBlood, x: hitX, y: hitY, life: 0.35, maxLife: 0.35, size: 32 });
     }
   }
 
@@ -3247,52 +3248,14 @@ class Expedition {
     }
     ctx.scale(0.6 * depthScale, 0.6 * depthScale);
     if (facingLeft) ctx.scale(-1, 1);
-
-    // Contact shadow and backpack establish the top-down silhouette.
-    ctx.save(); ctx.scale(1, 0.34); ctx.fillStyle = 'rgba(0,0,0,.42)';
-    ctx.beginPath(); ctx.ellipse(0, 82, 43, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.fillStyle = '#553625'; ctx.strokeStyle = '#281b17'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(-29, -10, 30, 52, 8); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#9a6337'; ctx.beginPath(); ctx.roundRect(-32, -5, 27, 32, 5); ctx.fill();
-    ctx.strokeStyle = '#d39a4c'; ctx.beginPath(); ctx.moveTo(-28, 4); ctx.lineTo(-9, 4); ctx.stroke();
-    ctx.fillStyle = '#e6bd54'; [-24, -18, -12].forEach((x, i) => { ctx.save(); ctx.translate(x, -7 - i * 3); ctx.rotate(-0.35); ctx.fillRect(-1, -14, 2, 18); ctx.restore(); });
-
-    // Boots, patched trousers, belt, broad torso and straw collar.
-    ctx.fillStyle = '#4a3026';
-    [-14, 14].forEach(x => { ctx.beginPath(); ctx.roundRect(x - 11, 48, 22, 25, 7); ctx.fill(); });
-    ctx.fillStyle = '#777553'; ctx.beginPath(); ctx.roundRect(-27, 25, 54, 38, 11); ctx.fill();
-    ctx.fillStyle = '#a99a68'; ctx.fillRect(-23, 44, 14, 10); ctx.fillStyle = '#5a4f3b'; ctx.fillRect(8, 31, 11, 9);
-    ctx.fillStyle = '#71502d'; ctx.fillRect(-30, 20, 60, 8); ctx.fillStyle = '#d2a34b'; ctx.strokeStyle = '#382619';
-    ctx.beginPath(); ctx.roundRect(-7, 18, 14, 12, 2); ctx.fill(); ctx.stroke();
-    const shirt = ctx.createLinearGradient(-30, -24, 30, 38); shirt.addColorStop(0, '#b7945e'); shirt.addColorStop(1, '#70553c');
-    ctx.fillStyle = shirt; ctx.beginPath(); ctx.roundRect(-34, -26, 68, 55, 17); ctx.fill();
-    ctx.fillStyle = '#4f4035'; ctx.beginPath(); ctx.roundRect(13, -4, 15, 12, 2); ctx.fill();
-    ctx.fillStyle = '#d8b85d'; ctx.beginPath(); ctx.moveTo(-35, -27); ctx.lineTo(-22, -39); ctx.lineTo(0, -31); ctx.lineTo(22, -39); ctx.lineTo(36, -25); ctx.lineTo(26, -14); ctx.lineTo(-25, -14); ctx.closePath(); ctx.fill();
-
-    // Arms and hands stay readable at game scale.
-    ctx.strokeStyle = '#d98f6f'; ctx.lineWidth = 13; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-39, 23); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(27, -7); ctx.lineTo(39, 19); ctx.stroke();
-    ctx.fillStyle = '#e6a07e'; [-40, 40].forEach((x, i) => { ctx.beginPath(); ctx.arc(x, 25 - i * 5, 7, 0, Math.PI * 2); ctx.fill(); });
-
-    // Head, red beard, large nose and expressive eyes from the turn-around reference.
-    ctx.fillStyle = '#c84e2f'; ctx.beginPath(); ctx.arc(0, -47, 30, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-27, -42); ctx.quadraticCurveTo(-24, -15, 0, -10); ctx.quadraticCurveTo(24, -15, 28, -43); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#efb092'; ctx.beginPath(); ctx.ellipse(0, -51, 23, 21, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#d76547'; ctx.beginPath(); ctx.ellipse(0, -44, 11, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff8de'; [-8, 8].forEach(x => { ctx.beginPath(); ctx.ellipse(x, -57, 6, 8, 0, 0, Math.PI * 2); ctx.fill(); });
-    ctx.fillStyle = '#2a211d'; [-8, 8].forEach(x => { ctx.beginPath(); ctx.arc(x + 1, -57, 2.2, 0, Math.PI * 2); ctx.fill(); });
-    ctx.strokeStyle = '#7c251c'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, -34, 13, 0.2, Math.PI - 0.2); ctx.stroke();
-
-    // Weathered metal hat, wheat decoration and side hook.
-    ctx.fillStyle = '#505654'; ctx.strokeStyle = '#271f1d'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.ellipse(0, -70, 37, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(-24, -92, 48, 23, 9); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = '#e0a841'; ctx.lineWidth = 2;
-    [-6, 1, 8].forEach((x, i) => { ctx.beginPath(); ctx.moveTo(x, -75); ctx.lineTo(x + 7 + i * 2, -104); ctx.stroke();
-      for (let j = 0; j < 4; j++) { const yy = -84 - j * 5; ctx.beginPath(); ctx.ellipse(x + 5 + i + j, yy, 3, 1.5, -0.6, 0, Math.PI * 2); ctx.fillStyle = '#e0a841'; ctx.fill(); } });
-    ctx.strokeStyle = '#303534'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(24, -82); ctx.quadraticCurveTo(42, -82, 38, -66); ctx.lineTo(44, -63); ctx.stroke();
-
+    // v2.7 Seedream 主角贴图
+    if (this.playerSprite && this.playerSprite.naturalWidth) {
+      const psz = 150;
+      const pdraw = psz * this.playerSprite.naturalHeight / this.playerSprite.naturalWidth;
+      ctx.drawImage(this.playerSprite, -psz/2, -pdraw*0.82, psz, pdraw);
+    } else {
+      ctx.fillStyle = '#c84e2f'; ctx.beginPath(); ctx.arc(0, -47, 30, 0, Math.PI * 2); ctx.fill();
+    }
     this.renderHeroWeapon(ctx, angle, swing, this.attackCombo, this.weaponRecoil);
     ctx.restore();
   }
