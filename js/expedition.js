@@ -162,9 +162,9 @@ class Expedition {
     });
     // v1.7 新怪物贴图
     const newMobs = {
-      treant: 'docs/art/enemies/treant_v2.png',
-      gargoyle: 'docs/art/enemies/gargoyle_v2.png',
-      shadow_demon: 'docs/art/enemies/shadow_demon_v2.png'
+      treant: 'docs/art/enemies/treant.png',
+      gargoyle: 'docs/art/enemies/gargoyle.png',
+      shadow_demon: 'docs/art/enemies/shadow_demon.png'
     };
     for (const [type, src] of Object.entries(newMobs)) {
       this.monsterSprites[type] = {};
@@ -1130,7 +1130,7 @@ class Expedition {
     this.beastWave.wave++;
     this.beastWave.active = true;
     this.beastWave.duration = 32 + this.map.tier * 3;
-    const count = Math.min(42, 10 + this.map.tier * 4 + this.beastWave.wave * 4);
+    const count = Math.min(60, 16 + this.map.tier * 5 + this.beastWave.wave * 5);
     const types = ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
       const type = types[randInt(0, types.length - 1)];
