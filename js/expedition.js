@@ -767,8 +767,8 @@ class Expedition {
           if (img && img.naturalWidth) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = Math.min(1, monster.attackAnim * 4);
-            const fw = drawSize * 1.6;
+            ctx.globalAlpha = Math.min(1, monster.attackAnim * 5);
+            const fw = drawSize * 1.1;
             const fh = fw * img.naturalHeight / img.naturalWidth;
             ctx.drawImage(img, sx - fw/2, sy - fh/2, fw, fh);
             ctx.restore();
@@ -1308,10 +1308,11 @@ class Expedition {
     if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:20px;">背包空空如也，打怪捡东西吧</div>';
     inv.forEach((item, i) => {
       const slots = item.slots || 1;
+      const canUse = item.type === 'consumable';
       html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
         <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
         <span style="display:flex;gap:4px;">
-          <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>
+          ${canUse ? `<button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>` : ''}
           <button class="secondary-btn" style="font-size:11px;color:#ff8888;" onclick="Game.expedition.dropInventoryItem(${i})">丢弃</button>
         </span>
       </div>`;
