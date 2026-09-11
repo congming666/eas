@@ -65,8 +65,8 @@ const Farm = {
         cell.title = plot.status ? `状态：${statusNames[plot.status]||plot.status}，点击照料` : (plot.ready ? '点击收获' : `生长中 · 湿度${Math.floor(plot.moisture||0)}%`);
         cell.onclick = () => plot.status ? Farm.tend(idx) : Farm.harvest(idx);
       } else {
-        cell.innerHTML = '';
-        cell.onclick = () => Farm.plant(idx);
+        cell.innerHTML = '<div style="color:#5a7a5a;font-size:18px;">+</div>';
+        cell.onclick = () => Farm.showCropPicker(idx);
       }
       grid.appendChild(cell);
     });
@@ -77,6 +77,40 @@ const Farm = {
     if (catalystCount) catalystCount.textContent = Warehouse.getCount('growth_catalyst');
     this.renderCropSelector();
     RewardSystem.render();
+  },
+
+  showCropPicker(idx) {
+    const existing = document.getElementById('cropPickerOverlay');
+    if (existing) { existing.remove(); return; }
+    const unlocked = CONFIG.crops.filter(c => GameState.unlockedCrops.includes(c.id));
+    let html = `<div style="width:520px;max-height:80vh;overflow-y:auto;background:#1a241a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="color:#ffd700;margin:0;">🌱 选择作物</h3>
+        <span style="color:#888;font-size:12px;">种子：${Warehouse.getCount('seeds')}</span>
+      </div>`;
+    unlocked.forEach(crop => {
+      html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:#${crop.rarity==='legendary'?'ffd700':crop.rarity==='rare'?'bb88ff':'#ddd'}">${crop.icon} ${crop.name}</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#888;font-size:11px;">${crop.growTime}秒 · 卖${crop.sellPrice}金</span>
+          <button class="secondary-btn" style="font-size:11px;" onclick="Farm.plantFromPicker(${idx}, '${crop.id}')">种植</button>
+        </span>
+      </div>`;
+    });
+    html += '</div>';
+    const overlay = document.createElement('div');
+    overlay.id = 'cropPickerOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = html;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  },
+
+  plantFromPicker(idx, cropId) {
+    const existing = document.getElementById('cropPickerOverlay');
+    if (existing) existing.remove();
+    GameState.selectedCrop = cropId;
+    this.plant(idx);
   },
 
   renderCropSelector() {

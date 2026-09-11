@@ -1287,9 +1287,13 @@ class Expedition {
       </div>`;
     if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:20px;">背包空空如也，打怪捡东西吧</div>';
     inv.forEach((item, i) => {
+      const slots = item.slots || 1;
       html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-        <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</span>
-        <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>
+        <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
+        <span style="display:flex;gap:4px;">
+          <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>
+          <button class="secondary-btn" style="font-size:11px;color:#ff8888;" onclick="Game.expedition.dropInventoryItem(${i})">丢弃</button>
+        </span>
       </div>`;
     });
     if (safe.length > 0) {
@@ -1308,17 +1312,52 @@ class Expedition {
   }
 
   useInventoryItem(idx) {
-    const item = (this.inventory || [])[idx];
+    const item = (this.bag || [])[idx];
     if (!item) return;
     if (item.type === 'consumable' && item.id) {
-      this.useConsumable(item.id);
-      this.inventory.splice(idx, 1);
+      // 直接从背包物品使用，不依赖 this.consumables 计数
+      const def = (CONFIG.consumables||[]).find(c => c.id === item.id);
+      if (item.id === 'herb_kit') {
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + (def?.heal || 30));
+        this.spawnAoeEffect(this.player.x, this.player.y, 60, '#ff66aa');
+        showToast(`使用${item.name}，回复${def?.heal||30}生命`, 'success');
+      } else if (item.id === 'thorn_storm') {
+        const range = def?.range || 200, dmg = def?.damage || 40;
+        [...this.monsters, ...(this.raiders||[])].forEach(m => {
+          if (dist(m, this.player) < range) {
+            this.damageEnemy(m, dmg, '#ff9a55', true, { x: m.x, y: m.y, angle: Math.atan2(m.y-this.player.y, m.x-this.player.x), fromPlayer: true });
+            this.applyBurn(m, 22, 3);
+          }
+        });
+        this.spawnAoeEffect(this.player.x, this.player.y, range, '#aa5500');
+        showToast(`释放${item.name}！`, 'success');
+      } else if (item.id === 'signal_flare') {
+        this.useConsumable('signal_flare');
+      } else {
+        this.useConsumable(item.id);
+      }
+      this.bag.splice(idx, 1);
     } else if (item.type === 'gold') {
       GameState.gold += item.amount;
       showToast(`💰 +${item.amount} 金币`, 'gold');
-      this.inventory.splice(idx, 1);
+      this.bag.splice(idx, 1);
+    } else if (item.type === 'material') {
+      if (!GameState.warehouse.materials) GameState.warehouse.materials = {};
+      const mid = item.matId || 'misc';
+      GameState.warehouse.materials[mid] = (GameState.warehouse.materials[mid]||0) + item.amount;
+      showToast(`📦 收材料：${item.name} ×${item.amount}`, 'success');
+      this.bag.splice(idx, 1);
     }
     this.toggleInventory();
+  }
+
+  dropInventoryItem(idx) {
+    const item = (this.bag || [])[idx];
+    if (!item) return;
+    // 扔到脚下
+    this.groundLoot.push({ ...item, x: this.player.x + rand(-20,20), y: this.player.y + rand(-20,20), bob: 0 });
+    this.bag.splice(idx, 1);
+    showToast(`🗑️ 丢弃了 ${item.name}`, 'warning');
     this.toggleInventory();
   }
 
