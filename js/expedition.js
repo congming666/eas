@@ -175,9 +175,13 @@ class Expedition {
       this.monsterSprites[type].hit = img;
       this.monsterSprites[type].death = img;
     }
-    this.fxSprites = { slash: new Image(), hit: new Image() };
+    this.fxSprites = { slash: new Image(), hit: new Image(), treant: new Image(), gargoyle: new Image(), shadow: new Image(), boar: new Image() };
     this.fxSprites.slash.src = 'docs/art/effects/fire_slash.png';
     this.fxSprites.hit.src = 'docs/art/effects/hit_spark.png';
+    this.fxSprites.treant.src = 'docs/art/mobfx/treant_swipe.png';
+    this.fxSprites.gargoyle.src = 'docs/art/mobfx/gargoyle_dive.png';
+    this.fxSprites.shadow.src = 'docs/art/mobfx/shadow_blink.png';
+    this.fxSprites.boar.src = 'docs/art/mobfx/boar_charge.png';
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -755,6 +759,22 @@ class Expedition {
       if (Math.cos(monster.facing || 0) < 0) ctx.scale(-1, 1);
       ctx.drawImage(creatureSprite, -drawSize * .5, -drawSize * .67, drawSize, drawSize);
       ctx.restore();
+      if (monster.attackAnim > 0 && this.fxSprites) {
+        const fxMap = { treant: 'treant', gargoyle: 'gargoyle', shadow_demon: 'shadow', boar: 'boar', boar_king: 'boar' };
+        const fxKey = fxMap[monster.type];
+        if (fxKey) {
+          const img = this.fxSprites[fxKey];
+          if (img && img.naturalWidth) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = Math.min(1, monster.attackAnim * 4);
+            const fw = drawSize * 1.6;
+            const fh = fw * img.naturalHeight / img.naturalWidth;
+            ctx.drawImage(img, sx - fw/2, sy - fh/2, fw, fh);
+            ctx.restore();
+          }
+        }
+      }
       ctx.restore();
       const barW = monster.elite ? 54 : 44, barY = sy - drawSize * .52;
       ctx.fillStyle = 'rgba(8,10,12,.82)'; ctx.beginPath(); ctx.roundRect(sx - barW/2 - 2, barY - 2, barW + 4, 9, 4); ctx.fill();
@@ -4083,6 +4103,34 @@ class Expedition {
     const tier = this.map.tier;
     const t = performance.now() / 1000;
     ctx.save();
+    const w = GameState.weather || 'sunny';
+    if (w === 'rain') {
+      ctx.strokeStyle = 'rgba(150,180,220,0.45)'; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 60; i++) {
+        const x = (i * 53 + t * 600) % (CONFIG.canvas.width + 40) - 20;
+        const y = (i * 97 + t * 900) % (CONFIG.canvas.height + 40) - 20;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 18); ctx.stroke();
+      }
+    } else if (w === 'storm') {
+      if (Math.random() < 0.008) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height); }
+      ctx.strokeStyle = 'rgba(180,180,220,0.5)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 45; i++) {
+        const x = (i * 61 + t * 700) % (CONFIG.canvas.width + 40) - 20;
+        const y = (i * 83 + t * 1100) % (CONFIG.canvas.height + 40) - 20;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 22); ctx.stroke();
+      }
+    } else if (w === 'snow' || w === 'winter') {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      for (let i = 0; i < 40; i++) {
+        const x = (i * 73 + Math.sin(t + i) * 30 + 40) % CONFIG.canvas.width;
+        const y = (i * 101 + t * 40) % CONFIG.canvas.height;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
     if (tier === 1) {
       for (let i = 0; i < 26; i++) {
         const x = (i * 83 + t * (9 + i % 4)) % CONFIG.canvas.width;
