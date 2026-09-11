@@ -32,9 +32,11 @@ class Expedition {
     this.skillCooldowns = [0, 0, 0, 0];
     this.skillFlashes = [0, 0, 0, 0];
     this.attackAnim = 0;
-    this.weaponIndex = Math.max(0, CONFIG.weapons.findIndex(weapon => weapon.id === GameState.selectedWeapon));
+    this.weaponIndex = Math.max(0, CONFIG.weapons.findIndex(weapon => weapon.id === (GameState.loadoutWeapon || GameState.selectedWeapon)));
     if (this.weaponIndex < 0) this.weaponIndex = 0;
     this.weapon = CONFIG.weapons[this.weaponIndex];
+    // v1.0 应用武器升级加成
+    if (typeof LoadoutSystem !== 'undefined') this.weapon = LoadoutSystem.getWeaponStats(this.weapon);
     this.weaponPulse = 0;
     // v0.9.0 作物buff缓存
     this.cropBuffs = (typeof CropExpansion !== 'undefined') ? CropExpansion.CropBuffSystem.getAllBuffs() : [];
@@ -1832,6 +1834,8 @@ class Expedition {
     this.result = 'failed';
     AudioManager.playDeath();
     if (GameState.achievements) GameState.achievements.stats.consecutiveExtracts = 0;
+    // v1.0 死亡永久损失带入武器
+    if (typeof LoadoutSystem !== 'undefined') LoadoutSystem.loseBroughtWeapon();
     this.endExpedition();
   }
 

@@ -3,27 +3,39 @@
 const AchievementSystem = {
   definitions: [
     // ===== 远征类 =====
-    { id: 'first_extract', cat: 'expedition', name: '初次撤离', desc: '首次成功撤离', icon: '🚁', reward: { type: 'gold', amount: 200 } },
-    { id: 'kill_50', cat: 'expedition', name: '猎杀新手', desc: '单局击杀50只怪物', icon: '⚔️', reward: { type: 'gold', amount: 300 } },
+    { id: 'first_extract', cat: 'expedition', name: '初次撤离', desc: '首次成功撤离', icon: '🚁', reward: { type: 'gold', amount: 100 } },
+    { id: 'first_death', cat: 'expedition', name: '出师未捷', desc: '首次远征失败', icon: '💀', reward: { type: 'gold', amount: 50 } },
+    { id: 'kill_50', cat: 'expedition', name: '猎杀新手', desc: '单局击杀50只怪物', icon: '⚔️', reward: { type: 'gold', amount: 200 } },
     { id: 'kill_100', cat: 'expedition', name: '战场收割者', desc: '单局击杀100只怪物', icon: '💀', reward: { type: 'stat', key: 'allDamage', value: 0.05 } },
-    { id: 'no_damage_t2', cat: 'expedition', name: '无伤通关', desc: '零受伤通关T2', icon: '🛡️', reward: { type: 'blueprint', weaponId: 'throwing_knife' } },
+    { id: 'kill_200', cat: 'expedition', name: '杀戮机器', desc: '单局击杀200只怪物', icon: '🗡️', reward: { type: 'gold', amount: 1000 } },
+    { id: 'no_damage_t1', cat: 'expedition', name: '毫发无伤', desc: '零受伤通关T1', icon: '🛡️', reward: { type: 'gold', amount: 300 } },
+    { id: 'no_damage_t2', cat: 'expedition', name: '铜墙铁壁', desc: '零受伤通关T2', icon: '🏰', reward: { type: 'blueprint', weaponId: 'throwing_knife' } },
     { id: 'extract_10', cat: 'expedition', name: '老练探险家', desc: '连续成功撤离10次', icon: '🏆', reward: { type: 'stat', key: 'maxHp', value: 20 } },
+    { id: 'extract_30', cat: 'expedition', name: '荒野传说', desc: '连续成功撤离30次', icon: '👑', reward: { type: 'title', title: '荒野传说' } },
     { id: 'boss_kill_t1', cat: 'expedition', name: '荒野猎手', desc: '击败T1 Boss', icon: '👹', reward: { type: 'gold', amount: 500 } },
     { id: 'boss_kill_t2', cat: 'expedition', name: '废墟征服者', desc: '击败T2 Boss', icon: '🐉', reward: { type: 'blueprint', weaponId: 'flame_bow' } },
     { id: 'hardcore', cat: 'expedition', name: '噩梦通关', desc: '噩梦难度成功撤离', icon: '🔥', reward: { type: 'title', title: '噩梦征服者' } },
     { id: 'rich_run', cat: 'expedition', name: '满载而归', desc: '单局带回2000金币', icon: '💰', reward: { type: 'stat', key: 'goldBonus', value: 0.1 } },
+    { id: 'rich_run_5k', cat: 'expedition', name: '腰缠万贯', desc: '单局带回5000金币', icon: '💎', reward: { type: 'gold', amount: 1500 } },
+    { id: 'elite_kill_10', cat: 'expedition', name: '精英猎人', desc: '累计击杀10只精英怪', icon: '⭐', reward: { type: 'stat', key: 'critChance', value: 0.05 } },
+    { id: 'no_weapon_loss', cat: 'expedition', name: '爱惜武器', desc: '连续10次远征不损失武器', icon: '🔒', reward: { type: 'gold', amount: 800 } },
     // ===== 农场类 =====
+    { id: 'first_plant', cat: 'farm', name: '初出茅庐', desc: '种下第一个作物', icon: '🌱', reward: { type: 'gold', amount: 50 } },
     { id: 'harvest_100', cat: 'farm', name: '勤劳农夫', desc: '累计收获100个作物', icon: '🌾', reward: { type: 'stat', key: 'growSpeed', value: 0.05 } },
     { id: 'harvest_500', cat: 'farm', name: '种植大师', desc: '累计收获500个作物', icon: '🌻', reward: { type: 'stat', key: 'sellPrice', value: 0.1 } },
+    { id: 'harvest_1000', cat: 'farm', name: '农场大亨', desc: '累计收获1000个作物', icon: '🏡', reward: { type: 'title', title: '农场大亨' } },
     { id: 'legendary_harvest', cat: 'farm', name: '传说收获', desc: '收获一个传说品质作物', icon: '✨', reward: { type: 'gold', amount: 500 } },
     { id: 'combo_master', cat: 'farm', name: '园艺大师', desc: '触发10次作物组合', icon: '🌿', reward: { type: 'stat', key: 'quality', value: 0.05 } },
     { id: 'greenhouse', cat: 'farm', name: '温室主人', desc: '建造温室', icon: '🏡', reward: { type: 'gold', amount: 800 } },
+    { id: 'chili_master', cat: 'farm', name: '辣椒狂魔', desc: '收获50个辣椒', icon: '🌶️', reward: { type: 'gold', amount: 300 } },
     // ===== 收藏类 =====
     { id: 'kill_3_bosses', cat: 'collection', name: '屠龙者', desc: '累计击杀3种不同Boss', icon: '⚡', reward: { type: 'stat', key: 'critChance', value: 0.05 } },
     { id: 'collect_10_mats', cat: 'collection', name: '材料收藏家', desc: '收集10种不同材料', icon: '📦', reward: { type: 'gold', amount: 400 } },
     { id: 'hidden_extract', cat: 'collection', name: '秘密通道', desc: '发现隐藏撤离点', icon: '🚪', reward: { type: 'safeSlot', slots: 1 } },
     { id: 'weapon_owner', cat: 'collection', name: '武器大师', desc: '锻造出3把不同武器', icon: '🔨', reward: { type: 'title', title: '锻造宗师' } },
-    { id: 'npc_all', cat: 'collection', name: '荒野之友', desc: '所有NPC好感度达到满级', icon: '🤝', reward: { type: 'gold', amount: 1000 } }
+    { id: 'weapon_max', cat: 'collection', name: '神兵利器', desc: '将一把武器升到满级', icon: '⚔️', reward: { type: 'gold', amount: 2000 } },
+    { id: 'npc_all', cat: 'collection', name: '荒野之友', desc: '所有NPC好感度达到满级', icon: '🤝', reward: { type: 'gold', amount: 1000 } },
+    { id: 'rich', cat: 'collection', name: '小有积蓄', desc: '持有10000金币', icon: '💰', reward: { type: 'gold', amount: 500 } }
   ],
 
   init() {

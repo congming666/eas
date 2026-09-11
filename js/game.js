@@ -94,9 +94,33 @@ const Game = {
         else el.innerHTML = buffs.map(b => `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.1);">🌿 ${CropExpansion.CropBuffSystem._buffName(b.type)}：+${Math.round(b.value*100)}%（剩余${b.duration}场）</div>`).join('');
       }
     }
+    // v1.0 渲染带入武器选择
+    this.renderWeaponLoadout();
   },
 
-  _startFarmTimer() {
+  renderWeaponLoadout() {
+    const el = document.getElementById('weaponLoadoutSelect');
+    if (!el) return;
+    el.innerHTML = '';
+    CONFIG.weapons.forEach(w => {
+      const count = (GameState.weaponInventory && GameState.weaponInventory[w.id]) || 0;
+      const isSelected = GameState.loadoutWeapon === w.id;
+      const lv = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getWeaponLevel(w.id) : 0;
+      const div = document.createElement('div');
+      div.style.cssText = `padding:10px 14px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;min-width:100px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
+      div.innerHTML = `<div style="font-size:24px;">${w.icon}</div>
+        <div style="font-size:12px;color:#e6bd54;font-weight:bold;">${w.name}${lv>0?' +'+lv:''}</div>
+        <div style="font-size:10px;color:#999;">${w.mode==='melee'?'近战':w.mode==='ranged'?'远程':'穿透'} · 伤害${w.damage}</div>
+        <div style="font-size:10px;color:${count>0?'#7fff7f':'#f66'};">仓库×${count}</div>`;
+      div.onclick = () => {
+        if (count <= 0) { showToast('仓库没有此武器！去锻造台打造', 'warning'); return; }
+        GameState.loadoutWeapon = w.id;
+        SaveSystem.save();
+        this.renderWeaponLoadout();
+      };
+      el.appendChild(div);
+    });
+  },
     if (this.farmInterval) return;
     this.farmInterval = setInterval(() => {
       try {
@@ -124,6 +148,13 @@ const Game = {
       return;
     }
     GameState.gold -= map.entryFee;
+    // v1.0 校验带入武器库存
+    const wid = GameState.loadoutWeapon || 'harvest_sickle';
+    if (!GameState.weaponInventory[wid] || GameState.weaponInventory[wid] <= 0) {
+      showToast('仓库没有可用武器！去锻造台打造', 'warning');
+      GameState.gold += map.entryFee;
+      return;
+    }
     SaveSystem.save();
     AudioManager.setScene('expedition');
     clearInterval(this.farmInterval);
@@ -267,28 +298,38 @@ const Game = {
     const overlay = document.createElement('div');
     overlay.className = 'overlay modal-overlay';
     overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    let html = '<div style="width:600px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
-    html += '<h3 style="color:#ffd700;margin:0 0 12px;">🔨 武器锻造台</h3>';
-    html += '<p style="color:#aaa;font-size:12px;margin-bottom:12px;">用远征带回的材料升级武器，每级+15%伤害。Boss掉落蓝图解锁新武器。</p>';
+    let html = '<div style="width:620px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
+    html += '<h3 style="color:#ffd700;margin:0 0 8px;">🔨 武器锻造台</h3>';
+    html += '<p style="color:#aaa;font-size:12px;margin-bottom:12px;">武器是仓库实物，死亡永久损失。用材料升级/打造新武器。每类武器独立升级。</p>';
     CONFIG.weapons.forEach(w => {
       const lv = LoadoutSystem.getWeaponLevel(w.id);
+      const count = LoadoutSystem.getWeaponCount(w.id);
       const cost = LoadoutSystem.getUpgradeCost(w.id);
-      const owned = GameState.blueprints && GameState.blueprints.includes(w.id);
-      if (w.blueprint && !owned) return;
-      html += `<div style="padding:10px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div><span style="font-size:18px;">${w.icon}</span> <span style="color:#e6bd54;font-weight:bold;">${w.name}</span>
-        <span style="color:#888;font-size:11px;"> Lv.${lv} ${w.mode==='melee'?'近战':w.mode==='ranged'?'远程':'穿透'} · 伤害${LoadoutSystem.getWeaponStats(w).damage}</span></div>`;
+      const owned = !w.blueprint || (GameState.blueprints && GameState.blueprints.includes(w.id));
+      if (!owned) {
+        html += `<div style="padding:10px;margin:6px 0;background:rgba(0,0,0,0.15);border-radius:8px;opacity:0.4;">
+          <span style="font-size:18px;">❓</span> <span style="color:#888;">???（蓝图未解锁）</span></div>`;
+        return;
+      }
+      html += `<div style="padding:10px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><span style="font-size:18px;">${w.icon}</span> <span style="color:#e6bd54;font-weight:bold;">${w.name}</span>
+          <span style="color:#7fff7f;font-size:11px;">仓库×${count}</span>
+          <span style="color:#888;font-size:11px;"> Lv.${lv} · 伤害${LoadoutSystem.getWeaponStats(w).damage}</span></div>`;
       if (cost) {
         const matStr = Object.entries(cost.materials).map(([m,n]) => {
           const mat = CONFIG.materials[m];
           const have = (GameState.warehouse.materials && GameState.warehouse.materials[m]) || 0;
           return `${mat?mat.name:m} ${have}/${n}`;
         }).join(' · ');
-        html += `<button class="secondary-btn" style="font-size:12px;" onclick="LoadoutSystem.upgradeWeapon('${w.id}');Game.openBlacksmith();location.reload()">升级(${cost.gold}金 · ${matStr})</button>`;
+        html += `<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.upgradeWeapon('${w.id}');Game.openBlacksmith()">升级 ${cost.gold}金</button>`;
       } else {
-        html += '<span style="color:#ffd700;font-size:12px;">已满级</span>';
+        html += '<span style="color:#ffd700;font-size:11px;">已满级</span>';
       }
-      html += '</div>';
+      html += `</div>
+        <div style="margin-top:6px;text-align:right;">
+          <button class="secondary-btn" style="font-size:11px;color:#ff9a6b;" onclick="LoadoutSystem.craftWeapon('${w.id}');Game.openBlacksmith()">➕ 打造新的一把</button>
+        </div></div>`;
     });
     html += '<div style="padding:12px;text-align:center;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
     overlay.innerHTML = html;

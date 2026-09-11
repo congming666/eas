@@ -61,6 +61,53 @@ const LoadoutSystem = {
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
+  // v1.0 武器库存管理
+  getWeaponCount(weaponId) {
+    return (GameState.weaponInventory && GameState.weaponInventory[weaponId]) || 0;
+  },
+
+  craftWeapon(weaponId) {
+    const wpn = CONFIG.weapons.find(w => w.id === weaponId);
+    if (!wpn) return;
+    // 蓝图武器需要解锁
+    if (wpn.blueprint && !(GameState.blueprints && GameState.blueprints.includes(weaponId))) {
+      showToast('未解锁蓝图！', 'warning'); return;
+    }
+    const costs = {
+      harvest_sickle: { gold: 100, materials: { wood: 3, iron: 2 } },
+      pea_repeater: { gold: 150, materials: { wood: 5, iron: 3 } },
+      vine_staff: { gold: 200, materials: { wood: 8, crystal: 2 } },
+      throwing_knife: { gold: 500, materials: { iron: 10, crystal: 3 } },
+      flame_bow: { gold: 1000, materials: { wood: 15, iron: 8, crystal: 5 } }
+    };
+    const cost = costs[weaponId];
+    if (!cost) { showToast('无法打造', 'warning'); return; }
+    if (GameState.gold < cost.gold) { showToast('金币不足', 'warning'); return; }
+    for (const [mat, need] of Object.entries(cost.materials)) {
+      const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
+      if (have < need) { showToast(`材料不足：需要 ${mat}×${need}`, 'warning'); return; }
+    }
+    GameState.gold -= cost.gold;
+    for (const [mat, need] of Object.entries(cost.materials)) {
+      GameState.warehouse.materials[mat] -= need;
+    }
+    GameState.weaponInventory[weaponId] = (GameState.weaponInventory[weaponId] || 0) + 1;
+    showToast(`🔨 打造完成：${wpn.name}！已入库`, 'gold');
+    if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill', 0);
+    if (typeof SaveSystem !== 'undefined') SaveSystem.save();
+  },
+
+  // 死亡时损失带入的武器
+  loseBroughtWeapon() {
+    const wid = GameState.loadoutWeapon;
+    if (wid && GameState.weaponInventory && GameState.weaponInventory[wid] > 0) {
+      GameState.weaponInventory[wid]--;
+      if (GameState.weaponInventory[wid] <= 0) delete GameState.weaponInventory[wid];
+      const wpn = CONFIG.weapons.find(w => w.id === wid);
+      showToast(`💀 永久失去武器：${wpn ? wpn.name : wid}！`, 'warning');
+    }
+  },
+
   // 局外武器升级
   getWeaponLevel(weaponId) { return GameState.weaponUpgrades[weaponId] || 0; },
 

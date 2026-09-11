@@ -269,6 +269,8 @@ const GameState = {
   selectedBoostCards: [],
   selectedMap: 't1',
   selectedWeapon: 'harvest_sickle',
+  loadoutWeapon: 'harvest_sickle', // v1.0 本次出征带入的武器
+  weaponInventory: { harvest_sickle: 1, pea_repeater: 1, vine_staff: 1 }, // v1.0 武器仓库实物
   difficulty: 'normal',
   heatModifiers: [],
   // v0.8.0 NPC+建筑+科技
