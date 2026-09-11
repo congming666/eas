@@ -3268,7 +3268,7 @@ class Expedition {
   renderHeroWeapon(ctx, angle, swing, combo = 0, recoil = 0) {
     const dir = combo === 1 ? -1 : 1;
     ctx.save();
-    ctx.translate(22, 14 - recoil * 3);
+    ctx.translate(24, -10 - recoil * 3);
     const targetRot = Math.atan2(Math.sin(angle), Math.cos(angle));
     ctx.rotate(targetRot + swing * 0.3 * dir);
     if (this.weaponSheet && this.weaponSheet.naturalWidth) {
@@ -3277,7 +3277,7 @@ class Expedition {
       const rowMap = { harvest_sickle: 0, pea_repeater: 1, vine_staff: 2, throwing_knife: 3, flame_bow: 4 };
       const row = rowMap[this.weapon.id] || 0;
       const sw = this.weaponSheet.naturalWidth, sh = slotH;
-      const dw = 60, dh = dw * sh / sw;
+      const dw = 95, dh = dw * sh / sw;
       ctx.drawImage(this.weaponSheet, 0, row * slotH, sw, sh, -dw/2, -dh/2, dw, dh);
     }
     ctx.restore();
