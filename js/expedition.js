@@ -1220,7 +1220,7 @@ class Expedition {
     canvas.addEventListener('mouseup', this.mouseupHandler);
     canvas.addEventListener('contextmenu', this.contextmenuHandler);
     canvas.addEventListener('wheel', this.wheelHandler, { passive: false });
-  },
+  }
 
   cleanup() {
     window.removeEventListener('keydown', this.keydownHandler);
@@ -1231,7 +1231,7 @@ class Expedition {
     canvas.removeEventListener('mouseup', this.mouseupHandler);
     canvas.removeEventListener('contextmenu', this.contextmenuHandler);
     canvas.removeEventListener('wheel', this.wheelHandler);
-  },
+  }
 
   showPauseMenu() {
     if (document.getElementById('pauseMenu')) return;
@@ -1250,17 +1250,17 @@ class Expedition {
       <div style="font-size:11px;color:#666;margin-top:12px;">ESC 关闭此菜单</div>
     </div>`;
     document.body.appendChild(overlay);
-  },
+  }
 
   toggleSettings() {
     const el = document.getElementById('pauseSettings');
     if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-  },
+  }
 
   hidePauseMenu() {
     const el = document.getElementById('pauseMenu');
     if (el) el.remove();
-  },
+  }
 
   quitToFarm() {
     this.hidePauseMenu();
@@ -1269,7 +1269,7 @@ class Expedition {
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
     this.cleanup && this.cleanup();
     Game.returnToFarm();
-  },
+  }
 
   cycleWeapon(direction = 1) {
     // v1.4 只在带入武器间切换
