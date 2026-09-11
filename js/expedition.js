@@ -1815,13 +1815,17 @@ class Expedition {
       this.spawnAoeEffect(x, y, 50, '#ffd700');
       showToast(`🔨 获得临时武器：${item.weapon.name}！按Q滚轮切换`, 'gold');
     } else {
-      // v1.0 背包格位检查
-      if (typeof LoadoutSystem !== 'undefined' && !LoadoutSystem.canAdd(this.bag, item)) {
+      // v2.9 同类物品无限叠加（金币/材料等堆叠进已有格）
+      const existing = this.bag.find(b => b.id === item.id && b.type === item.type);
+      if (existing) {
+        existing.amount = (existing.amount || 1) + (item.amount || 1);
+      } else if (typeof LoadoutSystem !== 'undefined' && !LoadoutSystem.canAdd(this.bag, item)) {
         showToast('背包已满！', 'warning');
-        this.groundLoot.push({ ...item, x, y, bob: 0 }); // 放回地上
+        this.groundLoot.push({ ...item, x, y, bob: 0 });
         return false;
+      } else {
+        this.bag.push(item);
       }
-      this.bag.push(item);
       this.spawnAoeEffect(x, y, 34, '#f6c75b');
       showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
     }
@@ -3263,20 +3267,18 @@ class Expedition {
 
   renderHeroWeapon(ctx, angle, swing, combo = 0, recoil = 0) {
     const dir = combo === 1 ? -1 : 1;
-    const localAngle = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle))) * dir;
     ctx.save();
-    ctx.translate(28 - recoil * 9, 6 + recoil * 3);
-    ctx.rotate(localAngle * 0.45 - 0.25 + swing * 0.8 * dir);
-    if (combo === 2) ctx.translate(swing * 16, 0);
-    // v2.8 Seedream 武器贴图（从 weapons.png 竖排 sheet 裁剪）
+    ctx.translate(22, 14 - recoil * 3);
+    const targetRot = Math.atan2(Math.sin(angle), Math.cos(angle));
+    ctx.rotate(targetRot + swing * 0.3 * dir);
     if (this.weaponSheet && this.weaponSheet.naturalWidth) {
-      const sheetH = this.weaponSheet.naturalHeight; // 2048
+      const sheetH = this.weaponSheet.naturalHeight;
       const slotH = sheetH / 5;
       const rowMap = { harvest_sickle: 0, pea_repeater: 1, vine_staff: 2, throwing_knife: 3, flame_bow: 4 };
       const row = rowMap[this.weapon.id] || 0;
-      const sx = 0, sy = row * slotH, sw = this.weaponSheet.naturalWidth, sh = slotH;
-      const dw = 70, dh = dw * sh / sw;
-      ctx.drawImage(this.weaponSheet, sx, sy, sw, sh, -dw/2, -dh/2, dw, dh);
+      const sw = this.weaponSheet.naturalWidth, sh = slotH;
+      const dw = 60, dh = dw * sh / sw;
+      ctx.drawImage(this.weaponSheet, 0, row * slotH, sw, sh, -dw/2, -dh/2, dw, dh);
     }
     ctx.restore();
   }
