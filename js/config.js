@@ -181,6 +181,50 @@ const CONFIG = {
     { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen', trait: 'carve' },
     { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary' }
   ],
+  // v1.6 战场种植：可带进远征种下去的植物
+  deployPlants: {
+    chili:     { icon: '🌶️', name: '辣椒',     hp: 60,  range: 40,  effect: 'fire',      desc: '火焰陷阱：每秒烧经过怪8血' },
+    sunflower: { icon: '🌻', name: '向日葵',   hp: 40,  range: 120, effect: 'light',     desc: '视野灯：照亮半径120' },
+    vine:      { icon: '🌿', name: '藤蔓',     hp: 100, range: 30,  effect: 'slow',      desc: '减速墙：经过怪移速-50%' },
+    watermelon:{ icon: '🍉', name: '西瓜',     hp: 0,   range: 80,  effect: 'boom',      desc: '定时爆炸：3秒后AOE30' },
+    wheat:     { icon: '🌾', name: '小麦稻草人', hp: 80, range: 150, effect: 'taunt',     desc: '嘲讽：怪优先打它' },
+    mushroom:  { icon: '🍄', name: '月光菇',   hp: 50,  range: 60,  effect: 'heal',      desc: '治疗站：每秒回2血' },
+    garlic:    { icon: '🧄', name: '大蒜',     hp: 40,  range: 50,  effect: 'repel',     desc: '驱虫：怪不靠近' },
+    cactus:    { icon: '🌵', name: '仙人掌',   hp: 120, range: 25,  effect: 'thorns',    desc: '尖刺：碰它的怪受5反伤' },
+    firegrass: { icon: '🔥', name: '火龙草',   hp: 80,  range: 150, effect: 'firebreath',desc: '喷火墙：直线每秒烧15' },
+    frost:     { icon: '❄️', name: '寒霜花',   hp: 60,  range: 80,  effect: 'freeze',    desc: '冰冻：半径内定身1.5s' },
+    electric:  { icon: '⚡', name: '电藤',     hp: 70,  range: 200, effect: 'tesla',    desc: '特斯拉：链电打3个怪' },
+    shadow:    { icon: '🌑', name: '暗影花',   hp: 50,  range: 80,  effect: 'stealth',   desc: '隐身力场：玩家隐身3s' },
+    rainbow:   { icon: '🌈', name: '虹光花',   hp: 80,  range: 100, effect: 'buff',      desc: '攻击塔：半径内攻击+20%' },
+    deathcap:  { icon: '💀', name: '亡语菇',   hp: 0,   range: 20,  effect: 'deathboom',desc: '自爆：怪靠近爆50血' }
+  },
+  // 作物id → 战场植物id映射（收获的作物可以当种子带进远征）
+  cropToDeploy: {
+    chili: 'chili', pepper: 'chili',
+    sunflower: 'sunflower',
+    vine_plant: 'vine', vine: 'vine',
+    watermelon: 'watermelon',
+    wheat: 'wheat',
+    mushroom: 'mushroom', moon_mushroom: 'mushroom',
+    garlic: 'garlic',
+    cactus: 'cactus',
+    fire_grass: 'firegrass',
+    frost_flower: 'frost',
+    electric_vine: 'electric',
+    shadow_flower: 'shadow',
+    rainbow_flower: 'rainbow',
+    death_cap: 'deathcap'
+  },
+  // 远征地图野生植物（采摘带回种子）
+  wildPlants: [
+    { id: 'wild_chili', icon: '🌶️', name: '野生辣椒', givesSeed: 'chili', tier: 1 },
+    { id: 'wild_mint', icon: '🌿', name: '野生藤蔓', givesSeed: 'vine', tier: 1 },
+    { id: 'wild_sun', icon: '🌻', name: '野生向日葵', givesSeed: 'sunflower', tier: 1 },
+    { id: 'wild_frost', icon: '❄️', name: '寒霜花', givesSeed: 'frost', tier: 2 },
+    { id: 'wild_electric', icon: '⚡', name: '电藤', givesSeed: 'electric', tier: 2 },
+    { id: 'wild_shadow', icon: '🌑', name: '暗影花', givesSeed: 'shadow', tier: 3 },
+    { id: 'wild_death', icon: '💀', name: '亡语菇', givesSeed: 'deathcap', tier: 3 }
+  ],
   // v0.9.0 新作物在crop-expansion.js中动态注册
   // 仓库物品定义
   warehouseItems: {
@@ -290,6 +334,7 @@ const GameState = {
   selectedMap: 't1',
   selectedWeapon: 'harvest_sickle',
   loadoutWeaponUids: [], // v1.4 本次出征带入的武器uid数组（最多2把）
+  carriedSeeds: [], // v1.6 携带的战场植物种子 [{type, count}]
   weaponInstances: [ // v1.1 每把武器独立实例
     { uid: 'w_001', weaponId: 'harvest_sickle', level: 0 },
     { uid: 'w_002', weaponId: 'pea_repeater', level: 0 },

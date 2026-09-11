@@ -79,6 +79,10 @@ class Expedition {
     this.monsters = [];
     this.chests = [];
     this.towers = [];
+    this.plants = [];
+    this.wildPlants = [];
+    this.selectedSeed = -1;
+    this.seedBar = (GameState.carriedSeeds || []).map(x => ({ ...x }));
     this.raiders = [];
     this.terrainPatches = [];
     this.terrainFields = [];
@@ -183,6 +187,7 @@ class Expedition {
     this.generateTerrain();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
     this.spawnEntities();
+    this.spawnWildPlants();
     this.obstacleSpatialHash.rebuild(this.obstacles);
     this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
@@ -1185,6 +1190,12 @@ class Expedition {
       if (e.key >= '5' && e.key <= '9') this.selectPlantByKey(Number(e.key) - 5);
       if (e.key.toLowerCase() === 'z') this.cyclePlantSelection(1);
       if (e.key === 'Tab') { e.preventDefault(); this.toggleInventory(); }
+      if (e.key === 'F1') { e.preventDefault(); this.selectedSeed = 0; this.showSeedBar(); }
+      if (e.key === 'F2') { e.preventDefault(); this.selectedSeed = 1; this.showSeedBar(); }
+      if (e.key === 'F3') { e.preventDefault(); this.selectedSeed = 2; this.showSeedBar(); }
+      if (e.key === 'F4') { e.preventDefault(); this.selectedSeed = 3; this.showSeedBar(); }
+      if (e.key === 'F5') { e.preventDefault(); this.selectedSeed = 4; this.showSeedBar(); }
+      if (e.key.toLowerCase() === 'e' && !e.shiftKey) this.tryPickWildPlant();
       if (e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
       if (e.key === 'q' && e.shiftKey) { e.preventDefault(); this.cycleWeapon(-1); }
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
@@ -1202,6 +1213,11 @@ class Expedition {
       this.mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
     };
     this.mousedownHandler = (e) => {
+      if (e.button === 2 && this.selectedSeed >= 0) {
+        const wx = this.mouse.x + this.camera.x, wy = this.mouse.y + this.camera.y;
+        this.tryPlacePlant(wx, wy);
+        return;
+      }
       if (e.button === 0) {
         this.mouse.down = true;
         if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive) {
@@ -1286,6 +1302,241 @@ class Expedition {
     }
     this.toggleInventory();
     this.toggleInventory();
+  }
+
+  showSeedBar() {
+    // 简单提示当前选中
+    if (!this.seedBar || this.seedBar.length === 0) { showToast('没有携带种子', 'warning'); return; }
+    if (this.selectedSeed < 0 || this.selectedSeed >= this.seedBar.length) return;
+    const s = this.seedBar[this.selectedSeed];
+    const def = CONFIG.deployPlants[s.type];
+    if (def) showToast(`已选种子：${def.icon}${def.name}（${s.count}个），点地面种植`, 'success');
+  }
+
+  tryPlacePlant(gx, gy) {
+    if (this.selectedSeed < 0 || !this.seedBar) return;
+    const slot = this.seedBar[this.selectedSeed];
+    if (!slot || slot.count <= 0) return;
+    const def = CONFIG.deployPlants[slot.type];
+    if (!def) return;
+    // 不能种在出生点/撤离点/障碍物上
+    for (const o of this.obstacles) {
+      const dx = gx - o.x, dy = gy - o.y;
+      if (Math.hypot(dx, dy) < (o.radius || 20) + 15) { showToast('这里不能种', 'warning'); return; }
+    }
+    const plant = {
+      type: slot.type, ...def,
+      x: gx, y: gy,
+      hp: def.hp, maxHp: def.hp,
+      age: 0,
+      growTimer: 2, // 2秒长成
+      cd: 0,
+      exploded: false
+    };
+    this.plants.push(plant);
+    slot.count--;
+    if (slot.count <= 0) {
+      this.seedBar.splice(this.selectedSeed, 1);
+      this.selectedSeed = -1;
+    }
+    this.updateHUD();
+  }
+
+  updatePlants(dt) {
+    if (!this.plants) return;
+    for (let i = this.plants.length - 1; i >= 0; i--) {
+      const p = this.plants[i];
+      p.age += dt;
+      if (p.growTimer > 0) { p.growTimer -= dt; continue; }
+      p.cd -= dt;
+      // 各种效果
+      switch (p.effect) {
+        case 'fire': {
+          // 每秒烧经过的怪
+          for (const m of this.monsters) {
+            if (m.hp <= 0) continue;
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < p.range) this.damageEnemy(m, 8 * dt * 10, '#ff6633', false, { noKnockback: true });
+          }
+          break;
+        }
+        case 'slow': {
+          for (const m of this.monsters) {
+            if (m.hp <= 0) continue;
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < p.range) m.slowTimer = 0.5;
+          }
+          break;
+        }
+        case 'taunt': {
+          for (const m of this.monsters) {
+            if (m.hp <= 0) continue;
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < p.range) m.target = p;
+          }
+          break;
+        }
+        case 'heal': {
+          const d = Math.hypot(this.player.x - p.x, this.player.y - p.y);
+          if (d < p.range && this.player.hp > 0) this.player.hp = Math.min(this.player.maxHp, this.player.hp + 2 * dt * 10);
+          break;
+        }
+        case 'repel': {
+          for (const m of this.monsters) {
+            if (m.hp <= 0) continue;
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < p.range) {
+              // 怪远离
+              const ang = Math.atan2(m.y - p.y, m.x - p.x);
+              m.x += Math.cos(ang) * 30 * dt;
+              m.y += Math.sin(ang) * 30 * dt;
+            }
+          }
+          break;
+        }
+        case 'thorns': {
+          // 怪碰到自动受伤（在怪物更新里处理）
+          break;
+        }
+        case 'watermelon':
+        case 'boom': {
+          if (!p.exploded && p.age > 3) {
+            p.exploded = true;
+            for (const m of this.monsters) {
+              if (m.hp <= 0) continue;
+              const d = Math.hypot(m.x - p.x, m.y - p.y);
+              if (d < p.range) this.damageEnemy(m, 30, '#ffaa00', false);
+            }
+            this.plants.splice(i, 1);
+          }
+          break;
+        }
+        case 'firebreath': {
+          if (p.cd <= 0) {
+            // 直线喷火：找玩家朝向方向
+            const ang = Math.atan2(this.player.y - p.y, this.player.x - p.x);
+            for (const m of this.monsters) {
+              if (m.hp <= 0) continue;
+              const mx = m.x - p.x, my = m.y - p.y;
+              const proj = mx * Math.cos(ang) + my * Math.sin(ang);
+              if (proj > 0 && proj < p.range) {
+                const perp = Math.abs(-mx * Math.sin(ang) + my * Math.cos(ang));
+                if (perp < 40) this.damageEnemy(m, 15, '#ff4400', false);
+              }
+            }
+            p.cd = 0.5;
+          }
+          break;
+        }
+        case 'freeze': {
+          if (p.cd <= 0) {
+            for (const m of this.monsters) {
+              if (m.hp <= 0) continue;
+              const d = Math.hypot(m.x - p.x, m.y - p.y);
+              if (d < p.range) m.freezeTimer = 1.5;
+            }
+            p.cd = 5;
+          }
+          break;
+        }
+        case 'tesla': {
+          if (p.cd <= 0) {
+            const near = this.monsters.filter(m => m.hp > 0).sort((a,b) =>
+              Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y)).slice(0,3);
+            for (const m of near) this.damageEnemy(m, 10, '#ffff66', false);
+            p.cd = 0.8;
+          }
+          break;
+        }
+        case 'stealth': {
+          const d = Math.hypot(this.player.x - p.x, this.player.y - p.y);
+          if (d < p.range) this.player.stealth = Math.max(this.player.stealth || 0, 3);
+          break;
+        }
+        case 'buff': {
+          const d = Math.hypot(this.player.x - p.x, this.player.y - p.y);
+          if (d < p.range) this.player.atkBuff = 0.2;
+          break;
+        }
+        case 'deathboom': {
+          for (const m of this.monsters) {
+            if (m.hp <= 0) continue;
+            const d = Math.hypot(m.x - p.x, m.y - p.y);
+            if (d < p.range) {
+              for (const mm of this.monsters) {
+                if (mm.hp <= 0) continue;
+                const dd = Math.hypot(mm.x - p.x, mm.y - p.y);
+                if (dd < p.range + 30) this.damageEnemy(mm, 50, '#aa44ff', false);
+              }
+              this.plants.splice(i, 1);
+              break;
+            }
+          }
+          break;
+        }
+      }
+      // 植物血量
+      if (p.hp <= 0) this.plants.splice(i, 1);
+    }
+  }
+
+  renderPlants(ctx, cam) {
+    if (!this.plants) return;
+    for (const p of this.plants) {
+      const sx = p.x - cam.x, sy = p.y - cam.y;
+      // 成长进度
+      const scale = p.growTimer > 0 ? 0.5 + (1 - p.growTimer/2) * 0.5 : 1;
+      ctx.globalAlpha = p.growTimer > 0 ? 0.7 : 1;
+      ctx.font = (28 * scale) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.icon, sx, sy);
+      ctx.globalAlpha = 1;
+      // 血条
+      if (p.maxHp > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(sx - 16, sy - 22, 32, 4);
+        ctx.fillStyle = '#4f4';
+        ctx.fillRect(sx - 16, sy - 22, 32 * (p.hp / p.maxHp), 4);
+      }
+    }
+    // 选中种子预览
+    if (this.selectedSeed >= 0 && this.mouse.x) {
+      const def = CONFIG.deployPlants[this.seedBar[this.selectedSeed].type];
+      if (def) {
+        ctx.globalAlpha = 0.5;
+        ctx.font = '28px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(def.icon, this.mouse.x - cam.x, this.mouse.y - cam.y);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  spawnWildPlants() {
+    if (!CONFIG.wildPlants) return;
+    const size = CONFIG.expedition.mapSize;
+    const tier = this.map.tier;
+    const pool = CONFIG.wildPlants.filter(w => w.tier <= tier);
+    for (let i = 0; i < 5; i++) {
+      const w = pool[Math.floor(Math.random() * pool.length)];
+      const x = rand(200, size - 200), y = rand(200, size - 200);
+      this.wildPlants.push({ ...w, x, y, picked: false });
+    }
+  }
+
+  tryPickWildPlant() {
+    for (const w of this.wildPlants) {
+      if (w.picked) continue;
+      const d = Math.hypot(w.x - this.player.x, w.y - this.player.y);
+      if (d < 40) {
+        w.picked = true;
+        if (!GameState.warehouse.crops) GameState.warehouse.crops = {};
+        GameState.warehouse.crops[w.givesSeed] = (GameState.warehouse.crops[w.givesSeed] || 0) + 1;
+        showToast(`🌿 采摘到种子：${w.name}！`, 'success');
+        return;
+      }
+    }
   }
 
   showPauseMenu() {
@@ -2367,6 +2618,7 @@ class Expedition {
 
   update(dt) {
     if (this.paused || this.gameOver) return;
+    this.updatePlants(dt);
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.update(dt);
     if (typeof DifficultySystem !== 'undefined') { DifficultySystem.tick(dt, this); DifficultySystem.tickPoison(dt, this); }
     this.updateWorldSystems(dt);
@@ -3143,6 +3395,17 @@ class Expedition {
       const fog = ctx.createRadialGradient(CONFIG.canvas.width/2, CONFIG.canvas.height/2, 150, CONFIG.canvas.width/2, CONFIG.canvas.height/2, 650);
       fog.addColorStop(0, 'rgba(190,215,220,.02)'); fog.addColorStop(.55, 'rgba(150,180,185,.18)'); fog.addColorStop(1, 'rgba(12,23,28,.72)');
       ctx.fillStyle=fog; ctx.fillRect(0,0,CONFIG.canvas.width,CONFIG.canvas.height);
+    }
+    this.renderPlants(ctx, cam);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (this.wildPlants) {
+      for (const w of this.wildPlants) {
+        if (w.picked) continue;
+        const sx = w.x - cam.x, sy = w.y - cam.y;
+        ctx.font = '24px serif';
+        ctx.fillText(w.icon, sx, sy);
+      }
     }
 
     // 分层地形：道路、水域、田块、树林和地图专属地标。

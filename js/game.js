@@ -96,6 +96,49 @@ const Game = {
     }
     // v1.0 渲染带入武器选择
     this.renderWeaponLoadout();
+    this.renderSeedLoadout();
+  },
+
+  renderSeedLoadout() {
+    const el = document.getElementById('seedLoadoutSelect');
+    if (!el) return;
+    el.innerHTML = '';
+    const carried = GameState.carriedSeeds || (GameState.carriedSeeds = []);
+    const crops = GameState.warehouse.crops || {};
+    const deployMap = CONFIG.cropToDeploy;
+    Object.keys(deployMap).forEach(cropId => {
+      const count = crops[cropId] || 0;
+      if (count <= 0) return;
+      const deployId = deployMap[cropId];
+      const plantDef = CONFIG.deployPlants[deployId];
+      if (!plantDef) return;
+      const carriedEntry = carried.find(c => c.type === deployId);
+      const inBag = carriedEntry ? carriedEntry.count : 0;
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:6px;border:2px solid ' + (inBag>0?'#7fff7f':'#444') + ';border-radius:6px;cursor:pointer;text-align:center;width:80px;background:rgba(0,0,0,0.3);';
+      div.innerHTML = '<div style="font-size:20px;">' + plantDef.icon + '</div>' +
+        '<div style="font-size:10px;color:#ccc;">' + plantDef.name + '</div>' +
+        '<div style="font-size:9px;color:#888;">仓库x' + count + '</div>' +
+        '<div style="font-size:9px;color:' + (inBag>0?'#7fff7f':'#666') + ';">带x' + inBag + '</div>';
+      div.onclick = () => {
+        const total = carried.reduce((sum,c)=>sum+c.count,0);
+        if (inBag > 0) {
+          carriedEntry.count--;
+          if (carriedEntry.count <= 0) GameState.carriedSeeds = carried.filter(c => c !== carriedEntry);
+        } else {
+          if (total >= 5) { showToast('最多带5个种子', 'warning'); return; }
+          let e = carried.find(c => c.type === deployId);
+          if (!e) { e = { type: deployId, count: 0 }; carried.push(e); }
+          e.count++;
+        }
+        SaveSystem.save();
+        this.renderSeedLoadout();
+      };
+      el.appendChild(div);
+    });
+    if (el.children.length === 0) {
+      el.innerHTML = '<div style="color:#888;font-size:11px;">仓库没有可种的作物，去农场种点辣椒/向日葵等</div>';
+    }
   },
 
   renderWeaponLoadout() {
@@ -173,6 +216,16 @@ const Game = {
       return;
     }
     GameState.loadoutWeaponUids = validUids;
+    // v1.6 扣仓库作物（带的种子）
+    if (GameState.carriedSeeds) {
+      for (const s of GameState.carriedSeeds) {
+        // 找到对应作物id
+        const cropId = Object.keys(CONFIG.cropToDeploy).find(k => CONFIG.cropToDeploy[k] === s.type);
+        if (cropId && GameState.warehouse.crops) {
+          GameState.warehouse.crops[cropId] = Math.max(0, (GameState.warehouse.crops[cropId]||0) - s.count);
+        }
+      }
+    }
     SaveSystem.save();
     AudioManager.setScene('expedition');
     clearInterval(this.farmInterval);
