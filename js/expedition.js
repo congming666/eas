@@ -1144,10 +1144,13 @@ class Expedition {
     this.keydownHandler = (e) => {
       this.keys[e.key.toLowerCase()] = true;
       if (e.key === 'Escape') this.paused = !this.paused;
-      if (e.key === '1') this.useSkill(0);
-      if (e.key === '2') this.useSkill(1);
-      if (e.key === '3') this.useSkill(2);
-      if (e.key === '4') this.useSkill(3);
+      const _branchActive = (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive);
+      if (!_branchActive) {
+        if (e.key === '1') this.useSkill(0);
+        if (e.key === '2') this.useSkill(1);
+        if (e.key === '3') this.useSkill(2);
+        if (e.key === '4') this.useSkill(3);
+      }
       if (e.key >= '5' && e.key <= '9') this.selectPlantByKey(Number(e.key) - 5);
       if (e.key.toLowerCase() === 'z') this.cyclePlantSelection(1);
       if (e.key === 'Tab' || e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
@@ -1169,6 +1172,15 @@ class Expedition {
     this.mousedownHandler = (e) => {
       if (e.button === 0) {
         this.mouse.down = true;
+        if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive) {
+          const mx = this.mouse.x, my = this.mouse.y;
+          const W = canvas.width, H = canvas.height;
+          for (let i = 0; i < 3; i++) {
+            const bx = W/2 - 200 + i * 200, by = H/2 - 40;
+            if (mx >= bx - 80 && mx <= bx + 80 && my >= by && my <= by + 120) { CombatEnhancement.chooseBranch(i); return; }
+          }
+          return;
+        }
         if (!this.tryDeployPlant()) this.tryInteract();
       }
     };
