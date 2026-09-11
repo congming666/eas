@@ -5,9 +5,28 @@ const LoadoutSystem = {
 
   init() {
     if (!GameState.safeSlots) GameState.safeSlots = 1;
-    if (!GameState.safeBox) GameState.safeBox = []; // 安全箱物品 [{type,id,name,icon,amount}]
-    if (!GameState.weaponUpgrades) GameState.weaponUpgrades = {}; // 武器升级等级
+    if (!GameState.safeBox) GameState.safeBox = [];
     if (!GameState.forgedWeapons) GameState.forgedWeapons = [];
+    // v1.1 旧存档迁移：weaponInventory → weaponInstances
+    if (!GameState.weaponInstances) {
+      GameState.weaponInstances = [];
+      const inv = GameState.weaponInventory || {};
+      let n = 1;
+      for (const [wid, cnt] of Object.entries(inv)) {
+        for (let i = 0; i < cnt; i++) {
+          const oldLv = (GameState.weaponUpgrades && GameState.weaponUpgrades[wid]) || 0;
+          GameState.weaponInstances.push({ uid: 'w_' + String(n++).padStart(3,'0'), weaponId: wid, level: oldLv });
+        }
+      }
+      if (GameState.weaponInstances.length === 0) {
+        GameState.weaponInstances = [
+          { uid: 'w_001', weaponId: 'harvest_sickle', level: 0 },
+          { uid: 'w_002', weaponId: 'pea_repeater', level: 0 },
+          { uid: 'w_003', weaponId: 'vine_staff', level: 0 }
+        ];
+      }
+    }
+    if (!GameState.loadoutWeaponUid) GameState.loadoutWeaponUid = GameState.weaponInstances[0]?.uid || null;
   },
 
   // 计算物品占几格
@@ -61,15 +80,23 @@ const LoadoutSystem = {
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
-  // v1.0 武器库存管理
+  // v1.1 武器实例管理
+  _nextUid() {
+    const used = (GameState.weaponInstances || []).map(w => parseInt(w.uid.split('_')[1]) || 0);
+    return 'w_' + (Math.max(0, ...used) + 1).toString().padStart(3, '0');
+  },
+
+  getWeaponInstance(uid) {
+    return (GameState.weaponInstances || []).find(w => w.uid === uid);
+  },
+
   getWeaponCount(weaponId) {
-    return (GameState.weaponInventory && GameState.weaponInventory[weaponId]) || 0;
+    return (GameState.weaponInstances || []).filter(w => w.weaponId === weaponId).length;
   },
 
   craftWeapon(weaponId) {
     const wpn = CONFIG.weapons.find(w => w.id === weaponId);
     if (!wpn) return;
-    // 蓝图武器需要解锁
     if (wpn.blueprint && !(GameState.blueprints && GameState.blueprints.includes(weaponId))) {
       showToast('未解锁蓝图！', 'warning'); return;
     }
@@ -91,70 +118,88 @@ const LoadoutSystem = {
     for (const [mat, need] of Object.entries(cost.materials)) {
       GameState.warehouse.materials[mat] -= need;
     }
-    GameState.weaponInventory[weaponId] = (GameState.weaponInventory[weaponId] || 0) + 1;
+    const inst = { uid: this._nextUid(), weaponId, level: 0 };
+    GameState.weaponInstances.push(inst);
     showToast(`🔨 打造完成：${wpn.name}！已入库`, 'gold');
-    if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill', 0);
+    if (typeof AchievementSystem !== 'undefined') AchievementSystem.checkAll();
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
-  // 死亡时损失带入的武器
+  // 死亡时损失带入的武器实例
   loseBroughtWeapon() {
-    const wid = GameState.loadoutWeapon;
-    if (wid && GameState.weaponInventory && GameState.weaponInventory[wid] > 0) {
-      GameState.weaponInventory[wid]--;
-      if (GameState.weaponInventory[wid] <= 0) delete GameState.weaponInventory[wid];
-      const wpn = CONFIG.weapons.find(w => w.id === wid);
-      showToast(`💀 永久失去武器：${wpn ? wpn.name : wid}！`, 'warning');
+    const uid = GameState.loadoutWeaponUid;
+    if (uid) {
+      const idx = (GameState.weaponInstances || []).findIndex(w => w.uid === uid);
+      if (idx >= 0) {
+        const inst = GameState.weaponInstances[idx];
+        const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+        GameState.weaponInstances.splice(idx, 1);
+        showToast(`💀 永久失去武器：${wpn ? wpn.name : inst.weaponId}！`, 'warning');
+      }
+      GameState.loadoutWeaponUid = null;
     }
   },
 
-  // 局外武器升级
-  getWeaponLevel(weaponId) { return GameState.weaponUpgrades[weaponId] || 0; },
-
-  getUpgradeCost(weaponId) {
-    const lv = this.getWeaponLevel(weaponId);
-    if (lv >= 3) return null;
+  // 升级单个武器实例
+  getUpgradeCost(uid) {
+    const inst = this.getWeaponInstance(uid);
+    if (!inst || inst.level >= 10) return null; // v1.1 每把武器可升10级
     const costs = [
-      { gold: 200, materials: { iron: 5 } },
-      { gold: 800, materials: { iron: 15, crystal: 3 } },
-      { gold: 2000, materials: { iron: 30, crystal: 10, bossFang: 1 } }
+      { gold: 200, materials: { iron: 3 } },
+      { gold: 400, materials: { iron: 5 } },
+      { gold: 700, materials: { iron: 8, crystal: 1 } },
+      { gold: 1000, materials: { iron: 12, crystal: 2 } },
+      { gold: 1500, materials: { iron: 20, crystal: 4 } },
+      { gold: 2200, materials: { iron: 30, crystal: 6 } },
+      { gold: 3000, materials: { iron: 40, crystal: 8, bossFang: 1 } },
+      { gold: 4000, materials: { iron: 50, crystal: 12, bossFang: 1 } },
+      { gold: 5500, materials: { iron: 70, crystal: 18, bossFang: 2 } },
+      { gold: 8000, materials: { iron: 100, crystal: 25, bossFang: 3 } }
     ];
-    return costs[lv];
+    return costs[inst.level];
   },
 
-  upgradeWeapon(weaponId) {
-    const cost = this.getUpgradeCost(weaponId);
-    if (!cost) { showToast('已满级', 'warning'); return; }
+  upgradeWeapon(uid) {
+    const inst = this.getWeaponInstance(uid);
+    if (!inst) { showToast('武器不存在', 'warning'); return; }
+    const cost = this.getUpgradeCost(uid);
+    if (!cost) { showToast('已满级(10级)', 'warning'); return; }
     if (GameState.gold < cost.gold) { showToast('金币不足', 'warning'); return; }
-    // 检查材料
     for (const [mat, need] of Object.entries(cost.materials)) {
       const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
       if (have < need) { showToast(`材料不足：需要 ${mat}×${need}`, 'warning'); return; }
     }
-    // 扣除
     GameState.gold -= cost.gold;
     for (const [mat, need] of Object.entries(cost.materials)) {
       GameState.warehouse.materials[mat] -= need;
     }
-    GameState.weaponUpgrades[weaponId] = (GameState.weaponUpgrades[weaponId] || 0) + 1;
-    const lv = GameState.weaponUpgrades[weaponId];
-    if (!GameState.forgedWeapons.includes(weaponId)) GameState.forgedWeapons.push(weaponId);
-    showToast(`🔨 武器升级！等级 ${lv}`, 'gold');
-    if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill', 0); // trigger check
+    inst.level++;
+    const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+    if (!GameState.forgedWeapons.includes(inst.weaponId)) GameState.forgedWeapons.push(inst.weaponId);
+    showToast(`🔨 ${wpn ? wpn.name : inst.weaponId} 升至 Lv.${inst.level}`, 'gold');
+    if (typeof AchievementSystem !== 'undefined') AchievementSystem.checkAll();
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
-  // 获取武器实际属性（含升级加成）
-  getWeaponStats(baseWeapon) {
-    const lv = this.getWeaponLevel(baseWeapon.id);
+  // 获取武器实例实际属性（含等级加成）
+  getWeaponStats(baseWeapon, level) {
+    const lv = level || 0;
     if (lv === 0) return { ...baseWeapon };
-    const mult = 1 + lv * 0.15; // 每级+15%伤害
+    const mult = 1 + lv * 0.1; // 每级+10%伤害
     return {
       ...baseWeapon,
       damage: Math.round(baseWeapon.damage * mult),
-      level: lv,
-      desc: baseWeapon.description + `（+${lv}）`
+      level: lv
     };
+  },
+
+  // 按uid获取实际属性
+  getInstanceStats(uid) {
+    const inst = this.getWeaponInstance(uid);
+    if (!inst) return null;
+    const base = CONFIG.weapons.find(w => w.id === inst.weaponId);
+    if (!base) return null;
+    return this.getWeaponStats(base, inst.level);
   },
 
   // 局内临时武器配件

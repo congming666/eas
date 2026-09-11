@@ -32,11 +32,15 @@ class Expedition {
     this.skillCooldowns = [0, 0, 0, 0];
     this.skillFlashes = [0, 0, 0, 0];
     this.attackAnim = 0;
-    this.weaponIndex = Math.max(0, CONFIG.weapons.findIndex(weapon => weapon.id === (GameState.loadoutWeapon || GameState.selectedWeapon)));
+    // v1.1 从武器实例加载
+    this.loadoutUid = GameState.loadoutWeaponUid;
+    let inst = null;
+    if (typeof LoadoutSystem !== 'undefined' && this.loadoutUid) inst = LoadoutSystem.getWeaponInstance(this.loadoutUid);
+    const wid = inst ? inst.weaponId : 'harvest_sickle';
+    this.weaponIndex = Math.max(0, CONFIG.weapons.findIndex(w => w.id === wid));
     if (this.weaponIndex < 0) this.weaponIndex = 0;
     this.weapon = CONFIG.weapons[this.weaponIndex];
-    // v1.0 应用武器升级加成
-    if (typeof LoadoutSystem !== 'undefined') this.weapon = LoadoutSystem.getWeaponStats(this.weapon);
+    if (inst && typeof LoadoutSystem !== 'undefined') this.weapon = LoadoutSystem.getWeaponStats(this.weapon, inst.level);
     this.weaponPulse = 0;
     // v0.9.0 作物buff缓存
     this.cropBuffs = (typeof CropExpansion !== 'undefined') ? CropExpansion.CropBuffSystem.getAllBuffs() : [];

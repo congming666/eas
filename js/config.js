@@ -257,7 +257,7 @@ const CONFIG = {
 // ==================== 游戏状态 ====================
 const GameState = {
   screen: 'menu', // menu, farm, expedition, result
-  gold: 500,
+  gold: 100000,
   seeds: 3,
   materials: 0,
   farmPlots: [], // 6x6 = 36格
@@ -269,8 +269,12 @@ const GameState = {
   selectedBoostCards: [],
   selectedMap: 't1',
   selectedWeapon: 'harvest_sickle',
-  loadoutWeapon: 'harvest_sickle', // v1.0 本次出征带入的武器
-  weaponInventory: { harvest_sickle: 1, pea_repeater: 1, vine_staff: 1 }, // v1.0 武器仓库实物
+  loadoutWeaponUid: null, // v1.1 本次出征带入的武器实例uid
+  weaponInstances: [ // v1.1 每把武器独立实例
+    { uid: 'w_001', weaponId: 'harvest_sickle', level: 0 },
+    { uid: 'w_002', weaponId: 'pea_repeater', level: 0 },
+    { uid: 'w_003', weaponId: 'vine_staff', level: 0 }
+  ],
   difficulty: 'normal',
   heatModifiers: [],
   // v0.8.0 NPC+建筑+科技

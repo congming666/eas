@@ -217,6 +217,26 @@ const Warehouse = {
     `;
 
     let hasItems = false;
+    // v1.1 武器区
+    const insts = GameState.weaponInstances || [];
+    if (insts.length > 0) {
+      hasItems = true;
+      html += `<div class="warehouse-category"><div class="category-title">⚔️ 武器（死亡永久损失）</div><div class="warehouse-grid">`;
+      insts.forEach(inst => {
+        const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+        if (!wpn) return;
+        const stats = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getInstanceStats(inst.uid) : wpn;
+        html += `
+          <div class="warehouse-item ${inst.level>=5?'rare':''}">
+            <div class="item-icon">${wpn.icon}</div>
+            <div class="item-name">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
+            <div class="item-count">伤害 ${stats?stats.damage:wpn.damage}</div>
+            <div style="font-size:10px;color:#888;">${inst.uid}</div>
+            <div class="item-not-sellable">去锻造台升级</div>
+          </div>`;
+      });
+      html += `</div></div>`;
+    }
     Object.keys(categories).forEach(cat => {
       const items = categories[cat];
       if (items.length === 0) return;
