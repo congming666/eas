@@ -28,7 +28,7 @@ const LoadoutSystem = {
         ];
       }
     }
-    if (!GameState.loadoutWeaponUid) GameState.loadoutWeaponUid = GameState.weaponInstances[0]?.uid || null;
+    if (!GameState.loadoutWeaponUids) GameState.loadoutWeaponUids = [];
   },
 
   // 计算物品占几格
@@ -127,19 +127,19 @@ const LoadoutSystem = {
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
-  // 死亡时损失带入的武器实例
+  // 死亡时损失所有带入的武器实例
   loseBroughtWeapon() {
-    const uid = GameState.loadoutWeaponUid;
-    if (uid) {
+    const uids = GameState.loadoutWeaponUids || [];
+    uids.forEach(uid => {
       const idx = (GameState.weaponInstances || []).findIndex(w => w.uid === uid);
       if (idx >= 0) {
         const inst = GameState.weaponInstances[idx];
         const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
         GameState.weaponInstances.splice(idx, 1);
-        showToast(`💀 永久失去武器：${wpn ? wpn.name : inst.weaponId}！`, 'warning');
+        showToast(`💀 永久失去武器：${wpn ? wpn.name : inst.weaponId}`, 'warning');
       }
-      GameState.loadoutWeaponUid = null;
-    }
+    });
+    GameState.loadoutWeaponUids = [];
   },
 
   // 升级单个武器实例

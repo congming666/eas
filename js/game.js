@@ -107,19 +107,28 @@ const Game = {
       el.innerHTML = '<div style="color:#f66;font-size:12px;">仓库没有武器！去锻造台打造</div>';
       return;
     }
+    const brought = GameState.loadoutWeaponUids || [];
     insts.forEach(inst => {
       const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
       if (!wpn) return;
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
-      const isSelected = GameState.loadoutWeaponUid === inst.uid;
+      const isSelected = brought.includes(inst.uid);
       const div = document.createElement('div');
       div.style.cssText = `padding:8px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;width:120px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
       div.innerHTML = `<img src="${wpn.img}" style="width:80px;height:80px;object-fit:contain;border-radius:6px;" onerror="this.style.display='none'">
         <div style="font-size:12px;color:#e6bd54;font-weight:bold;margin-top:4px;">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
         <div style="font-size:10px;color:#999;">伤害${stats?stats.damage:wpn.damage}</div>
-        <div style="font-size:9px;color:#666;">${inst.uid}</div>`;
+        <div style="font-size:9px;color:#666;">${inst.uid}</div>
+        <div style="font-size:9px;color:${isSelected?'#ffd700':'#888'};">${isSelected?'✓ 已带入':'点击带入'}</div>`;
       div.onclick = () => {
-        GameState.loadoutWeaponUid = inst.uid;
+        const arr = GameState.loadoutWeaponUids || (GameState.loadoutWeaponUids = []);
+        const idx = arr.indexOf(inst.uid);
+        if (idx >= 0) {
+          arr.splice(idx, 1);
+        } else {
+          if (arr.length >= 2) { showToast('最多带2把武器', 'warning'); return; }
+          arr.push(inst.uid);
+        }
         SaveSystem.save();
         this.renderWeaponLoadout();
       };
@@ -155,12 +164,15 @@ const Game = {
       return;
     }
     GameState.gold -= map.entryFee;
-    // v1.1 校验带入武器实例
-    if (!GameState.loadoutWeaponUid || !LoadoutSystem.getWeaponInstance(GameState.loadoutWeaponUid)) {
-      showToast('请先在准备大厅选择一把带入的武器！', 'warning');
+    // v1.4 校验带入武器（至少1把）
+    const uids = GameState.loadoutWeaponUids || [];
+    const validUids = uids.filter(uid => LoadoutSystem.getWeaponInstance(uid));
+    if (validUids.length === 0) {
+      showToast('请至少选择一把带入的武器（最多2把）！', 'warning');
       GameState.gold += map.entryFee;
       return;
     }
+    GameState.loadoutWeaponUids = validUids;
     SaveSystem.save();
     AudioManager.setScene('expedition');
     clearInterval(this.farmInterval);

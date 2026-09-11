@@ -149,7 +149,26 @@ const CONFIG = {
       desc: '速度极快且免疫减速，专克减速植物' },
     herbivore: { name: '食草兽', icon: '🦌', hp: 62, damage: 11, speed: 118, radius: 18, collisionRadius: 14,
       attackRange: 34, attackCooldown: 1.15, xp: 15, gold: 12, plantHate: true, counter: 'plant',
-      desc: '专啃植物防线，优先攻击植物' }
+      desc: '专啃植物防线，优先攻击植物' },
+    // v1.4 新怪
+    treant: { name: '树精', icon: '🌳', img: 'docs/art/enemies/treant.png', hp: 140, damage: 22, speed: 80, radius: 24, collisionRadius: 18,
+      attackRange: 45, attackCooldown: 1.4, xp: 25, gold: 20, auraHeal: 8,
+      desc: '近战肉盾，周围友军每秒回血8' },
+    gargoyle: { name: '石像鬼', icon: '👿', img: 'docs/art/enemies/gargoyle.png', hp: 80, damage: 18, speed: 170, radius: 18, collisionRadius: 12,
+      attackRange: 40, attackCooldown: 0.9, xp: 28, gold: 22, aerial: true, diveAttack: true,
+      desc: '飞行怪，周期性俯冲造成双倍伤害' },
+    shadow_demon: { name: '影魔', icon: '👤', img: 'docs/art/enemies/shadow_demon.png', hp: 65, damage: 25, speed: 190, radius: 16, collisionRadius: 12,
+      attackRange: 38, attackCooldown: 0.8, xp: 35, gold: 30, blink: true, invis: true,
+      desc: '周期性隐身瞬移到玩家身边' },
+    boar_king: { name: '狂暴野猪王', icon: '🐗', img: 'docs/art/enemies/boar_king.png', hp: 350, damage: 35, speed: 150, radius: 28, collisionRadius: 22,
+      attackRange: 50, attackCooldown: 1.1, xp: 100, gold: 120, elite: true, charge: true,
+      desc: '精英：蓄力冲锋+震荡波' },
+    stone_golem: { name: '远古魔像', icon: '🗿', img: 'docs/art/enemies/golem.png', hp: 600, damage: 28, speed: 70, radius: 32, collisionRadius: 26,
+      attackRange: 55, attackCooldown: 1.8, xp: 150, gold: 180, elite: true, armor: 0.6, reflect: 0.15,
+      desc: '精英：60%减伤+反弹15%伤害' },
+    treant_elder: { name: '树精长老', icon: '🌲', img: 'docs/art/enemies/treant_elder.png', hp: 2500, damage: 40, speed: 60, radius: 45, collisionRadius: 35,
+      attackRange: 80, attackCooldown: 1.5, xp: 800, gold: 1000, boss: true, summonRoot: true,
+      desc: 'T1 Boss：召唤树根缠绕+范围毒雾' }
   },
   crops: [
     { id: 'pea_shooter', name: '豌豆射手', icon: '🫛', growTime: 24, sellPrice: 12, seedPrice: 8, rarity: 'rare', cardChance: 1, upgradeSkill: 'straw_smash', rewardType: 'attack_card', rewardLabel: '必得攻击卡', trait: 'reharvest' },
@@ -258,6 +277,7 @@ const CONFIG = {
 const GameState = {
   screen: 'menu', // menu, farm, expedition, result
   gold: 100000,
+  volume: 0.8, // v1.4 全局音量
   seeds: 3,
   materials: 0,
   farmPlots: [], // 6x6 = 36格
@@ -269,7 +289,7 @@ const GameState = {
   selectedBoostCards: [],
   selectedMap: 't1',
   selectedWeapon: 'harvest_sickle',
-  loadoutWeaponUid: null, // v1.1 本次出征带入的武器实例uid
+  loadoutWeaponUids: [], // v1.4 本次出征带入的武器uid数组（最多2把）
   weaponInstances: [ // v1.1 每把武器独立实例
     { uid: 'w_001', weaponId: 'harvest_sickle', level: 0 },
     { uid: 'w_002', weaponId: 'pea_repeater', level: 0 },

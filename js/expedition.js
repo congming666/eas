@@ -32,8 +32,9 @@ class Expedition {
     this.skillCooldowns = [0, 0, 0, 0];
     this.skillFlashes = [0, 0, 0, 0];
     this.attackAnim = 0;
-    // v1.1 从武器实例加载
-    this.loadoutUid = GameState.loadoutWeaponUid;
+    // v1.4 从武器实例加载（支持多把）
+    const broughtUids = (GameState.loadoutWeaponUids && GameState.loadoutWeaponUids.length > 0) ? GameState.loadoutWeaponUids : [];
+    this.loadoutUid = broughtUids[0] || null;
     let inst = null;
     if (typeof LoadoutSystem !== 'undefined' && this.loadoutUid) inst = LoadoutSystem.getWeaponInstance(this.loadoutUid);
     const wid = inst ? inst.weaponId : 'harvest_sickle';
@@ -41,6 +42,15 @@ class Expedition {
     if (this.weaponIndex < 0) this.weaponIndex = 0;
     this.weapon = CONFIG.weapons[this.weaponIndex];
     if (inst && typeof LoadoutSystem !== 'undefined') this.weapon = LoadoutSystem.getWeaponStats(this.weapon, inst.level);
+    // v1.4 带入武器列表（最多2把）
+    this.broughtUids = broughtUids;
+    this.broughtStats = this.broughtUids.map(uid => {
+      const i = LoadoutSystem.getWeaponInstance(uid);
+      if (!i) return null;
+      const b = CONFIG.weapons.find(w => w.id === i.weaponId);
+      return { uid, weaponId: i.weaponId, level: i.level, stats: LoadoutSystem.getWeaponStats(b, i.level) };
+    }).filter(Boolean);
+    this.currentBroughtIdx = Math.max(0, this.broughtUids.indexOf(this.loadoutUid));
     this.weaponPulse = 0;
     // v0.9.0 作物buff缓存
     this.cropBuffs = (typeof CropExpansion !== 'undefined') ? CropExpansion.CropBuffSystem.getAllBuffs() : [];
@@ -112,7 +122,7 @@ class Expedition {
     this.eventModifiers = { enemySpeed: 1, enemyDamage: 1, loot: 1, vision: 1 };
     this.beastWave = {
       wave: 0,
-      nextIn: 48,
+      nextIn: 20,
       active: false,
       remaining: 0,
       duration: 0
@@ -1153,7 +1163,11 @@ class Expedition {
     };
     this.keydownHandler = (e) => {
       this.keys[e.key.toLowerCase()] = true;
-      if (e.key === 'Escape') this.paused = !this.paused;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.paused = !this.paused;
+        if (this.paused) this.showPauseMenu(); else this.hidePauseMenu();
+      }
       const _branchActive = (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive);
       if (!_branchActive) {
         if (e.key === '1') this.useSkill(0);
@@ -1219,10 +1233,53 @@ class Expedition {
     canvas.removeEventListener('wheel', this.wheelHandler);
   }
 
+  showPauseMenu() {
+    if (document.getElementById('pauseMenu')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'pauseMenu';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `<div style="width:320px;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:24px;text-align:center;">
+      <h2 style="color:#ffd700;margin:0 0 20px;">⏸ 游戏暂停</h2>
+      <button class="secondary-btn" style="width:100%;padding:10px;margin:6px 0;" onclick="Game.expedition.hidePauseMenu();Game.expedition.paused=false;">▶ 继续游戏</button>
+      <button class="secondary-btn" style="width:100%;padding:10px;margin:6px 0;" onclick="Game.expedition.toggleSettings()">⚙ 设置</button>
+      <div id="pauseSettings" style="display:none;text-align:left;margin:10px 0;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+        <div style="font-size:12px;color:#aaa;margin-bottom:6px;">音量：<span id="volVal">${Math.round((GameState.volume||0.8)*100)}%</span></div>
+        <input type="range" min="0" max="100" value="${Math.round((GameState.volume||0.8)*100)}" style="width:100%;" oninput="GameState.volume=this.value/100;document.getElementById('volVal').textContent=this.value+'%';if(typeof AudioManager!=='undefined')AudioManager.setVolume(GameState.volume);">
+      </div>
+      <button class="secondary-btn" style="width:100%;padding:10px;margin:6px 0;color:#f66;" onclick="Game.expedition.quitToFarm()">🏠 返回主菜单（当前远征进度丢失）</button>
+      <div style="font-size:11px;color:#666;margin-top:12px;">ESC 关闭此菜单</div>
+    </div>`;
+    document.body.appendChild(overlay);
+  },
+
+  toggleSettings() {
+    const el = document.getElementById('pauseSettings');
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  },
+
+  hidePauseMenu() {
+    const el = document.getElementById('pauseMenu');
+    if (el) el.remove();
+  },
+
+  quitToFarm() {
+    this.hidePauseMenu();
+    // 等同死亡：损失带入武器
+    if (typeof LoadoutSystem !== 'undefined') LoadoutSystem.loseBroughtWeapon();
+    if (typeof SaveSystem !== 'undefined') SaveSystem.save();
+    this.cleanup && this.cleanup();
+    Game.returnToFarm();
+  },
+
   cycleWeapon(direction = 1) {
-    this.weaponIndex = (this.weaponIndex + direction + CONFIG.weapons.length) % CONFIG.weapons.length;
-    this.weapon = CONFIG.weapons[this.weaponIndex];
-    GameState.selectedWeapon = this.weapon.id;
+    // v1.4 只在带入武器间切换
+    if (!this.broughtStats || this.broughtStats.length <= 1) return;
+    this.currentBroughtIdx = (this.currentBroughtIdx + direction + this.broughtStats.length) % this.broughtStats.length;
+    const b = this.broughtStats[this.currentBroughtIdx];
+    this.loadoutUid = b.uid;
+    this.weaponIndex = Math.max(0, CONFIG.weapons.findIndex(w => w.id === b.weaponId));
+    this.weapon = b.stats;
+    GameState.selectedWeapon = b.weaponId;
     this.weaponPulse = 0.35;
     this.spawnWeaponSwitchEffect();
     showToast(`切换武器：${this.weapon.name}`, 'success');
@@ -3554,7 +3611,7 @@ class Expedition {
     if (this.beastWave.active) {
       if (waveMonsterCount === 0) {
         this.beastWave.active = false;
-        this.beastWave.nextIn = Math.max(58, 92 - this.map.tier * 4);
+        this.beastWave.nextIn = 40; // v1.4 每40秒一波
         GameState.gold += 20 * this.beastWave.wave * this.map.tier;
         showToast(`第 ${this.beastWave.wave} 波兽潮已击退，获得守塔奖励`, 'success');
       }
