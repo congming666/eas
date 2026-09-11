@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鍐滃簞鐗岋細鑽掗噹杩滃緛 v1.9</title>
+<title>农庄牌：荒野远征 v1.9</title>
 <meta name="game-version" content="1.9.0">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,7 +34,7 @@
   #gameCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:0; filter:saturate(1.06) contrast(1.04); }
   #pixiEffectsCanvas { position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none; }
   #expeditionHUD::after { content:"";position:absolute;inset:0;z-index:24;pointer-events:none;background:linear-gradient(180deg,rgba(188,220,224,.08),transparent 24%,transparent 68%,rgba(3,10,8,.22));mix-blend-mode:soft-light; }
-  /* 閫氱敤UI瑕嗙洊灞?*/
+  /* 通用UI覆盖层 */
   .overlay {
     position: absolute;
     top: 0; left: 0;
@@ -49,7 +49,7 @@
     z-index: 10;
   }
   .hidden { display: none !important; }
-  /* 涓昏彍鍗?*/
+  /* 主菜单 */
   #mainMenu {
     background: linear-gradient(135deg, #1a3a1a 0%, #0f2810 50%, #1a1a2e 100%);
   }
@@ -96,7 +96,7 @@
     font-size: 14px;
     color: #666;
   }
-  /* 鍐滃満鐣岄潰 */
+  /* 农场界面 */
   #farmScreen {
     background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 40%, #90EE90 70%, #228B22 100%);
   }
@@ -326,7 +326,7 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  /* 杩滃緛HUD */
+  /* 远征HUD */
   #expeditionHUD {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -473,7 +473,7 @@
     border-radius: 8px;
     overflow: hidden;
   }
-  /* 缁撶畻鐣岄潰 */
+  /* 结算界面 */
   #resultScreen {
     background: rgba(0,0,0,0.85);
   }
@@ -531,7 +531,7 @@
   }
   .loot-item.lost { color: #ff6644; text-decoration: line-through; }
   .loot-item.kept { color: #7fff7f; }
-  /* 鎻愮ず娑堟伅 */
+  /* 提示消息 */
   #toastContainer {
     position: absolute;
     top: 80px;
@@ -558,7 +558,7 @@
   .toast.gold { border-color: #ffd700; color: #ffd700; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } }
   @keyframes toastOut { to { opacity: 0; transform: translateY(-20px); } }
-  /* 浜や簰鎻愮ず */
+  /* 交互提示 */
   .interact-prompt {
     position: absolute;
     background: rgba(0,0,0,0.8);
@@ -571,7 +571,7 @@
     white-space: nowrap;
     transform: translate(-50%, -100%);
   }
-  /* 鎾ょ璇绘潯 */
+  /* 撤离读条 */
   .extract-bar-container {
     position: absolute;
     top: 50%;
@@ -605,7 +605,7 @@
     color: #fff;
     text-shadow: 1px 1px 2px #000;
   }
-  /* 鎿嶄綔璇存槑 */
+  /* 操作说明 */
   .controls-hint {
     position: absolute;
     bottom: 90px;
@@ -626,7 +626,7 @@
     color: #fff;
   }
 
-  /* ==================== v1.1 楂樼骇瑙嗚瑕嗙洊 ==================== */
+  /* ==================== v1.1 高级视觉覆盖 ==================== */
   :root {
     --gold: #f6c75b;
     --mint: #83f2b2;
@@ -855,7 +855,7 @@
   }
   .consumable-bar .skill-slot { width:105px; background:linear-gradient(145deg, rgba(69,42,27,.95), rgba(21,18,15,.97)); }
   .consumable-bar .skill-slot::after {
-    content:"馃敟"; position:absolute; right:4px; bottom:2px; font-size:9px; opacity:.62;
+    content:"🔥"; position:absolute; right:4px; bottom:2px; font-size:9px; opacity:.62;
   }
   .defense-bar {
     position:absolute; left:50%; transform:translateX(-50%); bottom:96px;
@@ -1055,7 +1055,7 @@
     .prep-content { padding-top: 12px; }
   }
 
-  /* ==================== v1.3 鍐滆€曠焊寮?/ 鐏惧彉甯嗗竷涓婚 ==================== */
+  /* ==================== v1.3 农耕纸张 / 灾变帆布主题 ==================== */
   #farmScreen {
     background:
       linear-gradient(to bottom, rgba(16,25,22,.02) 0 35%, rgba(19,28,21,.22) 55%, rgba(20,21,16,.58) 100%),
@@ -1253,7 +1253,7 @@
   #signalFlash.active { animation: signalAlert .85s ease; }
   @keyframes signalAlert { 0%,100% { opacity:0; } 25%,60% { opacity:.72; } }
 
-  /* ==================== v1.5 瀹跺洯琛ョ粰绔?==================== */
+  /* ==================== v1.5 家园补给站 ==================== */
   .support-panel { padding:13px !important; }
   .support-panel .panel-title { margin-bottom:8px; padding-bottom:7px; }
   .daily-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:8px; }
@@ -1287,7 +1287,7 @@
   #farmScreen .expedition-gate p { margin:5px 0 9px; line-height:1.45; }
   #farmScreen .gate-btn { padding:10px; }
 
-  /* 鐗╄祫浠撳簱寮圭獥 */
+  /* 物资仓库弹窗 */
   .warehouse-modal { background:linear-gradient(160deg,#1e2a1e,#162016); border:2px solid #4a6b4a; border-radius:16px; padding:20px; max-width:720px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
   .warehouse-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #3a5a3a; }
   .warehouse-modal-header h2 { margin:0; color:#a8d8a8; font-size:22px; }
@@ -1322,7 +1322,7 @@
   .item-not-sellable { font-size:11px; color:#666; padding:4px; }
   .warehouse-empty { text-align:center; padding:40px 20px; color:#888; }
 
-  /* 鑲茬娓╁ */
+  /* 育种温室 */
   .greenhouse-modal { background:linear-gradient(160deg,#1e2a2e,#162028); border:2px solid #4a7a8a; border-radius:16px; padding:20px; max-width:900px; width:95%; max-height:85vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.6); }
   .greenhouse-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #3a6a7a; }
   .greenhouse-modal-header h2 { margin:0; color:#8ac8d8; font-size:22px; }
@@ -1375,7 +1375,7 @@
   .tips-title { font-size:13px; color:#8ac8d8; margin-bottom:6px; font-weight:bold; }
   .greenhouse-tips ul { margin:0; padding-left:16px; }
   .greenhouse-tips li { font-size:11px; color:#aaa; line-height:1.6; margin-bottom:2px; }
-  /* ============ 鏄熶簯搴忕珷 路 涓昏彍鍗曠矑瀛愬紑鍦?============ */
+  /* ============ 星云序章 · 主菜单粒子开场 ============ */
   #nebulaBg {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: radial-gradient(ellipse at 50% 42%, #0b1322 0%, #050810 46%, #020308 100%);
@@ -1439,8 +1439,8 @@
     text-align: center; font-size: 12px; color: rgba(160, 200, 235, 0.55); letter-spacing: 2px;
     pointer-events: none;
   }
-  /* ============ 鏄熶簯闇撹櫣鏂囧瓧绯荤粺 ============ */
-  /* 涓绘枃瀛楋細闈掆啋绱啋鍐拌摑娓愬彉 + 杈夊厜 */
+  /* ============ 星云霓虹文字系统 ============ */
+  /* 主文字：青→紫→冰蓝渐变 + 辉光 */
   .nebula-glow {
     background: linear-gradient(115deg, #bdf4ff 0%, #e4d4ff 38%, #a8d8ff 72%, #cfe6ff 100%);
     -webkit-background-clip: text;
@@ -1448,7 +1448,7 @@
     color: transparent;
     filter: drop-shadow(0 0 9px rgba(140, 195, 255, 0.50)) drop-shadow(0 0 26px rgba(120, 165, 255, 0.28));
   }
-  /* 杈呭姪鏂囧瓧锛氬啺钃濊緣鍏?*/
+  /* 辅助文字：冰蓝辉光 */
   .nebula-glow-soft {
     color: #cfe9ff;
     text-shadow: 0 0 7px rgba(140, 195, 255, 0.45), 0 0 20px rgba(120, 165, 255, 0.22);
@@ -1461,7 +1461,7 @@
   #mainMenu .nebula-btn:hover .nebula-glow {
     filter: drop-shadow(0 0 10px rgba(160, 215, 255, 0.75)) drop-shadow(0 0 30px rgba(130, 180, 255, 0.45));
   }
-  /* 绗竴椤靛彲瑙佺殑鍏ㄥ眬鎺т欢鏂囧瓧锛堥煶涔愬紑鍏筹級 */
+  /* 第一页可见的全局控件文字（音乐开关） */
   #audioControl #musicToggle {
     color: #cfe9ff;
     text-shadow: 0 0 7px rgba(140, 195, 255, 0.45), 0 0 20px rgba(120, 165, 255, 0.22);
@@ -1476,7 +1476,8 @@
   }
 
   /* ==================================================================
-   * 鐣岄潰绯荤粺鍗囩骇 路 娣辩┖鐜荤拑鎷熸€侊紙涓昏彍鍗曚箣鍚庡叏閮ㄧ晫闈㈢粺涓€璁捐璇█锛?   * 娣辩┖鑳屾櫙 / 鐜荤拑闈㈡澘 / 闇撹櫣杈夊厜 / 缁熶竴浜や簰鍙嶉 / 杞満鍔ㄧ敾
+   * 界面系统升级 · 深空玻璃拟态（主菜单之后全部界面统一设计语言）
+   * 深空背景 / 玻璃面板 / 霓虹辉光 / 统一交互反馈 / 转场动画
    * ================================================================== */
   :root {
     --glass-bg: rgba(10, 17, 32, 0.58);
@@ -1488,7 +1489,7 @@
     --ui-transition: all 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
-  /* ---- 娣辩┖鑳屾櫙锛氬啘鍦?/ 鍑嗗澶у巺 / 缁撶畻 ---- */
+  /* ---- 深空背景：农场 / 准备大厅 / 结算 ---- */
   #farmScreen, #expeditionPrepScreen, #resultScreen {
     background:
       radial-gradient(ellipse 62% 42% at 50% 0%, rgba(92, 142, 205, 0.13), transparent 62%),
@@ -1496,7 +1497,7 @@
       radial-gradient(ellipse 44% 34% at 8% 86%, rgba(96, 190, 190, 0.08), transparent 60%),
       linear-gradient(160deg, #0a101d 0%, #070b14 55%, #04070d 100%) !important;
   }
-  /* 寰急鏄熺偣 */
+  /* 微弱星点 */
   #farmScreen::before, #expeditionPrepScreen::before, #resultScreen::before {
     content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
     background-image:
@@ -1519,7 +1520,7 @@
     position: relative; z-index: 1;
   }
 
-  /* ---- 鐜荤拑闈㈡澘锛堜富瑕佸鍣級 ---- */
+  /* ---- 玻璃面板（主要容器） ---- */
   .panel, .prep-panel, .hud-panel, .result-card, .workshop-window,
   .warehouse-modal, .greenhouse-modal, .expedition-gate, .supply-card, .daily-strip {
     background: var(--glass-bg) !important;
@@ -1529,7 +1530,7 @@
     border-radius: 18px !important;
     box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
   }
-  /* 瑕嗙洊 v1.9 鍐滃満鏆栬壊闈㈡澘锛堝悓鐗瑰紓鎬у悗瀹氫箟锛?*/
+  /* 覆盖 v1.9 农场暖色面板（同特异性后定义） */
   #farmScreen .panel, #farmScreen .farm-grid-container, #farmScreen .homestead-card {
     background: var(--glass-bg) !important;
     backdrop-filter: blur(16px) saturate(1.32) !important;
@@ -1537,7 +1538,7 @@
     border-color: var(--glass-border) !important;
     box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
   }
-  /* 灏忓崱鐗囷細鍗婇€忔槑娣卞簳锛堜笉 blur锛屾€ц兘鍙嬪ソ锛?*/
+  /* 小卡片：半透明深底（不 blur，性能友好） */
   .facility, .map-option, .prep-skill, .loadout-slot, .defense-slot, .boost-card,
   .crop-choice, .farm-cell, .supply-btn, .greenhouse-grid-cell {
     transition: var(--ui-transition) !important;
@@ -1553,7 +1554,7 @@
   }
   .facility { border: 1px solid rgba(150, 200, 255, 0.12); border-radius: 14px; }
 
-  /* ---- 鎸夐挳浣撶郴锛氱粺涓€鐜荤拑鍖?---- */
+  /* ---- 按钮体系：统一玻璃化 ---- */
   .menu-btn, .secondary-btn, .gate-btn, .start-expedition-btn, .supply-btn {
     background: linear-gradient(135deg, rgba(32, 58, 96, 0.74), rgba(14, 26, 48, 0.86)) !important;
     border: 1px solid rgba(150, 205, 255, 0.28) !important;
@@ -1581,7 +1582,7 @@
   }
   .close-btn:hover { border-color: rgba(255, 130, 130, 0.55) !important; color: #ff9a9a !important; box-shadow: 0 0 14px rgba(255, 100, 100, 0.2); }
 
-  /* ---- 鏍囬杈夊厜 ---- */
+  /* ---- 标题辉光 ---- */
   .panel-title { color: #e2f3ff !important; text-shadow: 0 0 12px rgba(140, 190, 255, 0.32); letter-spacing: 1px; }
   .farm-title, .prep-title h2, .warehouse-modal-header h2, .greenhouse-modal-header h2, .workshop-header h2,
   .expedition-gate-title {
@@ -1595,7 +1596,7 @@
     border-color: rgba(130, 190, 255, 0.28) !important;
   }
 
-  /* ---- 璧勬簮鏉?---- */
+  /* ---- 资源条 ---- */
   .resource-item {
     background: rgba(10, 18, 36, 0.66) !important;
     border: 1px solid rgba(150, 200, 255, 0.14) !important;
@@ -1605,7 +1606,7 @@
   }
   .resource-item .resource-icon { box-shadow: 0 0 12px rgba(255, 215, 0, 0.35); }
 
-  /* ---- 椤堕儴鏍?---- */
+  /* ---- 顶部栏 ---- */
   .farm-top-bar {
     background: rgba(6, 12, 24, 0.72) !important;
     backdrop-filter: blur(18px) saturate(1.35) !important;
@@ -1617,7 +1618,7 @@
     border-bottom: 1px solid rgba(150, 200, 255, 0.14) !important;
   }
 
-  /* ---- 杩滃緛 HUD ---- */
+  /* ---- 远征 HUD ---- */
   .hud-panel {
     background: rgba(6, 12, 24, 0.66) !important;
     border-radius: 14px !important;
@@ -1664,7 +1665,7 @@
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
 
-  /* ---- 缁撶畻鐣岄潰 ---- */
+  /* ---- 结算界面 ---- */
   .result-card {
     background:
       radial-gradient(ellipse 75% 60% at 50% 0%, rgba(120, 175, 245, 0.14), transparent 65%),
@@ -1677,7 +1678,7 @@
   .result-title { text-shadow: 0 0 22px rgba(150, 205, 255, 0.55), 0 0 60px rgba(120, 165, 255, 0.3); }
   .result-stats, .loot-list { color: #cfe4f8 !important; }
 
-  /* ---- 寮圭獥 ---- */
+  /* ---- 弹窗 ---- */
   .modal-overlay { background: rgba(2, 5, 12, 0.66) !important; backdrop-filter: blur(6px); }
   .workshop-window, .warehouse-modal, .greenhouse-modal {
     animation: uiPopIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -1687,7 +1688,7 @@
     border-bottom: 1px solid rgba(150, 200, 255, 0.12) !important;
   }
 
-  /* ---- Toast 鍗囩骇 ---- */
+  /* ---- Toast 升级 ---- */
   .toast {
     background: rgba(10, 18, 34, 0.84) !important;
     backdrop-filter: blur(12px);
@@ -1697,25 +1698,25 @@
     font-weight: 500;
   }
 
-  /* ---- 杞満鍔ㄧ敾 ---- */
+  /* ---- 转场动画 ---- */
   .overlay:not(.hidden) { animation: uiFadeIn 0.34s ease; }
   #expeditionHUD:not(.hidden) { animation: uiFadeIn 0.3s ease; }
   @keyframes uiFadeIn { from { opacity: 0; } }
   @keyframes uiPopIn { from { opacity: 0; transform: scale(0.96) translateY(10px); } }
 
-  /* ---- 婊氬姩鏉?---- */
+  /* ---- 滚动条 ---- */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(140, 190, 255, 0.24); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(140, 190, 255, 0.45); }
   ::-webkit-scrollbar-track { background: rgba(8, 13, 26, 0.4); }
 
-  /* ---- 閿洏鐒︾偣鍙鎬э紙鏃犻殰纰嶏級 ---- */
+  /* ---- 键盘焦点可见性（无障碍） ---- */
   button:focus-visible, .facility:focus-visible, .map-option:focus-visible, .farm-cell:focus-visible {
     outline: 2px solid rgba(150, 210, 255, 0.6);
     outline-offset: 2px;
   }
 
-  /* ---- 澶у睆澧炲己锛堚墺1600px 鍐呭涓嶅啀鎷ユ尋锛?---- */
+  /* ---- 大屏增强（≥1600px 内容不再拥挤） ---- */
   @media (min-width: 1600px) {
     #farmScreen .farm-content, #expeditionPrepScreen .prep-content { max-width: 1500px; margin: 0 auto; }
   }
@@ -1727,192 +1728,192 @@
   <canvas id="nebulaCanvas"></canvas>
   <canvas id="gameCanvas" width="1280" height="720"></canvas>
   <div id="audioControl">
-    <button id="musicToggle" type="button" onclick="AudioManager.toggle()">鈾?闊充箰锛氬紑</button>
-    <input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="鑳屾櫙闊充箰闊抽噺" oninput="AudioManager.setVolume(this.value)">
+    <button id="musicToggle" type="button" onclick="AudioManager.toggle()">♫ 音乐：开</button>
+    <input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)">
   </div>
 
-  <!-- 涓昏彍鍗?路 鏄熶簯搴忕珷 -->
+  <!-- 主菜单 · 星云序章 -->
   <div id="mainMenu" class="overlay">
     <div class="nebula-topbar">
-      <div class="nebula-brand nebula-glow">馃尵 鍐滃簞鐗?路 鑽掗噹杩滃緛</div>
-      <div class="nebula-brand-meta nebula-glow-soft">鏄熶簯搴忕珷 路 鎷栨嫿鏃嬭浆 路 鎮诞鑱氬厜</div>
+      <div class="nebula-brand nebula-glow">🌾 农庄牌 · 荒野远征</div>
+      <div class="nebula-brand-meta nebula-glow-soft">星云序章 · 拖拽旋转 · 悬浮聚光</div>
     </div>
     <div class="nebula-card">
       <div class="nebula-eyebrow nebula-glow">FARMBOUND EXPEDITION</div>
-      <h1 class="nebula-title nebula-glow">鑽掗噹杩滃緛</h1>
-      <p class="nebula-sub nebula-glow-soft">鏄熶簯涔嬩笅 路 瀹堟湜鍐滃満 路 杩滃緛鍦ㄥ嵆</p>
-      <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">寮€ 濮?娓?鎴?/span></button>
-      <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">娓?鎴?璇?鏄?/span></button>
-      <div class="version-info nebula-ver nebula-glow-soft">v1.9 路 妞嶇墿闃茬嚎 脳 鑲茬娓╁ 脳 鐗╄祫浠撳簱 路 WebGL 鏄熶簯寮曟搸</div>
+      <h1 class="nebula-title nebula-glow">荒野远征</h1>
+      <p class="nebula-sub nebula-glow-soft">星云之下 · 守望农场 · 远征在即</p>
+      <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
+      <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
+      <div class="version-info nebula-ver nebula-glow-soft">v1.9 · 植物防线 × 育种温室 × 物资仓库 · WebGL 星云引擎</div>
     </div>
-    <div class="nebula-hint nebula-glow-soft">馃柋 鎷栨嫿鏃嬭浆鏄熶簯 路 榧犳爣鎮诞鑱氭嫝鏄熷厜</div>
+    <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
 
-  <!-- 鍐滃満鐣岄潰 -->
+  <!-- 农场界面 -->
   <div id="farmScreen" class="overlay hidden">
     <div class="farm-top-bar">
-      <div class="farm-title">馃尵 鎴戠殑瀹跺洯鍐滃満</div>
+      <div class="farm-title">🌾 我的家园农场</div>
       <div class="resource-display">
         <div class="resource-item">
-          <span class="resource-icon" style="background:#ffd700;">馃挵</span>
+          <span class="resource-icon" style="background:#ffd700;">💰</span>
           <span id="goldDisplay">500</span>
         </div>
         <div class="resource-item">
-          <span class="resource-icon" style="background:#7fff7f;">馃尡</span>
+          <span class="resource-icon" style="background:#7fff7f;">🌱</span>
           <span id="seedDisplay">3</span>
         </div>
         <div class="resource-item">
-          <span class="resource-icon" style="background:#ff8800;">馃摝</span>
+          <span class="resource-icon" style="background:#ff8800;">📦</span>
           <span id="materialDisplay">0</span>
         </div>
-        <div class="resource-item" id="weatherDisplay" style="cursor:default;" title="褰撳墠澶╂皵">
-          <span class="resource-icon" style="background:#88ccff;">鈽€锔?/span>
-          <span id="weatherText">鏅存湕</span>
+        <div class="resource-item" id="weatherDisplay" style="cursor:default;" title="当前天气">
+          <span class="resource-icon" style="background:#88ccff;">☀️</span>
+          <span id="weatherText">晴朗</span>
         </div>
-        <div class="resource-item" id="seasonDisplay" style="cursor:default;" title="褰撳墠瀛ｈ妭">
-          <span class="resource-icon" style="background:#ffaa88;">馃尭</span>
-          <span id="seasonText">鏄ュ</span>
+        <div class="resource-item" id="seasonDisplay" style="cursor:default;" title="当前季节">
+          <span class="resource-icon" style="background:#ffaa88;">🌸</span>
+          <span id="seasonText">春季</span>
         </div>
-        <div class="resource-item" id="beautyDisplay" style="cursor:default;" title="鍐滃満缇庤搴?>
-          <span class="resource-icon" style="background:#ddaaff;">鉁?/span>
+        <div class="resource-item" id="beautyDisplay" style="cursor:default;" title="农场美观度">
+          <span class="resource-icon" style="background:#ddaaff;">✨</span>
           <span id="beautyText">0</span>
         </div>
       </div>
-      <button class="menu-btn" style="width:auto;padding:8px 20px;font-size:14px;" onclick="Game.backToMenu()">杩斿洖鑿滃崟</button>
+      <button class="menu-btn" style="width:auto;padding:8px 20px;font-size:14px;" onclick="Game.backToMenu()">返回菜单</button>
     </div>
     <div class="farm-content">
       <div class="farm-left">
         <div class="farm-grid-container">
-          <div class="farm-grid-title">鍐滅敯锛堢偣鍑荤┖鍦版挱绉嶏紝鐐瑰嚮鎴愮啛浣滅墿鏀惰幏锛?/div>
+          <div class="farm-grid-title">农田（点击空地播种，点击成熟作物收获）</div>
           <div class="crop-selector" id="cropSelector"></div>
           <div class="farm-grid" id="farmGrid"></div>
         </div>
       </div>
       <div class="farm-right">
         <div class="panel">
-          <div class="panel-title">馃彙 瀹跺洯璁炬柦</div>
+          <div class="panel-title">🏡 家园设施</div>
           <div class="facility-grid">
-            <div class="facility" onclick="Warehouse.open()"><div class="facility-icon">馃彋锔?/div><div class="facility-name">鐗╄祫浠撳簱</div><div class="facility-state" id="warehouseState">瀹归噺鍏呰冻 路 鐐瑰嚮鏌ョ湅</div></div>
-            <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">馃洜锔?/div><div class="facility-name">鍗＄墝宸ュ潑</div><div class="facility-state">寮哄寲鍩虹鎶€鑳?路 鏌ョ湅鎺夎惤鍗?/div></div>
-            <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">馃彙</div><div class="facility-name">鑲茬娓╁</div><div class="facility-state">绉嶆绋€鏈夋鐗?路 鑾峰彇閬撳叿</div></div>
-            <div class="facility" onclick="showToast('杩滃緛妗ｆ璁板綍涓嶅悓鍦板尯鎯呮姤', 'gold')"><div class="facility-icon">馃摐</div><div class="facility-name">杩滃緛妗ｆ</div><div class="facility-state">T1鈥揟4 鎯呮姤宸茬櫥璁?/div></div>
+            <div class="facility" onclick="Warehouse.open()"><div class="facility-icon">🏚️</div><div class="facility-name">物资仓库</div><div class="facility-state" id="warehouseState">容量充足 · 点击查看</div></div>
+            <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
+            <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">种植稀有植物 · 获取道具</div></div>
+            <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
           </div>
         </div>
         <div class="panel">
-          <div class="panel-title">馃尡 鍐滃満鏂板姛鑳?/div>
+          <div class="panel-title">🌱 农场新功能</div>
           <div class="facility-grid">
-            <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">馃彮</div><div class="facility-name">鍔犲伐宸ュ潑</div><div class="facility-state" id="workshopLevelState">Lv.1 路 浣滅墿鍔犲伐</div></div>
-            <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">馃摉</div><div class="facility-name">浣滅墿鍥鹃壌</div><div class="facility-state">鏀堕泦鍝佽川 路 鍏ㄥ眬buff</div></div>
-            <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">馃帹</div><div class="facility-name">瑁呴グ鍟嗗簵</div><div class="facility-state">缇庤搴?路 閲戝竵鍔犳垚</div></div>
-            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">馃懃</div><div class="facility-name">NPC璁垮</div><div class="facility-state" id="npcCountState">4浣嶈瀹?路 瀵硅瘽/閫佺ぜ</div></div>
-            <div class="facility" onclick="TechSystemUI.open()"><div class="facility-icon">馃彈锔?/div><div class="facility-name">寤虹瓚绉戞妧</div><div class="facility-state" id="techPointState">0绉戞妧鐐?路 鍗囩骇寤虹瓚</div></div>
-            <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">馃毝</div><div class="facility-name" id="visitorName">璁垮</div><div class="facility-state">鐐瑰嚮浜掑姩鑾峰緱濂栧姳</div></div>
+            <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">🏭</div><div class="facility-name">加工工坊</div><div class="facility-state" id="workshopLevelState">Lv.1 · 作物加工</div></div>
+            <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">📖</div><div class="facility-name">作物图鉴</div><div class="facility-state">收集品质 · 全局buff</div></div>
+            <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">🎨</div><div class="facility-name">装饰商店</div><div class="facility-state">美观度 · 金币加成</div></div>
+            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">👥</div><div class="facility-name">NPC访客</div><div class="facility-state" id="npcCountState">4位访客 · 对话/送礼</div></div>
+            <div class="facility" onclick="TechSystemUI.open()"><div class="facility-icon">🏗️</div><div class="facility-name">建筑科技</div><div class="facility-state" id="techPointState">0科技点 · 升级建筑</div></div>
+            <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">🚶</div><div class="facility-name" id="visitorName">访客</div><div class="facility-state">点击互动获得奖励</div></div>
           </div>
         </div>
         <div class="panel support-panel">
-          <div class="panel-title">馃巵 瀹跺洯琛ョ粰绔?/div>
+          <div class="panel-title">🎁 家园补给站</div>
           <div class="supply-card" style="margin-bottom:9px;">
-            <div class="supply-icon">鈴?/div>
-            <div><div class="supply-name">鐢熼暱鍌寲鍓?脳<span id="growthCatalystCount">0</span></div><div class="supply-desc">瀵瑰墿浣欐椂闂存渶闀跨殑鐢熼暱涓綔鐗╀娇鐢紝绔嬪嵆鍑忓皯鍏舵€荤妞嶆椂闂寸殑10%銆?/div><button class="supply-btn" onclick="Farm.useGrowthCatalyst()">浣跨敤閬撳叿</button></div>
+            <div class="supply-icon">⏳</div>
+            <div><div class="supply-name">生长催化剂 ×<span id="growthCatalystCount">0</span></div><div class="supply-desc">对剩余时间最长的生长中作物使用，立即减少其总种植时间的10%。</div><button class="supply-btn" onclick="Farm.useGrowthCatalyst()">使用道具</button></div>
           </div>
           <div class="daily-strip" id="dailyRewardStrip"></div>
           <div class="supply-actions">
             <div class="supply-card">
-              <div class="supply-icon">馃搮</div>
-              <div><div class="supply-name" id="dailyRewardTitle">姣忔棩绛惧埌</div><div class="supply-desc" id="dailyRewardDesc"></div><button class="supply-btn" id="dailyRewardButton" onclick="RewardSystem.claimDaily()">棰嗗彇</button></div>
+              <div class="supply-icon">📅</div>
+              <div><div class="supply-name" id="dailyRewardTitle">每日签到</div><div class="supply-desc" id="dailyRewardDesc"></div><button class="supply-btn" id="dailyRewardButton" onclick="RewardSystem.claimDaily()">领取</button></div>
             </div>
             <div class="supply-card relief">
-              <div class="supply-icon">馃Ш</div>
-              <div><div class="supply-name">寮€鑽掍繚闅?/div><div class="supply-desc" id="reliefRewardDesc"></div><button class="supply-btn" id="reliefRewardButton" onclick="RewardSystem.claimRelief()">鐢宠鏁戞祹</button></div>
+              <div class="supply-icon">🧺</div>
+              <div><div class="supply-name">开荒保障</div><div class="supply-desc" id="reliefRewardDesc"></div><button class="supply-btn" id="reliefRewardButton" onclick="RewardSystem.claimRelief()">申请救济</button></div>
             </div>
           </div>
         </div>
         <div class="expedition-gate">
-          <div class="expedition-gate-title">鑽掗噹杩滃緛绔?/div>
-          <p>鍦板浘閫夋嫨銆佹妧鑳界‘璁ゅ拰鎼哄甫鐗╅厤缃凡绉昏嚦鐙珛鍑嗗澶у巺銆傚鍥笉浼氬彈鍒拌繙寰佹垬鏂楀奖鍝嶃€?/p>
-          <button class="start-expedition-btn gate-btn" onclick="Game.openExpeditionPrep()">杩涘叆杩滃緛鍑嗗澶у巺 鈫?/button>
+          <div class="expedition-gate-title">荒野远征站</div>
+          <p>地图选择、技能确认和携带物配置已移至独立准备大厅。家园不会受到远征战斗影响。</p>
+          <button class="start-expedition-btn gate-btn" onclick="Game.openExpeditionPrep()">进入远征准备大厅 →</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 鐙珛杩滃緛鍑嗗澶у巺 -->
+  <!-- 独立远征准备大厅 -->
   <div id="expeditionPrepScreen" class="overlay hidden">
     <div class="prep-header">
-      <div class="prep-title"><h2>鈿旓笍 鑽掗噹杩滃緛鍑嗗澶у巺</h2><p>SELECT REGION 路 CHECK SKILLS 路 PACK SUPPLIES</p></div>
+      <div class="prep-title"><h2>⚔️ 荒野远征准备大厅</h2><p>SELECT REGION · CHECK SKILLS · PACK SUPPLIES</p></div>
       <div class="resource-display">
-        <div class="resource-item"><span class="resource-icon" style="background:#ffd700;">馃挵</span><span id="prepGoldDisplay">500</span></div>
-        <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">杩斿洖瀹跺洯</button>
+        <div class="resource-item"><span class="resource-icon" style="background:#ffd700;">💰</span><span id="prepGoldDisplay">500</span></div>
+        <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回家园</button>
       </div>
     </div>
     <div class="prep-content">
       <div class="prep-column">
         <div class="prep-panel prep-map-panel">
-          <div class="panel-title">馃椇锔?閫夋嫨杩滃緛鍖哄煙</div>
+          <div class="panel-title">🗺️ 选择远征区域</div>
           <div class="map-select" id="mapSelect"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">鈿欙笍 闅惧害閫夋嫨</div>
+          <div class="panel-title">⚙️ 难度选择</div>
           <div id="difficultySelect" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">馃儚 鏈甯搁┗鎶€鑳?/div>
+          <div class="panel-title">🃏 本次常驻技能</div>
           <div class="prep-skill-grid" id="prepSkillGrid"></div>
         </div>
       </div>
       <div class="prep-column">
         <div class="prep-panel prep-loadout">
-          <div class="panel-title">馃帓 鎼哄甫娑堣€楀搧</div>
+          <div class="panel-title">🎒 携带消耗品</div>
           <div class="loadout-grid" id="loadoutGrid"></div>
         </div>
         <div class="prep-panel prep-loadout">
-          <div class="panel-title">馃尶 鎼哄甫妞嶇墿闃茬嚎锛堝煿鑲叉弧100鍙儴缃诧級</div>
+          <div class="panel-title">🌿 携带植物防线（培育满100可部署）</div>
           <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title" style="display:flex;justify-content:space-between;"><span>鉁?鎼哄甫寮哄寲鍗?/span><span class="boost-count" id="boostCardCount">0/3</span></div>
+          <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
           <div class="boost-card-grid" id="boostCardGrid"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">馃敟 Heat 淇敼鍣紙鍙€夛紝澧炲姞濂栧姳锛?/div>
+          <div class="panel-title">🔥 Heat 修改器（可选，增加奖励）</div>
           <div id="heatSelect" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">馃尶 浣滅墿 buff锛堟敹鑾蜂綔鐗╄幏寰楋紝甯﹀叆杩滃緛锛?/div>
-          <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">鏆傛棤浣滅墿buff锛屽幓鍐滃満鏀惰幏杈ｆ/钖勮嵎/澶ц挏绛夎幏寰?/div>
+          <div class="panel-title">🌿 作物 buff（收获作物获得，带入远征）</div>
+          <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得</div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">馃摗 鍖哄煙鎻愮ず</div>
-          <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">閫夋嫨鍦板浘鍚庢煡鐪嬪湴褰€佺幆澧冨拰闄烽槺鎯呮姤銆?/div>
+          <div class="panel-title">📡 区域提示</div>
+          <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">选择地图后查看地形、环境和陷阱情报。</div>
         </div>
         <div class="prep-actions">
-          <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">鍙栨秷</button>
-          <button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()">纭閰嶇疆骞跺嚭鍙?/button>
+          <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">取消</button>
+          <button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()">确认配置并出发</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 杩滃緛HUD -->
+  <!-- 远征HUD -->
   <div id="expeditionHUD" class="hidden">
     <div class="hud-top">
       <div class="hud-panel player-stats">
         <div class="stat-bar">
-          <span class="stat-label">鐢熷懡</span>
+          <span class="stat-label">生命</span>
           <div class="stat-bar-bg">
             <div class="stat-bar-fill hp-fill" id="hpBar" style="width:100%"></div>
             <span class="stat-value" id="hpText">100/100</span>
           </div>
         </div>
         <div class="stat-bar">
-          <span class="stat-label">鑳介噺</span>
+          <span class="stat-label">能量</span>
           <div class="stat-bar-bg">
             <div class="stat-bar-fill energy-fill" id="energyBar" style="width:100%"></div>
             <span class="stat-value" id="energyText">100/100</span>
           </div>
         </div>
         <div class="stat-bar">
-          <span class="stat-label">鍏诲垎</span>
+          <span class="stat-label">养分</span>
           <div class="stat-bar-bg">
             <div class="stat-bar-fill nutrient-fill" id="nutrientBar" style="width:100%"></div>
             <span class="stat-value" id="nutrientText">30/200</span>
@@ -1921,7 +1922,7 @@
       </div>
       <div class="hud-panel">
         <div class="timer-display" id="timerDisplay">12:00</div>
-        <div class="map-badge" id="mapNameDisplay">T1 路 鑽掑簾閲庣敯</div>
+        <div class="map-badge" id="mapNameDisplay">T1 · 荒废野田</div>
       </div>
       <div class="bag-display" id="bagDisplay"></div>
     </div>
@@ -1930,34 +1931,34 @@
     <div class="consumable-bar" id="consumableBar"></div>
     <div class="defense-bar" id="defenseBar"></div>
     <canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
-    <div class="weapon-controls-tip"><kbd>Tab / 婊氳疆</kbd> 鍒囨崲姝﹀櫒 路 杩戞垬鑼冨洿鍐呰嚜鍔ㄦ嬀鍙?路 <kbd>1-4</kbd> 閲婃斁鎶€鑳?路 <kbd>5-9</kbd> 閫夐槻绾?/ <kbd>Z</kbd> 鍒囨崲 路 宸﹂敭閮ㄧ讲</div>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · 近战范围内自动拾取 · <kbd>1-4</kbd> 释放技能 · <kbd>5-9</kbd> 选防线 / <kbd>Z</kbd> 切换 · 左键部署</div>
     <div class="controls-hint">
-      <kbd>WASD</kbd> 绉诲姩 | <kbd>榧犳爣宸﹂敭</kbd> 鏀诲嚮/浜や簰 | 鎴樺埄鍝佽嚜鍔ㄦ嬀鍙?br>
-      <kbd>1-4</kbd> 甯搁┗鎶€鑳?| <kbd>Q/R/E</kbd> 娑堣€楀搧<br>
-      <kbd>Shift</kbd> 鍐插埡 | <kbd>ESC</kbd> 鏆傚仠
+      <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | 战利品自动拾取<br>
+      <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>
+      <kbd>Shift</kbd> 冲刺 | <kbd>ESC</kbd> 暂停
     </div>
   </div>
 
-  <!-- 缁撶畻鐣岄潰 -->
+  <!-- 结算界面 -->
   <div id="resultScreen" class="overlay hidden">
     <div class="result-card" id="resultCard">
-      <div class="result-title" id="resultTitle">杩滃緛鎴愬姛</div>
-      <div class="result-subtitle" id="resultSubtitle">浣犳垚鍔熷甫鐫€鎴樺埄鍝佹挙绂讳簡鑽掗噹</div>
+      <div class="result-title" id="resultTitle">远征成功</div>
+      <div class="result-subtitle" id="resultSubtitle">你成功带着战利品撤离了荒野</div>
       <div class="result-stats" id="resultStats"></div>
       <div class="loot-list" id="lootList"></div>
-      <button class="menu-btn" onclick="Game.returnToFarm()">杩斿洖鍐滃満</button>
+      <button class="menu-btn" onclick="Game.returnToFarm()">返回农场</button>
     </div>
   </div>
 
-  <!-- 鍗＄墝宸ュ潑寮圭獥 -->
+  <!-- 卡牌工坊弹窗 -->
   <div id="cardWorkshopModal" class="overlay modal-overlay hidden" onclick="if(event.target===this) Game.closeCardWorkshop()">
     <div class="workshop-window">
       <div class="workshop-header">
-        <div><h2>馃洜锔?鍗＄墝宸ュ潑</h2><p>鏀惰幏浣滅墿鏈夋鐜囨帀钀藉己鍖栧崱锛屼娇鐢ㄥ悗姘镐箙鎻愬崌鍩虹鎶€鑳姐€?/p></div>
-        <button class="secondary-btn" onclick="Game.closeCardWorkshop()">鍏抽棴</button>
+        <div><h2>🛠️ 卡牌工坊</h2><p>收获作物有概率掉落强化卡，使用后永久提升基础技能。</p></div>
+        <button class="secondary-btn" onclick="Game.closeCardWorkshop()">关闭</button>
       </div>
-      <div class="workshop-section"><div class="panel-title">鍩虹鎶€鑳界瓑绾?/div><div class="workshop-skills" id="workshopSkills"></div></div>
-      <div class="workshop-section workshop-inventory"><div class="panel-title">浣滅墿鍗＄墝搴撳瓨</div><div class="workshop-cards" id="workshopCards"></div></div>
+      <div class="workshop-section"><div class="panel-title">基础技能等级</div><div class="workshop-skills" id="workshopSkills"></div></div>
+      <div class="workshop-section workshop-inventory"><div class="panel-title">作物卡牌库存</div><div class="workshop-cards" id="workshopCards"></div></div>
     </div>
   </div>
 
@@ -1965,40 +1966,40 @@
   <div id="signalFlash"></div>
   <div id="lowHealthVignette"></div>
 
-  <!-- 鐗╄祫浠撳簱寮圭獥 -->
+  <!-- 物资仓库弹窗 -->
   <div id="warehouseModal" class="overlay hidden">
     <div class="warehouse-modal">
       <div class="warehouse-modal-header">
-        <h2>馃摝 鐗╄祫浠撳簱</h2>
-        <button class="close-btn" onclick="Warehouse.close()">鉁?/button>
+        <h2>📦 物资仓库</h2>
+        <button class="close-btn" onclick="Warehouse.close()">✕</button>
       </div>
       <div id="warehouseContent" class="warehouse-content"></div>
     </div>
   </div>
 
-  <!-- 鑲茬娓╁寮圭獥 -->
+  <!-- 育种温室弹窗 -->
   <div id="greenhouseModal" class="overlay hidden">
     <div class="greenhouse-modal">
       <div class="greenhouse-modal-header">
-        <h2>馃彙 鑲茬娓╁</h2>
-        <button class="close-btn" onclick="Greenhouse.close()">鉁?/button>
+        <h2>🏡 育种温室</h2>
+        <button class="close-btn" onclick="Greenhouse.close()">✕</button>
       </div>
       <div class="greenhouse-content">
         <div class="greenhouse-left">
-          <div class="greenhouse-grid-title">娓╁ 4/16</div>
+          <div class="greenhouse-grid-title">温室 4/16</div>
           <div class="greenhouse-plant-selector" id="greenhousePlantSelector"></div>
           <div class="greenhouse-grid" id="greenhouseGrid"></div>
         </div>
         <div class="greenhouse-right">
           <div class="greenhouse-drops" id="greenhouseDrops"></div>
           <div class="greenhouse-tips">
-            <div class="tips-title">馃挕 娓╁鎻愮ず</div>
+            <div class="tips-title">💡 温室提示</div>
             <ul>
-              <li>绉嶆绋€鏈夋鐗╅渶瑕佹秷鑰楅噾甯佽喘涔扮瀛?/li>
-              <li>绋€鏈夋鐗╂垚鐔熷悗鍙敹鑾峰悇绉嶉亾鍏?/li>
-              <li>浼犺妞嶇墿鏈夋鐜囪В閿佹柊鐨勭█鏈夋鐗?/li>
-              <li>娓╁鏍煎瓙闇€瑕侀噾甯佸拰鏉愭枡瑙ｉ攣</li>
-              <li>浣滅墿杞寲鍗″彲灏嗘櫘閫氫綔鐗╁彉涓虹█鏈変綔鐗?/li>
+              <li>种植稀有植物需要消耗金币购买种子</li>
+              <li>稀有植物成熟后可收获各种道具</li>
+              <li>传说植物有概率解锁新的稀有植物</li>
+              <li>温室格子需要金币和材料解锁</li>
+              <li>作物转化卡可将普通作物变为稀有作物</li>
             </ul>
           </div>
         </div>
@@ -2006,7 +2007,7 @@
     </div>
   </div>
 
-  <!-- 鎻愮ず娑堟伅瀹瑰櫒 -->
+  <!-- 提示消息容器 -->
   <div id="toastContainer"></div>
 </div>
 
@@ -2031,7 +2032,7 @@
   <script src="js/combat-enhancement.js?v=0902"></script>
   <script src="js/game.js?v=0902"></script>
 
-  <!-- 鏄熶簯搴忕珷锛歐ebGL 绮掑瓙寮€鍦猴紙CDN 鍔犺浇澶辫触鏃惰嚜鍔ㄩ檷绾т负闈欐€佽儗鏅級 -->
+  <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
@@ -2040,20 +2041,20 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js"></script>
-  <script src="js/nebula-text.js"></script>
+  <script src="js/nebula.js?v=0902"></script>
+  <script src="js/nebula-text.js?v=0902"></script>
 
-  <!-- v2.0 鍐滃満澶ф洿鏂板脊绐?-->
+  <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
     <div class="modal-panel" style="max-width:680px;">
-      <div class="modal-title">馃彮 鍔犲伐宸ュ潑 <span id="processingLevel" style="font-size:14px;color:#ffd700;">Lv.1</span>
-        <button class="modal-close" onclick="FarmUI.closeModal('processingModal')">鉁?/button>
+      <div class="modal-title">🏭 加工工坊 <span id="processingLevel" style="font-size:14px;color:#ffd700;">Lv.1</span>
+        <button class="modal-close" onclick="FarmUI.closeModal('processingModal')">✕</button>
       </div>
       <div class="modal-body">
-        <div id="processingQueue" style="margin-bottom:12px;padding:8px;background:#1a2a1a;border-radius:6px;min-height:36px;color:#aaccaa;font-size:13px;">鍔犲伐闃熷垪锛氱┖闂?/div>
+        <div id="processingQueue" style="margin-bottom:12px;padding:8px;background:#1a2a1a;border-radius:6px;min-height:36px;color:#aaccaa;font-size:13px;">加工队列：空闲</div>
         <div id="recipeList" style="display:flex;flex-direction:column;gap:6px;"></div>
         <div style="margin-top:12px;text-align:center;">
-          <button class="supply-btn" onclick="FarmProcessingSystem.upgradeWorkshop();FarmUI.renderProcessing();" style="padding:8px 20px;">鍗囩骇宸ュ潑 (<span id="workshopUpgradeCost">100</span>閲?</button>
+          <button class="supply-btn" onclick="FarmProcessingSystem.upgradeWorkshop();FarmUI.renderProcessing();" style="padding:8px 20px;">升级工坊 (<span id="workshopUpgradeCost">100</span>金)</button>
         </div>
       </div>
     </div>
@@ -2061,8 +2062,8 @@
 
   <div id="collectionModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('collectionModal')">
     <div class="modal-panel" style="max-width:680px;">
-      <div class="modal-title">馃摉 浣滅墿鍥鹃壌
-        <button class="modal-close" onclick="FarmUI.closeModal('collectionModal')">鉁?/button>
+      <div class="modal-title">📖 作物图鉴
+        <button class="modal-close" onclick="FarmUI.closeModal('collectionModal')">✕</button>
       </div>
       <div class="modal-body">
         <div id="collectionProgress" style="margin-bottom:12px;color:#aaccaa;font-size:14px;"></div>
@@ -2073,8 +2074,8 @@
 
   <div id="decorationModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('decorationModal')">
     <div class="modal-panel" style="max-width:680px;">
-      <div class="modal-title">馃帹 瑁呴グ鍟嗗簵
-        <button class="modal-close" onclick="FarmUI.closeModal('decorationModal')">鉁?/button>
+      <div class="modal-title">🎨 装饰商店
+        <button class="modal-close" onclick="FarmUI.closeModal('decorationModal')">✕</button>
       </div>
       <div class="modal-body">
         <div id="decorationBeauty" style="margin-bottom:12px;color:#ffd700;font-size:14px;"></div>
@@ -2112,14 +2113,14 @@
     renderProcessing(){
       document.getElementById('processingLevel').textContent = 'Lv.' + GameState.workshopLevel;
       document.getElementById('workshopUpgradeCost').textContent = GameState.workshopLevel * 100;
-      // 闃熷垪
+      // 队列
       const q = document.getElementById('processingQueue');
-      if (GameState.processingQueue.length === 0) q.textContent = '鍔犲伐闃熷垪锛氱┖闂?;
-      else q.innerHTML = '鍔犲伐闃熷垪锛? + GameState.processingQueue.map(j => {
+      if (GameState.processingQueue.length === 0) q.textContent = '加工队列：空闲';
+      else q.innerHTML = '加工队列：' + GameState.processingQueue.map(j => {
         const r = FarmRecipes.find(x => x.id === j.recipeId);
         return r ? `${r.icon}${r.name} ${j.remaining.toFixed(0)}s` : '';
-      }).join(' 路 ');
-      // 閰嶆柟
+      }).join(' · ');
+      // 配方
       const list = document.getElementById('recipeList');
       list.innerHTML = '';
       FarmRecipes.forEach(r => {
@@ -2128,11 +2129,11 @@
         const can = !locked && have >= r.inputQty;
         const row = document.createElement('div');
         row.className = 'recipe-row' + (locked ? ' locked' : '');
-        row.innerHTML = `<div class="recipe-info">${r.icon} ${r.name} 鈥?${r.inputQty} ${r.inputCrop} 鈫?${r.outputQty} ${r.outputName} (${r.time}s) ${locked?'馃敀闇€Lv.'+r.workshopLevel:''} <span style="color:#888;">[搴撳瓨${have}]</span></div>`;
+        row.innerHTML = `<div class="recipe-info">${r.icon} ${r.name} — ${r.inputQty} ${r.inputCrop} → ${r.outputQty} ${r.outputName} (${r.time}s) ${locked?'🔒需Lv.'+r.workshopLevel:''} <span style="color:#888;">[库存${have}]</span></div>`;
         if (!locked) {
           const btn = document.createElement('button');
           btn.className = 'recipe-btn';
-          btn.textContent = can ? '鍔犲伐' : '鍘熸枡涓嶈冻';
+          btn.textContent = can ? '加工' : '原料不足';
           btn.disabled = !can;
           btn.style.opacity = can ? 1 : 0.5;
           btn.onclick = () => { FarmProcessingSystem.startProcessing(r.id); this.renderProcessing(); };
@@ -2146,7 +2147,7 @@
       const total = CONFIG.crops.length;
       const got = Object.keys(GameState.cropCollection).length;
       const bonus = ((FarmCollectionSystem.collectionBonus() - 1) * 100).toFixed(0);
-      document.getElementById('collectionProgress').textContent = `鏀堕泦杩涘害锛?{got}/${total}  路  鍏ㄥ眬鐢熼暱 +${bonus}%`;
+      document.getElementById('collectionProgress').textContent = `收集进度：${got}/${total}  ·  全局生长 +${bonus}%`;
       const grid = document.getElementById('collectionGrid');
       grid.innerHTML = '';
       CONFIG.crops.forEach(c => {
@@ -2155,9 +2156,9 @@
         card.className = 'collection-card' + (found ? '' : ' locked');
         if (found) {
           const qColor = FarmCollectionSystem.qualityColor(found);
-          card.innerHTML = `<div style="font-size:16px;color:${qColor}">${c.icon} ${c.name}</div><div style="color:${qColor};margin-top:2px;">鍝佽川锛?{FarmCollectionSystem.qualityName(found)}</div><div style="color:#888;margin-top:2px;font-size:11px;">${FarmTraitSystem.traitDesc(c.trait)}</div>`;
+          card.innerHTML = `<div style="font-size:16px;color:${qColor}">${c.icon} ${c.name}</div><div style="color:${qColor};margin-top:2px;">品质：${FarmCollectionSystem.qualityName(found)}</div><div style="color:#888;margin-top:2px;font-size:11px;">${FarmTraitSystem.traitDesc(c.trait)}</div>`;
         } else {
-          card.innerHTML = `<div style="font-size:16px;">鉂????</div><div style="color:#666;margin-top:2px;">鏈彂鐜?/div>`;
+          card.innerHTML = `<div style="font-size:16px;">❓ ???</div><div style="color:#666;margin-top:2px;">未发现</div>`;
         }
         grid.appendChild(card);
       });
@@ -2165,19 +2166,19 @@
 
     renderDecoration(){
       const bonus = ((FarmDecorationSystem.beautyGoldBonus() - 1) * 100).toFixed(0);
-      document.getElementById('decorationBeauty').textContent = `鉁?褰撳墠缇庤搴︼細${GameState.farmBeauty}  路  閲戝竵鍔犳垚 +${bonus}%`;
+      document.getElementById('decorationBeauty').textContent = `✨ 当前美观度：${GameState.farmBeauty}  ·  金币加成 +${bonus}%`;
       const grid = document.getElementById('decorationGrid');
       grid.innerHTML = '';
       DecoShopItems.forEach(d => {
         const card = document.createElement('div');
         card.className = 'deco-card';
-        card.innerHTML = `<div style="font-size:20px;">${d.icon}</div><div style="font-weight:600;margin:2px 0;">${d.name}</div><div style="color:#888;font-size:11px;">${d.desc}</div><button onclick="FarmDecorationSystem.buyDecoration('${d.id}');FarmUI.renderDecoration();">璐拱 (${d.cost}閲?</button>`;
+        card.innerHTML = `<div style="font-size:20px;">${d.icon}</div><div style="font-weight:600;margin:2px 0;">${d.name}</div><div style="color:#888;font-size:11px;">${d.desc}</div><button onclick="FarmDecorationSystem.buyDecoration('${d.id}');FarmUI.renderDecoration();">购买 (${d.cost}金)</button>`;
         grid.appendChild(card);
       });
     }
   };
 
-  // 鎵╁睍 Farm.render 鏇存柊澶╂皵/瀛ｈ妭/缇庤/璁垮鏄剧ず
+  // 扩展 Farm.render 更新天气/季节/美观/访客显示
   const _origFarmRender = Farm.render.bind(Farm);
   Farm.render = function() {
     _origFarmRender();
@@ -2194,34 +2195,34 @@
     const bEl = document.getElementById('beautyText');
     if (bEl) bEl.textContent = GameState.farmBeauty || 0;
     const ws = document.getElementById('workshopLevelState');
-    if (ws) ws.textContent = 'Lv.' + (GameState.workshopLevel || 1) + ' 路 浣滅墿鍔犲伐';
+    if (ws) ws.textContent = 'Lv.' + (GameState.workshopLevel || 1) + ' · 作物加工';
     const vf = document.getElementById('visitorFacility');
     if (vf) {
       if (GameState.visitorState === 'visiting') {
         vf.style.display = '';
         const vn = document.getElementById('visitorName');
-        if (vn) vn.textContent = GameState.visitorName || '璁垮';
+        if (vn) vn.textContent = GameState.visitorName || '访客';
       } else vf.style.display = 'none';
     }
   };
   </script>
 
-  <!-- v0.8.0 NPC妯℃€?-->
+  <!-- v0.8.0 NPC模态 -->
   <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">
     <div class="modal-window npc-modal">
-      <div class="modal-header"><span>馃懃 NPC 璁垮</span><button onclick="NpcSystemUI.close()" class="modal-close">鉁?/button></div>
+      <div class="modal-header"><span>👥 NPC 访客</span><button onclick="NpcSystemUI.close()" class="modal-close">✕</button></div>
       <div class="npc-modal-body">
         <div class="npc-list" id="npcList"></div>
-        <div class="npc-detail" id="npcDetail"><div style="color:#888;text-align:center;padding:40px;">閫夋嫨宸︿晶 NPC 寮€濮嬪璇?/div></div>
+        <div class="npc-detail" id="npcDetail"><div style="color:#888;text-align:center;padding:40px;">选择左侧 NPC 开始对话</div></div>
       </div>
-      <div class="modal-footer"><button onclick="DiaryUI.open()" class="modal-btn">馃摐 鏃ヨ娈嬮〉 (0/5)</button></div>
+      <div class="modal-footer"><button onclick="DiaryUI.open()" class="modal-btn">📜 日记残页 (0/5)</button></div>
     </div>
   </div>
 
-  <!-- v0.8.0 寤虹瓚绉戞妧妯℃€?-->
+  <!-- v0.8.0 建筑科技模态 -->
   <div id="techModal" class="modal-overlay hidden" onclick="if(event.target===this)TechSystemUI.close()">
     <div class="modal-window tech-modal">
-      <div class="modal-header"><span>馃彈锔?寤虹瓚鍗囩骇 + 绉戞妧鏍?/span><button onclick="TechSystemUI.close()" class="modal-close">鉁?/button></div>
+      <div class="modal-header"><span>🏗️ 建筑升级 + 科技树</span><button onclick="TechSystemUI.close()" class="modal-close">✕</button></div>
       <div class="tech-modal-body">
         <div class="building-list" id="buildingList"></div>
         <div class="tech-tree-container" id="techTreeContainer"></div>
@@ -2229,10 +2230,10 @@
     </div>
   </div>
 
-  <!-- v0.8.0 鏃ヨ妯℃€?-->
+  <!-- v0.8.0 日记模态 -->
   <div id="diaryModal" class="modal-overlay hidden" onclick="if(event.target===this)DiaryUI.close()">
     <div class="modal-window diary-modal">
-      <div class="modal-header"><span>馃摐 鏃ヨ娈嬮〉 - 鑽掗噹涔嬭皽</span><button onclick="DiaryUI.close()" class="modal-close">鉁?/button></div>
+      <div class="modal-header"><span>📜 日记残页 - 荒野之谜</span><button onclick="DiaryUI.close()" class="modal-close">✕</button></div>
       <div class="diary-container" id="diaryContainer"></div>
     </div>
   </div>
