@@ -1231,7 +1231,7 @@ class Expedition {
     canvas.removeEventListener('mouseup', this.mouseupHandler);
     canvas.removeEventListener('contextmenu', this.contextmenuHandler);
     canvas.removeEventListener('wheel', this.wheelHandler);
-  }
+  },
 
   showPauseMenu() {
     if (document.getElementById('pauseMenu')) return;
