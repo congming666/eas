@@ -186,6 +186,7 @@ class Expedition {
     this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
     this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
     this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
+    this.weaponSheet = new Image(); this.weaponSheet.src = 'docs/art/v2/weapons.png';
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -3264,23 +3265,18 @@ class Expedition {
     const dir = combo === 1 ? -1 : 1;
     const localAngle = Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle))) * dir;
     ctx.save();
-    // 后坐：开火/挥击后武器短暂后拉
     ctx.translate(28 - recoil * 9, 6 + recoil * 3);
     ctx.rotate(localAngle * 0.45 - 0.25 + swing * 0.8 * dir);
-    if (combo === 2) ctx.translate(swing * 16, 0); // 突刺：武器沿攻击方向前伸
-    if (this.weapon.id === 'harvest_sickle') {
-      ctx.strokeStyle = '#684328'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-5, 17); ctx.lineTo(30, -31); ctx.stroke();
-      const blade = ctx.createLinearGradient(22, -38, 51, -22); blade.addColorStop(0, '#fff2bd'); blade.addColorStop(1, '#8c9c99');
-      ctx.strokeStyle = blade; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(25, -22, 22, -1.25, 0.4); ctx.stroke();
-    } else if (this.weapon.id === 'pea_repeater') {
-      ctx.fillStyle = '#496b32'; ctx.strokeStyle = '#22331f'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(-3, -12, 41, 18, 6); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#82bd48'; ctx.beginPath(); ctx.arc(35, -3, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#d2ae52'; ctx.fillRect(7, 5, 8, 19);
-    } else {
-      ctx.strokeStyle = '#67462d'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, 17); ctx.lineTo(34, -30); ctx.stroke();
-      ctx.strokeStyle = '#4f9b64'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(31, -33, 13, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#86f0c9'; ctx.shadowColor = '#86f0c9'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(31, -33, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    if (combo === 2) ctx.translate(swing * 16, 0);
+    // v2.8 Seedream 武器贴图（从 weapons.png 竖排 sheet 裁剪）
+    if (this.weaponSheet && this.weaponSheet.naturalWidth) {
+      const sheetH = this.weaponSheet.naturalHeight; // 2048
+      const slotH = sheetH / 5;
+      const rowMap = { harvest_sickle: 0, pea_repeater: 1, vine_staff: 2, throwing_knife: 3, flame_bow: 4 };
+      const row = rowMap[this.weapon.id] || 0;
+      const sx = 0, sy = row * slotH, sw = this.weaponSheet.naturalWidth, sh = slotH;
+      const dw = 70, dh = dw * sh / sw;
+      ctx.drawImage(this.weaponSheet, sx, sy, sw, sh, -dw/2, -dh/2, dw, dh);
     }
     ctx.restore();
   }
