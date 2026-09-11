@@ -121,6 +121,8 @@ const Game = {
       el.appendChild(div);
     });
   },
+
+  _startFarmTimer() {
     if (this.farmInterval) return;
     this.farmInterval = setInterval(() => {
       try {
