@@ -23,6 +23,8 @@ const Game = {
         if (typeof NpcSystem !== 'undefined') NpcSystem.init();
         if (typeof TechSystem !== 'undefined') TechSystem.init();
         if (typeof CropExpansion !== 'undefined') { CropExpansion.registerCrops(); CropExpansion.CropBuffSystem.init(); }
+        if (typeof AchievementSystem !== 'undefined') AchievementSystem.init();
+        if (typeof LoadoutSystem !== 'undefined') LoadoutSystem.init();
         if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
           showToast('家园补给站有今日奖励可以领取', 'gold');
         }
@@ -246,6 +248,81 @@ const Game = {
     Farm.renderDefenseLoadout();
     this._startFarmTimer();
     this.expedition = null;
+  },
+
+  // v1.0 成就板
+  openAchievements() {
+    if (typeof AchievementSystem === 'undefined') return;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay modal-overlay';
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="width:600px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #4a6a4a;"><div id="achvContent"></div><div style="padding:12px;text-align:center;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    document.body.appendChild(overlay);
+    AchievementSystem.renderPanel(overlay.querySelector('#achvContent'));
+  },
+
+  // v1.0 武器锻造台
+  openBlacksmith() {
+    if (typeof LoadoutSystem === 'undefined') return;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay modal-overlay';
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    let html = '<div style="width:600px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
+    html += '<h3 style="color:#ffd700;margin:0 0 12px;">🔨 武器锻造台</h3>';
+    html += '<p style="color:#aaa;font-size:12px;margin-bottom:12px;">用远征带回的材料升级武器，每级+15%伤害。Boss掉落蓝图解锁新武器。</p>';
+    CONFIG.weapons.forEach(w => {
+      const lv = LoadoutSystem.getWeaponLevel(w.id);
+      const cost = LoadoutSystem.getUpgradeCost(w.id);
+      const owned = GameState.blueprints && GameState.blueprints.includes(w.id);
+      if (w.blueprint && !owned) return;
+      html += `<div style="padding:10px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div><span style="font-size:18px;">${w.icon}</span> <span style="color:#e6bd54;font-weight:bold;">${w.name}</span>
+        <span style="color:#888;font-size:11px;"> Lv.${lv} ${w.mode==='melee'?'近战':w.mode==='ranged'?'远程':'穿透'} · 伤害${LoadoutSystem.getWeaponStats(w).damage}</span></div>`;
+      if (cost) {
+        const matStr = Object.entries(cost.materials).map(([m,n]) => {
+          const mat = CONFIG.materials[m];
+          const have = (GameState.warehouse.materials && GameState.warehouse.materials[m]) || 0;
+          return `${mat?mat.name:m} ${have}/${n}`;
+        }).join(' · ');
+        html += `<button class="secondary-btn" style="font-size:12px;" onclick="LoadoutSystem.upgradeWeapon('${w.id}');Game.openBlacksmith();location.reload()">升级(${cost.gold}金 · ${matStr})</button>`;
+      } else {
+        html += '<span style="color:#ffd700;font-size:12px;">已满级</span>';
+      }
+      html += '</div>';
+    });
+    html += '<div style="padding:12px;text-align:center;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  },
+
+  // v1.0 安全箱
+  openSafeBox() {
+    if (typeof LoadoutSystem === 'undefined') return;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay modal-overlay';
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const slots = LoadoutSystem.getSafeCapacity();
+    const cost = LoadoutSystem.upgradeSafeCost();
+    let html = '<div style="width:420px;background:#1a1f1a;border-radius:12px;border:1px solid #4a6a8a;padding:20px;">';
+    html += '<h3 style="color:#7ec8ff;margin:0 0 12px;">🔐 安全箱</h3>';
+    html += `<p style="color:#aaa;font-size:13px;">安全箱内的物品在远征失败时<b style="color:#7fff7f;">必定保留</b>。<br>当前：${slots}格 | 背包：16格（金币50个占1格）</p>`;
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">';
+    if (GameState.safeBox && GameState.safeBox.length) {
+      GameState.safeBox.forEach((item,i) => {
+        html += `<div style="padding:4px;">${item.icon||'📦'} ${item.name} ×${item.amount||1}</div>`;
+      });
+    } else {
+      html += '<p style="color:#666;font-size:12px;">安全箱为空。远征中按拾取顺序前'+slots+'个物品视为安全箱物品。</p>';
+    }
+    html += '</div>';
+    if (cost) {
+      html += `<button class="secondary-btn" onclick="LoadoutSystem.upgradeSafe();Game.openSafeBox();location.reload()">升级到${slots+1}格（${cost}金币）</button>`;
+    } else {
+      html += '<p style="color:#ffd700;">安全箱已满级（3格）</p>';
+    }
+    html += '<div style="margin-top:12px;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
   }
 };
 

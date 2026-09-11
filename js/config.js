@@ -13,8 +13,20 @@ const CONFIG = {
     { id: 'pea_repeater', name: '豌豆连弩', shortName: '连弩', icon: '弩', mode: 'ranged',
       damage: 11, range: 470, cooldown: 0.28, projectileSpeed: 620, color: '#75dc68', description: '快速远射，适合持续压制' },
     { id: 'vine_staff', name: '藤芯法杖', shortName: '法杖', icon: '杖', mode: 'pierce',
-      damage: 24, range: 390, cooldown: 0.72, projectileSpeed: 440, pierce: 2, color: '#7be5c4', description: '灵藤波可贯穿多个目标' }
+      damage: 24, range: 390, cooldown: 0.72, projectileSpeed: 440, pierce: 2, color: '#7be5c4', description: '灵藤波可贯穿多个目标' },
+    // v1.0 蓝图武器（成就/Boss解锁）
+    { id: 'throwing_knife', name: '飞刃', shortName: '飞刃', icon: '刃', mode: 'ranged', blueprint: true,
+      damage: 16, range: 520, cooldown: 0.35, projectileSpeed: 800, color: '#c0c0e0', description: '高初速远程，攻速极快' },
+    { id: 'flame_bow', name: '烈焰长弓', shortName: '火弓', icon: '弓', mode: 'ranged', blueprint: true,
+      damage: 32, range: 600, cooldown: 0.85, projectileSpeed: 550, color: '#ff6b35', description: '火焰箭矢，命中爆炸AOE' }
   ],
+  materials: {
+    iron: { name: '铁块', icon: '⛓️', desc: '武器锻造基础材料' },
+    crystal: { name: '灵晶', icon: '💎', desc: '高级材料，法杖附魔用' },
+    bossFang: { name: 'Boss獠牙', icon: '🦷', desc: 'Boss掉落，顶级升级用' },
+    wood: { name: '硬木', icon: '🪵', desc: '基础材料' },
+    herb: { name: '草药', icon: '🌿', desc: '消耗品材料' }
+  },
   expedition: {
     duration: 720,
     demoDuration: 720, // v1.3 统一对局时限：12分钟

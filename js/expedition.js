@@ -975,11 +975,15 @@ class Expedition {
         loot: randInt(1, 3)
       });
     }
-    // 撤离点（地图边缘2个）
-    this.extractPoints = [
-      { x: rand(100, 300), y: rand(100, size-100), radius: 50 },
-      { x: rand(size-300, size-100), y: rand(100, size-100), radius: 50 }
-    ];
+    // v1.0 撤离点随机化（每局1-2个，位置随机，小地图仅显示大致区域）
+    this.extractPoints = [];
+    const _extractCount = Math.random() < 0.4 ? 1 : 2;
+    for (let _ei = 0; _ei < _extractCount; _ei++) {
+      this.extractPoints.push({
+        x: rand(200, size-200), y: rand(200, size-200), radius: 50,
+        revealed: false, hidden: true
+      });
+    }
     // 初始养分结晶
     for (let i = 0; i < 3 + this.map.tier; i++) {
       const pos = this.findSafeSpawn(150, size - 150, 16);
@@ -1352,7 +1356,19 @@ class Expedition {
       if (record) record.recovered = true;
       this.spawnAoeEffect(x, y, 30, '#a5e675');
       showToast('回收植物残骸，培育损失减半', 'gold');
+    } else if (item.type === 'weapon_drop') {
+      // v1.0 临时武器拾取（自动切换）
+      this.tempWeapons = this.tempWeapons || [];
+      this.tempWeapons.push(item.weapon);
+      this.spawnAoeEffect(x, y, 50, '#ffd700');
+      showToast(`🔨 获得临时武器：${item.weapon.name}！按Q滚轮切换`, 'gold');
     } else {
+      // v1.0 背包格位检查
+      if (typeof LoadoutSystem !== 'undefined' && !LoadoutSystem.canAdd(this.bag, item)) {
+        showToast('背包已满！', 'warning');
+        this.groundLoot.push({ ...item, x, y, bob: 0 }); // 放回地上
+        return false;
+      }
       this.bag.push(item);
       this.spawnAoeEffect(x, y, 34, '#f6c75b');
       showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
@@ -1799,6 +1815,15 @@ class Expedition {
     this.gameOver = true;
     this.result = 'success';
     AudioManager.playEvacuateSuccess();
+    // v1.0 成就追踪
+    if (typeof AchievementSystem !== 'undefined') {
+      AchievementSystem.trackEvent('extract');
+      const s = AchievementSystem && GameState.achievements.stats;
+      s.consecutiveExtracts = (s.consecutiveExtracts || 0) + 1;
+      s.lastRunKills = this.killCount || 0;
+      s.lastRunGold = this.bag.filter(i=>i.type==='gold').reduce((a,i)=>a+i.amount,0);
+      AchievementSystem.checkAll();
+    }
     this.endExpedition();
   }
 
@@ -1806,6 +1831,7 @@ class Expedition {
     this.gameOver = true;
     this.result = 'failed';
     AudioManager.playDeath();
+    if (GameState.achievements) GameState.achievements.stats.consecutiveExtracts = 0;
     this.endExpedition();
   }
 
@@ -1846,14 +1872,18 @@ class Expedition {
         Warehouse.addItem(i.id, i.amount);
       });
     } else {
-      // 失败：只有安全箱保留（简化：随机保留20%）
+      // v1.0 失败：安全箱内物品必保留，其余全掉
+      const safeSlots = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getSafeCapacity() : 1;
+      let safeIdx = 0;
       this.bag.forEach(i => {
-        if (Math.random() < 0.2) {
+        const inSafe = safeIdx < safeSlots;
+        if (inSafe) {
           keptItems.push({ ...i, kept: true });
-          if (i.type === 'gold') GameState.gold += Math.floor(i.amount * 0.2);
-          if (i.type === 'seed') Warehouse.addItem('seeds', Math.floor(i.amount * 0.5));
-          if (i.type === 'material') Warehouse.addItem('materials', Math.floor(i.amount * 0.5));
-          if (i.type === 'consumable') Warehouse.addItem(i.id, Math.max(1, Math.floor(i.amount * 0.5)));
+          if (i.type === 'gold') GameState.gold += i.amount;
+          if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
+          if (i.type === 'material') Warehouse.addItem('materials', i.amount);
+          if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
+          safeIdx++;
         } else {
           lostItems.push({ ...i, kept: false });
         }
@@ -2467,11 +2497,29 @@ class Expedition {
           this.spawnGroundLoot({ type: 'material', name: '首领核心', amount: 2 + this.map.tier, icon: '◆' }, m.x + 18, m.y);
           this.spawnGroundLoot({ type: 'gold', name: '首领赏金', amount: 150 * this.map.tier, icon: '💰' }, m.x - 18, m.y);
           showToast(`首领「${m.name}」已击败，撤离奖励提升`, 'success');
+          if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('boss', 't'+this.map.tier);
+          // v1.0 Boss 掉蓝图/高级材料
+          this.spawnGroundLoot({ type: 'material', name: 'Boss獠牙', amount: 1, icon: '🦷', matId: 'bossFang' }, m.x, m.y+15);
           this.boss = null;
         }
+        // v1.0 击杀计数成就
+        if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill');
         // 掉落
         if (Math.random() < 0.3) {
           this.spawnGroundLoot({ type: 'gold', name: '金币', amount: m.gold || 5, icon: '💰' }, m.x, m.y);
+        }
+        // v1.0 材料掉落
+        if (Math.random() < 0.2) {
+          this.spawnGroundLoot({ type: 'material', name: '铁块', amount: randInt(1,3), icon: '⛓️', matId: 'iron' }, m.x+10, m.y);
+        }
+        if (m.elite && Math.random() < 0.35) {
+          this.spawnGroundLoot({ type: 'material', name: '灵晶', amount: 1, icon: '💎', matId: 'crystal' }, m.x-10, m.y);
+        }
+        // v1.0 精英/Boss 掉临时武器
+        if (m.elite && Math.random() < 0.5 && typeof LoadoutSystem !== 'undefined') {
+          const _base = CONFIG.weapons[Math.floor(Math.random() * 3)];
+          const _tw = LoadoutSystem.rollTempWeapon(_base, this.map.tier);
+          this.spawnGroundLoot({ type: 'weapon_drop', name: _tw.name, icon: '🔨', weapon: _tw }, m.x, m.y-15);
         }
         if (m.type !== 'boss' && Math.random() < 0.055) {
           this.spawnGroundLoot({ type: 'invincible', name: '无敌核心', amount: 1, icon: '🛡️', duration: 5 }, m.x, m.y);

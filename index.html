@@ -1797,6 +1797,9 @@
             <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
             <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">种植稀有植物 · 获取道具</div></div>
             <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
+            <div class="facility" onclick="Game.openAchievements()"><div class="facility-icon">🏆</div><div class="facility-name">成就殿堂</div><div class="facility-state" id="achievementState">查看成就进度</div></div>
+            <div class="facility" onclick="Game.openBlacksmith()"><div class="facility-icon">🔨</div><div class="facility-name">武器锻造台</div><div class="facility-state" id="blacksmithState">升级武器 · 配件管理</div></div>
+            <div class="facility" onclick="Game.openSafeBox()"><div class="facility-icon">🔐</div><div class="facility-name">安全箱</div><div class="facility-state" id="safeBoxState">死亡必保留 · 升级格位</div></div>
           </div>
         </div>
         <div class="panel">
@@ -2011,26 +2014,28 @@
   <div id="toastContainer"></div>
 </div>
 
-  <script src="js/config.js?v=0903"></script>
-  <script src="js/save.js?v=0903"></script>
-  <script src="js/ui.js?v=0903"></script>
-  <script src="js/card.js?v=0903"></script>
-  <script src="js/farm.js?v=0903"></script>
-  <script src="js/farm-expansion.js?v=0903"></script>
-  <script src="js/warehouse.js?v=0903"></script>
-  <script src="js/greenhouse.js?v=0903"></script>
-  <script src="js/performance.js?v=0903"></script>
+  <script src="js/config.js?v=100"></script>
+  <script src="js/save.js?v=100"></script>
+  <script src="js/ui.js?v=100"></script>
+  <script src="js/card.js?v=100"></script>
+  <script src="js/farm.js?v=100"></script>
+  <script src="js/farm-expansion.js?v=100"></script>
+  <script src="js/warehouse.js?v=100"></script>
+  <script src="js/greenhouse.js?v=100"></script>
+  <script src="js/performance.js?v=100"></script>
   <script src="vendor/pixi.min.js"></script>
-  <script src="js/pixi-renderer.js?v=0903"></script>
-  <script src="js/expedition.js?v=0903"></script>
-  <script src="js/difficulty-system.js?v=0903"></script>
-  <script src="js/npc-system.js?v=0903"></script>
-  <script src="js/tech-system.js?v=0903"></script>
-  <script src="js/v080-ui.js?v=0903"></script>
-  <script src="js/crop-expansion.js?v=0903"></script>
-  <script src="js/crop-render-ext.js?v=0903"></script>
-  <script src="js/combat-enhancement.js?v=0903"></script>
-  <script src="js/game.js?v=0903"></script>
+  <script src="js/pixi-renderer.js?v=100"></script>
+  <script src="js/expedition.js?v=100"></script>
+  <script src="js/difficulty-system.js?v=100"></script>
+  <script src="js/npc-system.js?v=100"></script>
+  <script src="js/tech-system.js?v=100"></script>
+  <script src="js/v080-ui.js?v=100"></script>
+  <script src="js/crop-expansion.js?v=100"></script>
+  <script src="js/crop-render-ext.js?v=100"></script>
+  <script src="js/combat-enhancement.js?v=100"></script>
+  <script src="js/achievement-system.js?v=100"></script>
+  <script src="js/loadout-system.js?v=100"></script>
+  <script src="js/game.js?v=100"></script>
 
   <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -2041,8 +2046,8 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js?v=0903"></script>
-  <script src="js/nebula-text.js?v=0903"></script>
+  <script src="js/nebula.js?v=100"></script>
+  <script src="js/nebula-text.js?v=100"></script>
 
   <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
