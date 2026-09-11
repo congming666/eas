@@ -1220,7 +1220,7 @@ class Expedition {
     canvas.addEventListener('mouseup', this.mouseupHandler);
     canvas.addEventListener('contextmenu', this.contextmenuHandler);
     canvas.addEventListener('wheel', this.wheelHandler, { passive: false });
-  }
+  },
 
   cleanup() {
     window.removeEventListener('keydown', this.keydownHandler);
