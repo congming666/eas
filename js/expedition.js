@@ -930,6 +930,13 @@ class Expedition {
       const extraTypes = this.map.tier >= 2 ? ['locust'] : [];
       if (this.map.tier >= 3) extraTypes.push('wolf');
       const pool = [...basicTypes, ...extraTypes];
+      // v1.4 新怪按T级加入
+      if (this.map.tier >= 1) pool.push('treant');          // T1+ 树精
+      if (this.map.tier >= 2) pool.push('gargoyle');       // T2+ 石像鬼
+      if (this.map.tier >= 3) pool.push('shadow_demon');   // T3+ 影魔
+      // v1.4 精英怪低概率直接生成
+      if (this.map.tier >= 2 && Math.random() < 0.08) pool.push('stone_golem');
+      if (this.map.tier >= 1 && Math.random() < 0.06) pool.push('boar_king');
       // 反制兵种按T级固定混入（T2起：疾风狼/食草兽，T3+厚甲猪）
       const mix = CONFIG.counterMixes[this.map.tier - 1] || { swift_wolf: 0, herbivore: 0, armored_boar: 0 };
       ['swift_wolf', 'herbivore', 'armored_boar'].forEach(mt => {
@@ -1177,7 +1184,8 @@ class Expedition {
       }
       if (e.key >= '5' && e.key <= '9') this.selectPlantByKey(Number(e.key) - 5);
       if (e.key.toLowerCase() === 'z') this.cyclePlantSelection(1);
-      if (e.key === 'Tab' || e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
+      if (e.key === 'Tab') { e.preventDefault(); this.toggleInventory(); }
+      if (e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
       if (e.key === 'q' && e.shiftKey) { e.preventDefault(); this.cycleWeapon(-1); }
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
       if (e.key.toLowerCase() === 'r') this.useConsumable('thorn_storm');
@@ -1231,6 +1239,53 @@ class Expedition {
     canvas.removeEventListener('mouseup', this.mouseupHandler);
     canvas.removeEventListener('contextmenu', this.contextmenuHandler);
     canvas.removeEventListener('wheel', this.wheelHandler);
+  }
+
+  toggleInventory() {
+    const existing = document.getElementById('inventoryOverlay');
+    if (existing) { existing.remove(); return; }
+    const inv = this.inventory || [];
+    const safe = (GameState.safeBox || []);
+    let html = `<div style="width:480px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="color:#ffd700;margin:0;">🎒 背包</h3>
+        <span style="color:#888;font-size:12px;">${inv.length}/16 格</span>
+      </div>`;
+    if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:20px;">背包空空如也，打怪捡东西吧</div>';
+    inv.forEach((item, i) => {
+      html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+        <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</span>
+        <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>
+      </div>`;
+    });
+    if (safe.length > 0) {
+      html += '<div style="margin-top:12px;color:#ffd700;font-size:13px;">🔒 安全箱（死亡保留）</div>';
+      safe.forEach((item, i) => {
+        html += `<div style="padding:6px;margin:4px 0;background:rgba(255,215,0,0.05);border-radius:6px;">${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</div>`;
+      });
+    }
+    html += '<div style="margin-top:12px;text-align:center;font-size:11px;color:#666;">按 Tab 关闭 · 死亡时背包物品全部掉落</div></div>';
+    const overlay = document.createElement('div');
+    overlay.id = 'inventoryOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = html;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+
+  useInventoryItem(idx) {
+    const item = (this.inventory || [])[idx];
+    if (!item) return;
+    if (item.type === 'consumable' && item.id) {
+      this.useConsumable(item.id);
+      this.inventory.splice(idx, 1);
+    } else if (item.type === 'gold') {
+      GameState.gold += item.amount;
+      showToast(`💰 +${item.amount} 金币`, 'gold');
+      this.inventory.splice(idx, 1);
+    }
+    this.toggleInventory();
+    this.toggleInventory();
   }
 
   showPauseMenu() {
