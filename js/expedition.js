@@ -152,21 +152,22 @@ class Expedition {
       sprite.src = `assets/obstacles/${type}.webp`;
       this.obstacleSprites[type] = sprite;
     });
-    ['bat', 'spider', 'boar'].forEach(type => {
-      this.monsterSprites[type] = {};
-      ['idle', 'attack', 'hit', 'death'].forEach(state => {
-        const sprite = new Image();
-        sprite.src = `assets/monsters/${type}-${state}.webp`;
-        this.monsterSprites[type][state] = sprite;
-      });
-    });
-    // v1.7 新怪物贴图
-    const newMobs = {
-      treant: 'docs/art/enemies/treant.png',
-      gargoyle: 'docs/art/enemies/gargoyle.png',
-      shadow_demon: 'docs/art/enemies/shadow_demon.png'
+    // v2.6 Seedream 5.0 真实怪物贴图（已去背景）
+    const v3mobs = {
+      bat: 'docs/art/enemies/bat_v3.png',
+      spider: 'docs/art/enemies/spider_v3.png',
+      boar: 'docs/art/enemies/boar_king_v3.png',
+      wolf: 'docs/art/enemies/wolf_v3.png',
+      locust: 'docs/art/enemies/locust_v3.png',
+      treant: 'docs/art/enemies/treant_v3.png',
+      gargoyle: 'docs/art/enemies/gargoyle_v3.png',
+      shadow_demon: 'docs/art/enemies/shadow_demon_v3.png',
+      boar_king: 'docs/art/enemies/boar_king_v3.png',
+      stone_golem: 'docs/art/enemies/stone_golem_v3.png',
+      't1-stone-maw': 'docs/art/enemies/boss_t1.png',
+      't2-storm-drake': 'docs/art/enemies/boss_t2.png'
     };
-    for (const [type, src] of Object.entries(newMobs)) {
+    for (const [type, src] of Object.entries(v3mobs)) {
       this.monsterSprites[type] = {};
       const img = new Image();
       img.src = src;
@@ -182,6 +183,8 @@ class Expedition {
     this.fxSprites.gargoyle.src = 'docs/art/mobfx/gargoyle_dive.png';
     this.fxSprites.shadow.src = 'docs/art/mobfx/shadow_blink.png';
     this.fxSprites.boar.src = 'docs/art/mobfx/boar_charge.png';
+    this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
+    this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -2586,6 +2589,10 @@ class Expedition {
     }
     AudioManager.playMonsterHit(isBoss ? 'heavy' : (isCrit ? 'crit' : heavy ? 'heavy' : 'normal'), weaponId);
     if (isBoss) AudioManager.playBossHit();
+    if (this.fxSprites && this.fxSprites.hitBlood) {
+      this.fxParticles = this.fxParticles || [];
+      this.fxParticles.push({ img: this.fxSprites.hitBlood, x: hitX, y: hitY, life: 0.35, maxLife: 0.35, size: 60 });
+    }
   }
 
   spawnKillFeedback(target) {
@@ -3155,6 +3162,7 @@ class Expedition {
         arr[w++] = p;
       }
       arr.length = w;
+      if (this.fxParticles) for (const p of this.fxParticles) p.life -= dt;
     }
     // 伤害跳字：原地紧凑
     {
@@ -3939,6 +3947,18 @@ class Expedition {
       }
     });
 
+    // v2.6 血雾贴图粒子
+    if (this.fxParticles) {
+      this.fxParticles = this.fxParticles.filter(p => p.life > 0);
+      this.fxParticles.forEach(p => {
+        const sx = p.x - cam.x, sy = p.y - cam.y;
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        ctx.save(); ctx.globalAlpha = a * 0.9;
+        const sz = p.size * (1.4 - a * 0.4);
+        ctx.drawImage(p.img, sx - sz/2, sy - sz/2, sz, sz);
+        ctx.restore();
+      });
+    }
     // 伤害跳字：上浮、渐隐，重击字号更大。
     this.damageNumbers.forEach(number => {
       const sx = number.x - cam.x, sy = number.y - cam.y;
