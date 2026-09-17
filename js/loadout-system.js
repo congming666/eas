@@ -1,7 +1,7 @@
 // ================= v1.0 背包/安全箱/入场费系统 =================
 const LoadoutSystem = {
   BAG_SIZE: 16,          // 背包格位
-  GOLD_PER_SLOT: 50,     // 50金币占1格
+  GOLD_PER_SLOT: 100,    // 100金币占1格
 
   init() {
     if (!GameState.safeSlots) GameState.safeSlots = 1;
@@ -74,12 +74,13 @@ const LoadoutSystem = {
 
   upgradeSafe() {
     const cost = this.upgradeSafeCost();
-    if (cost === null) { showToast('安全箱已满级', 'warning'); return; }
-    if (GameState.gold < cost) { showToast('金币不足', 'warning'); return; }
+    if (cost === null) { showToast('安全箱已满级', 'warning'); return false; }
+    if (GameState.gold < cost) { showToast('金币不足', 'warning'); return false; }
     GameState.gold -= cost;
     GameState.safeSlots++;
     showToast(`安全箱升级！现在 ${GameState.safeSlots} 格`, 'gold');
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
+    return true;
   },
 
   // v1.1 武器实例管理
@@ -186,14 +187,80 @@ const LoadoutSystem = {
   // 获取武器实例实际属性（含等级加成）
   getWeaponStats(baseWeapon, level) {
     const lv = level || 0;
-    if (lv === 0) return { ...baseWeapon };
-    const mult = 1 + lv * 0.1; // 每级+10%伤害
-    return {
-      ...baseWeapon,
-      damage: Math.round(baseWeapon.damage * mult),
-      level: lv
-    };
+    let stats = { ...baseWeapon };
+    if (lv > 0) {
+      const mult = 1 + lv * 0.1; // 每级+10%伤害
+      stats.damage = Math.round(baseWeapon.damage * mult);
+    }
+    // v2.0 每级专属词条
+    const b = this.getWeaponBonuses(baseWeapon.id, lv);
+    Object.assign(stats, b);
+    stats.level = lv;
+    return stats;
   },
+
+  // v2.0 武器等级成长表：每级除了+10%伤害，还解锁专属词条
+  // 返回 flags/numbers，由 expedition.js 在 playerAttack 中读
+  getWeaponBonuses(weaponId, level) {
+    const lv = level || 0;
+    const b = { level: lv,
+      rangeBonus: 0, cdBonus: 0, speedBonus: 0, pierceBonus: 0,
+      critChanceBonus: 0, critDmgBonus: 0, lifesteal: 0,
+      knockback3: false, whirlwind: false, whirlwindDmg: 0, bleed: false,
+      multiShot: 0, ricochet: 0, instantKillLow: 0,
+      aoeBonus: 0, slowOnHit: 0, slowDur: 0, explosionOnKill: 0, rootChance: 0, rootDur: 0, plague: 0,
+      explode: 0, burnDps: 0, burnStack: 0, rainArrows: 0, nuke: false, autoAim: false
+    };
+    switch (weaponId) {
+      case 'harvest_sickle':
+        if (lv >= 4) b.rangeBonus = 0.15;
+        if (lv >= 5) b.knockback3 = true;
+        if (lv >= 6) b.critChanceBonus = 0.10;
+        if (lv >= 7) b.lifesteal = 2;
+        if (lv >= 8) b.whirlwind = true;
+        if (lv >= 9) b.whirlwindDmg = 0.30;
+        if (lv >= 10) b.bleed = true;
+        break;
+      case 'pea_repeater':
+        if (lv >= 4) b.cdBonus = -0.08;       // 攻速+8%
+        if (lv >= 5) b.speedBonus = 0.20;
+        if (lv >= 6) b.pierceBonus = 1;
+        if (lv >= 7) b.critChanceBonus = 0.05; // 暴击后0.5s攻速+20%（代码侧处理）
+        if (lv >= 8) b.multiShot = 3;
+        if (lv >= 9) b.multiShot = 4;
+        if (lv >= 10) b.instantKillLow = 0.30;
+        break;
+      case 'vine_staff':
+        if (lv >= 4) b.aoeBonus = 0.20;
+        if (lv >= 5) b.pierceBonus = 2;
+        if (lv >= 6) { b.slowOnHit = 0.30; b.slowDur = 1.5; }
+        if (lv >= 7) b.explosionOnKill = 60;
+        if (lv >= 8) b.rootChance = 0.25, b.rootDur = 1.0;
+        if (lv >= 9) b.rootDur = 2.0;
+        if (lv >= 10) b.plague = 0.6;
+        break;
+      case 'throwing_knife':
+        if (lv >= 4) b.cdBonus = -0.12;
+        if (lv >= 5) b.ricochet = 1;
+        if (lv >= 6) b.critChanceBonus = 0.15;
+        if (lv >= 7) b.moveShoot = true;
+        if (lv >= 8) b.multiShot = 2;
+        if (lv >= 9) b.multiShot = 3;
+        if (lv >= 10) b.autoAim = true;
+        break;
+      case 'flame_bow':
+        if (lv >= 4) b.critDmgBonus = 0.50;
+        if (lv >= 5) b.explode = 50;
+        if (lv >= 6) b.burnDps = 8;
+        if (lv >= 7) b.burnStack = 3;
+        if (lv >= 8) b.rainArrows = 3;
+        if (lv >= 9) b.burnDps *= 1.5;
+        if (lv >= 10) b.nuke = true;
+        break;
+    }
+    return b;
+  },
+
 
   // 按uid获取实际属性
   getInstanceStats(uid) {

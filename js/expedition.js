@@ -10,6 +10,13 @@ const WEAPON_FX = {
 class Expedition {
   constructor(mapId) {
     this.map = CONFIG.maps.find(m => m.id === mapId);
+    // v3.5 加载地图背景图
+    this.mapBgImg = new Image();
+    this.mapBgLoaded = false;
+    if (this.map && this.map.bgImage) {
+      this.mapBgImg.onload = () => { this.mapBgLoaded = true; };
+      this.mapBgImg.src = this.map.bgImage;
+    }
     this.timeLeft = CONFIG.expedition.demoDuration;
     this.player = {
       x: 640, y: 360,
@@ -92,6 +99,7 @@ class Expedition {
     this.traps = [];
     this.groundLoot = [];
     this.projectiles = [];
+    this.aoeTimers = [];
     this.particles = [];
     this.damageNumbers = [];
     this.particlePool = [];       // 粒子对象池（消灭每帧 filter 分配）
@@ -115,6 +123,23 @@ class Expedition {
     this.killCount = 0;
     this.chestOpened = 0;
     this.damageTaken = 0;
+    // v3.8 本局高光统计
+    this.runStats = {
+      startTime: performance.now(),
+      maxDistFromSpawn: 0,       // 最远探索距离
+      minHpSeen: 100,            // 最低血量百分比（险象环生）
+      maxCombo: 0,               // 最高连击
+      eliteKills: 0,             // 精英击杀
+      bossKills: 0,              // Boss 击杀
+      nearDeathCount: 0,         // 血量低于 25% 的次数
+      perfectDodgeCount: 0,      // 完美闪避次数
+      barrelsDetonated: 0,       // 油桶引爆数
+      propsDestroyed: 0,         // 破坏物数
+      plantsDeployed: 0,         // 战场种植数
+      highestWave: 0,            // 最高兽潮波次
+    };
+    this.spawnX = CONFIG.expedition.mapSize / 2;
+    this.spawnY = CONFIG.expedition.mapSize / 2;
     this.balance = this.getBalanceProfile();
     this.objective = null;
     this.boss = null;
@@ -186,7 +211,7 @@ class Expedition {
     this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
     this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
     this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
-    this.weaponSheet = new Image(); this.weaponSheet.src = 'docs/art/v2/weapons.png';
+    this.weaponSheet = new Image(); this.weaponSheet.src = 'assets/weapons/weapon_sheet_t.png'; this.weaponSheetPrekeyed = true;
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
     this.bossSprites.t1 = t1BossSprite;
@@ -209,12 +234,21 @@ class Expedition {
       DifficultySystem.applyDifficulty(GameState.difficulty || 'normal', GameState.heatModifiers || [], this.map.tier);
       const _ds = DifficultySystem.get();
       this.visionRadius = 360 * _ds.visionMul;
+      // v3.4 地图词条：视野修正
+      if (this.map.visibilityBonus) this.visionRadius *= (1 + this.map.visibilityBonus);
+      if (this.map.visionPenalty) this.visionRadius *= (1 - this.map.visionPenalty);
       this.beastWave.nextIn = DifficultySystem.getTierMechanic(this.map.tier).beastWaveInterval || 48;
     }
     this.generateTerrain();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
     this.spawnEntities();
     this.spawnWildPlants();
+    this.applyMapModifiers();
+    this.generateHeightZones();
+    this.generateLandmarks();
+    this.generateProps();
+    this.generatePatrols();
+    if (typeof WorldFX !== 'undefined') WorldFX.generate(this);
     this.obstacleSpatialHash.rebuild(this.obstacles);
     this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
@@ -261,7 +295,7 @@ class Expedition {
       // 单张连续迷雾：当前视野完全透明，视野外统一遮盖，不再按探索格画圆形泡泡。
       fogCtx.globalCompositeOperation = 'source-over';
       fogCtx.globalAlpha = 1;
-      fogCtx.fillStyle = 'rgba(10,16,24,.78)';
+      fogCtx.fillStyle = this.nightMode ? 'rgba(6,8,20,.92)' : 'rgba(10,16,24,.78)';
       fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
       fogCtx.globalCompositeOperation = 'destination-out';
       const px = this.player.x - this.camera.x;
@@ -291,7 +325,7 @@ class Expedition {
       enemyDamage: (1 + (tier - 1) * 0.22) * _ds.dmgMul,
       enemySpeed: (1 + (tier - 1) * 0.055) * (_ds.speedMulExtra || 1),
       reward: (1 + (tier - 1) * 0.48) * _ds.rewardMul * ((typeof DifficultySystem !== 'undefined') ? DifficultySystem.getHeatRewardMultiplier() : 1),
-      eliteChance: (tier < 3 ? 0 : 0.08 + tier * 0.025) + (_tierM.eliteChanceBonus || 0),
+      eliteChance: (tier < 3 ? 0 : 0.08 + tier * 0.025) + (_tierM.eliteChanceBonus || 0) + (this.map.eliteBonus || 0),
       bossHp: (520 + tier * 260) * _ds.hpMul,
       bossDamage: (14 + tier * 5) * _ds.dmgMul,
     };
@@ -335,7 +369,7 @@ class Expedition {
     }
 
     for (let i = 0; i < 12 + this.map.tier * 3; i++) {
-      const waterChance = 0.14 + this.map.tier * 0.015;
+      const waterChance = (0.14 + this.map.tier * 0.015) * (this.map.waterHeavy ? 2.2 : 1);
       const type = Math.random() < waterChance ? 'water' : (Math.random() < 0.5 ? 'soil' : 'grass');
       this.terrainPatches.push({
         x: rand(100, size - 100), y: rand(100, size - 100),
@@ -418,18 +452,44 @@ class Expedition {
     // 使用 chunk canvas 实际尺寸，而非全局画布尺寸（修复全黑问题）
     const viewW = ctx.canvas.width || CONFIG.canvas.width;
     const viewH = ctx.canvas.height || CONFIG.canvas.height;
-    ctx.fillStyle = this.map.bgColor;
-    ctx.fillRect(0, 0, viewW, viewH);
+    // v3.5 优先画地图背景图，没有图才用纯色
+    let usedBgImage = false;
+    if (this.mapBgLoaded && this.mapBgImg && this.mapBgImg.complete && this.mapBgImg.naturalWidth > 0) {
+      const iw = this.mapBgImg.naturalWidth, ih = this.mapBgImg.naturalHeight;
+      const scale = Math.max(viewW / iw, viewH / ih);
+      const dw = iw * scale, dh = ih * scale;
+      const offX = -((cam.x * 0.5) % dw);
+      const offY = -((cam.y * 0.5) % dh);
+      ctx.globalAlpha = 0.85;
+      for (let x = offX - dw; x < viewW + dw; x += dw) {
+        for (let y = offY - dh; y < viewH + dh; y += dh) {
+          ctx.drawImage(this.mapBgImg, x, y, dw, dh);
+        }
+      }
+      ctx.globalAlpha = 1;
+      usedBgImage = true;
+    }
+    if (!usedBgImage) {
+      ctx.fillStyle = this.map.bgColor;
+      ctx.fillRect(0, 0, viewW, viewH);
+    }
 
-    // Continuous grass field: no square tile boundaries or visible grid lines.
+    // Continuous grass field: 用全局坐标算散点，避免 chunk 拼接处出现接缝
     ctx.save();
     ctx.globalAlpha = 0.11;
     ctx.strokeStyle = theme.glow;
     ctx.lineWidth = 1;
-    const seed = Math.floor(cam.x / 38) * 17 + Math.floor(cam.y / 38) * 31;
+    // 全局世界坐标种子，保证相邻 chunk 图案连续
+    const gx0 = cam.x, gy0 = cam.y;
+    const seed = Math.floor(gx0 / 38) * 17 + Math.floor(gy0 / 38) * 31;
     for (let i = 0; i < 160; i++) {
-      const x = ((i * 83 + seed * 7) % (viewW + 80)) - 40;
-      const y = ((i * 137 + seed * 11) % (viewH + 80)) - 40;
+      // 用全局坐标取模，确保跨 chunk 连续
+      const wx = ((i * 83 + seed * 7) % 4096) - 2048;
+      const wy = ((i * 137 + seed * 11) % 4096) - 2048;
+      // 转到 chunk 局部坐标
+      const x = wx - gx0;
+      const y = wy - gy0;
+      if (x < -20 || x > viewW + 20 || y < -20 || y > viewH + 20) continue;
       ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + 3, y - 3); ctx.stroke();
     }
     const light = ctx.createLinearGradient(0, 0, 0, viewH);
@@ -550,6 +610,34 @@ class Expedition {
       ctx.restore();
     });
 
+    // v3.7 绘制高低差区域
+    if (this.heightZones) {
+      this.heightZones.forEach(z => {
+        const sx = z.x - cam.x, sy = z.y - cam.y;
+        if (sx < -z.r || sx > viewW + z.r || sy < -z.r || sy > viewH + z.r) return;
+        const g = ctx.createRadialGradient(sx, sy, z.r * 0.2, sx, sy, z.r);
+        if (z.type === 'high') {
+          g.addColorStop(0, 'rgba(255,220,140,0.18)');
+          g.addColorStop(1, 'rgba(255,220,140,0)');
+        } else {
+          g.addColorStop(0, 'rgba(80,60,40,0.22)');
+          g.addColorStop(1, 'rgba(80,60,40,0)');
+        }
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(sx, sy, z.r, 0, Math.PI * 2);
+        ctx.fill();
+        // 边框圈
+        ctx.strokeStyle = z.type === 'high' ? 'rgba(255,220,140,0.4)' : 'rgba(80,60,40,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(sx, sy, z.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+    }
+
     const vignette = ctx.createRadialGradient(viewW / 2, viewH / 2, 170, viewW / 2, viewH / 2, 720);
     vignette.addColorStop(0, 'rgba(0,0,0,0)');
     vignette.addColorStop(1, 'rgba(0,0,0,.12)');
@@ -567,7 +655,7 @@ class Expedition {
       const chunk = this.terrainChunkCache.get(cx, cy, (chunkCtx, worldX, worldY) => {
         this.renderTerrainDirect(chunkCtx, { x: worldX, y: worldY });
       });
-      ctx.drawImage(chunk, cx * chunkSize - cam.x, cy * chunkSize - cam.y);
+      ctx.drawImage(chunk, cx * chunkSize - cam.x - 1, cy * chunkSize - cam.y - 1, chunkSize + 2, chunkSize + 2);
     }
   }
 
@@ -1000,6 +1088,286 @@ class Expedition {
     return position;
   }
 
+  // v3.4 地图词条实际逻辑
+  // v3.7 生成高低差区域（高地/洼地）
+  generateHeightZones() {
+    const size = CONFIG.expedition.mapSize;
+    this.heightZones = [];
+    // 2-3 个高地（远程怪占，玩家上去射程+15%）
+    const numHigh = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numHigh; i++) {
+      const p = this.findSafeSpawn(200, size - 200, 100);
+      this.heightZones.push({ x: p.x, y: p.y, r: 90 + Math.random() * 50, type: 'high' });
+    }
+    // 2-3 个洼地（减速 30%）
+    const numLow = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numLow; i++) {
+      const p = this.findSafeSpawn(200, size - 200, 100);
+      this.heightZones.push({ x: p.x, y: p.y, r: 80 + Math.random() * 40, type: 'low' });
+    }
+  }
+
+  // 查询某点所在的高度区
+  getHeightAt(x, y) {
+    if (!this.heightZones) return 'normal';
+    for (const z of this.heightZones) {
+      const d = Math.hypot(x - z.x, y - z.y);
+      if (d < z.r) return z.type;
+    }
+    return 'normal';
+  }
+
+  // v3.7 打道具（油桶爆炸/木箱掉钱）
+  damageProp(pr, dmg) {
+    pr.hp -= dmg;
+    this.spawnAoeEffect(pr.x, pr.y, 20, '#aaa');
+    if (pr.hp <= 0) {
+      if (pr.kind === 'barrel') {
+        // 爆炸 AOE
+        this.spawnAoeEffect(pr.x, pr.y, 100, '#ff6633');
+        this.spawnRadialBurst(pr.x, pr.y, '#ffaa44', 30);
+        // 对周围怪 AOE
+        [...this.monsters, ...this.raiders].forEach(m => {
+          const d = Math.hypot(m.x - pr.x, m.y - pr.y);
+          if (d < 100) {
+            this.damageEnemy(m, 35, '#ff6633', false, { x: m.x, y: m.y, fromPlayer: true });
+          }
+        });
+        // 对玩家也造成伤害（谨慎用）
+        const pd = Math.hypot(this.player.x - pr.x, this.player.y - pr.y);
+        if (pd < 100) this.player.hp -= 15;
+        showToast('💥 油桶爆炸！', 'gold');
+      } else if (pr.kind === 'crate') {
+        // 掉钱
+        const gold = randInt(15, 40);
+        this.spawnGroundLoot({ type: 'gold', name: '金币', amount: gold, icon: '💰' }, pr.x, pr.y);
+        this.spawnAoeEffect(pr.x, pr.y, 30, '#ffd700');
+        showToast(`📦 木箱掉落 ${gold} 金`, 'success');
+      }
+      pr.hp = 0;
+      pr.destroyed = true;
+    }
+  }
+
+  // v3.7 生成地标建筑（每张图 1 个独特锚点）
+  generateLandmarks() {
+    const size = CONFIG.expedition.mapSize;
+    const tier = this.map.tier;
+    // 按 tier 选地标
+    const landmarkPool = {
+      1: ['dead_tree', 'windmill'],
+      2: ['stone_arch', 'dry_well'],
+      3: ['giant_sword', 'stone_circle'],
+    };
+    const pool = landmarkPool[tier] || landmarkPool[1];
+    const chosen = pool[Math.floor(Math.random() * pool.length)];
+    const p = this.findSafeSpawn(250, size - 250, 200);
+    this.landmarks = [{ type: chosen, x: p.x, y: p.y, size: 180 }];
+    // 预加载图片
+    this.landmarkImgs = this.landmarkImgs || {};
+    if (!this.landmarkImgs[chosen]) {
+      const img = new Image();
+      img.src = `assets/landmarks/${chosen}_t.png`;
+      this.landmarkImgs[chosen] = img;
+    }
+  }
+
+  // v3.7 生成可交互道具（油桶/木箱/高草/骷髅/推车）
+  generateProps() {
+    const size = CONFIG.expedition.mapSize;
+    this.props = [];
+    // 油桶（爆炸 AOE）
+    const numBarrels = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < numBarrels; i++) {
+      const p = this.findSafeSpawn(150, size - 150, 60);
+      this.props.push({ kind: 'barrel', x: p.x, y: p.y, hp: 10, size: 40 });
+    }
+    // 木箱（打了掉钱）
+    const numCrates = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < numCrates; i++) {
+      const p = this.findSafeSpawn(150, size - 150, 60);
+      this.props.push({ kind: 'crate', x: p.x, y: p.y, hp: 8, size: 36 });
+    }
+    // 高草（隐身）
+    const numGrass = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numGrass; i++) {
+      const p = this.findSafeSpawn(100, size - 100, 80);
+      this.props.push({ kind: 'grass', x: p.x, y: p.y, size: 70 });
+    }
+    // 骷髅（给临时武器/材料）
+    const numSkeletons = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numSkeletons; i++) {
+      const p = this.findSafeSpawn(150, size - 150, 50);
+      this.props.push({ kind: 'skeleton', x: p.x, y: p.y, size: 50, looted: false });
+    }
+    // 翻倒推车（掉材料）
+    const numCarts = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numCarts; i++) {
+      const p = this.findSafeSpawn(150, size - 150, 50);
+      this.props.push({ kind: 'cart', x: p.x, y: p.y, size: 60, looted: false });
+    }
+    // 预加载图片
+    this.propImgs = this.propImgs || {};
+    ['barrel','crate','grass','skeleton','cart'].forEach(k => {
+      if (!this.propImgs[k]) {
+        const img = new Image();
+        img.src = `assets/props/${k}_t.png`;
+        this.propImgs[k] = img;
+      }
+    });
+  }
+
+  // v3.7 生成巡逻队（2-3 支，每支沿固定路线走，玩家靠近才追）
+  generatePatrols() {
+    const size = CONFIG.expedition.mapSize;
+    this.patrols = [];
+    const numPatrols = 2 + Math.floor(Math.random() * 2);
+    const monsterTypesByTier = {
+      1: ['boar', 'wolf', 'spider'],
+      2: ['boar', 'wolf', 'gargoyle', 'brute'],
+      3: ['shadow', 'lava', 'brute', 'gargoyle'],
+    };
+    const types = monsterTypesByTier[this.map.tier] || monsterTypesByTier[1];
+
+    for (let p = 0; p < numPatrols; p++) {
+      // 选一个中心区域，生成 4-5 个巡逻点
+      const cx = randInt(300, size - 300);
+      const cy = randInt(300, size - 300);
+      const waypoints = [];
+      const numWp = 3 + Math.floor(Math.random() * 2);
+      for (let w = 0; w < numWp; w++) {
+        const ang = (w / numWp) * Math.PI * 2 + Math.random() * 0.5;
+        const r = randInt(150, 300);
+        waypoints.push({
+          x: clamp(cx + Math.cos(ang) * r, 100, size - 100),
+          y: clamp(cy + Math.sin(ang) * r, 100, size - 100),
+        });
+      }
+      // 每支巡逻队 2-3 只怪
+      const squadSize = 2 + Math.floor(Math.random() * 2);
+      const members = [];
+      for (let s = 0; s < squadSize; s++) {
+        const type = types[randInt(0, types.length - 1)];
+        const data = CONFIG.monsters[type];
+        if (!data) continue;
+        // 出生在第一个巡逻点附近
+        const startWp = waypoints[0];
+        const offset = s * 25;
+        const m = {
+          type, ...data,
+          x: startWp.x + Math.cos(s) * offset,
+          y: startWp.y + Math.sin(s) * offset,
+          hp: data.hp, maxHp: data.hp,
+          damage: data.damage * this.balance.enemyDamage,
+          speed: data.speed * this.balance.enemySpeed,
+          attackCd: 1, vx: 0, vy: 0, facing: 0, animTime: 0, hitFlash: 0,
+          elite: false, abilityCd: 2, packOffset: 0,
+          state: 'patrol', stateTimer: 0,
+          patrolRoute: waypoints,
+          patrolWpIndex: 1, // 下一个要去的点
+          patrolOffset: s * 30, // 编队偏移
+          lostPlayerTimer: 0,
+        };
+        this.monsters.push(m);
+        members.push(m);
+      }
+      this.patrols.push({ waypoints, members });
+    }
+  }
+
+  applyMapModifiers() {
+    const size = CONFIG.expedition.mapSize;
+    const mid = size / 2;
+    const id = this.map.id;
+
+    // T1_4 旧采石场：多石障碍
+    if (id === 't1_4') {
+      for (let i = 0; i < 22; i++) {
+        const p = this.findSafeSpawn(150, size - 150, 28);
+        this.obstacles.push({ x: p.x, y: p.y, w: rand(36, 70), h: rand(36, 70), type: 'rock', hp: 999 });
+      }
+    }
+    // T2_3 旧磨坊：多建筑障碍
+    if (id === 't2_3') {
+      for (let i = 0; i < 14; i++) {
+        const p = this.findSafeSpawn(200, size - 200, 40);
+        this.obstacles.push({ x: p.x, y: p.y, w: rand(50, 90), h: rand(50, 90), type: 'building', hp: 999 });
+      }
+    }
+    // T2_4 烟熏果园：怪物埋伏在玩家附近
+    if (id === 't2_4') {
+      for (let i = 0; i < 6; i++) {
+        const ang = rand(0, Math.PI * 2);
+        const dist = rand(180, 320);
+        const x = mid + Math.cos(ang) * dist;
+        const y = mid + Math.sin(ang) * dist;
+        const type = ['boar', 'wolf', 'spider'][randInt(0, 2)];
+        const data = CONFIG.monsters[type];
+        this.monsters.push({
+          type, ...data, x, y,
+          hp: data.hp, maxHp: data.hp, damage: data.damage * this.balance.enemyDamage,
+          speed: data.speed * this.balance.enemySpeed, attackCd: 1,
+          vx: 0, vy: 0, facing: 0, animTime: 0, hitFlash: 0,
+          elite: false, abilityCd: 2, packOffset: 0, state: 'idle', stateTimer: 0
+        });
+      }
+    }
+    // T2_5 断桥废墟：坑洞（掉血区域）
+    if (id === 't2_5') {
+      this.hazardZones = this.hazardZones || [];
+      for (let i = 0; i < 8; i++) {
+        const p = this.findSafeSpawn(200, size - 200, 40);
+        this.hazardZones.push({ x: p.x, y: p.y, r: rand(50, 90), damage: 8, type: 'pit', tick: 0 });
+      }
+    }
+    // T3_2 腐殖沼泽：泥地减速区
+    if (id === 't3_2') {
+      this.hazardZones = this.hazardZones || [];
+      for (let i = 0; i < 6; i++) {
+        const p = this.findSafeSpawn(200, size - 200, 40);
+        this.hazardZones.push({ x: p.x, y: p.y, r: rand(80, 140), type: 'mud', slow: 0.5 });
+      }
+    }
+    // T4_2 深渊祭坛：毒雾区
+    if (id === 't4_2') {
+      this.hazardZones = this.hazardZones || [];
+      for (let i = 0; i < 5; i++) {
+        const p = this.findSafeSpawn(200, size - 200, 40);
+        this.hazardZones.push({ x: p.x, y: p.y, r: rand(90, 150), damage: 6, type: 'poison', tick: 0 });
+      }
+    }
+    // T4_3 龙骨荒原：远程怪更多
+    if (id === 't4_3') {
+      const rangedTypes = ['spider', 'locust'];
+      for (let i = 0; i < 10; i++) {
+        const type = rangedTypes[randInt(0, 1)];
+        const data = CONFIG.monsters[type];
+        const p = this.findSafeSpawn(300, size - 300, 18);
+        this.monsters.push({
+          type, ...data, x: p.x, y: p.y,
+          hp: Math.round(data.hp * this.balance.enemyHp),
+          maxHp: Math.round(data.hp * this.balance.enemyHp),
+          damage: Math.round(data.damage * this.balance.enemyDamage),
+          speed: data.speed * this.balance.enemySpeed, attackCd: 0,
+          vx: 0, vy: 0, facing: 0, animTime: 0, hitFlash: 0,
+          elite: false, abilityCd: 2, packOffset: 0, state: 'idle', stateTimer: 0
+        });
+      }
+    }
+    // T4_4 时空裂隙：随机传送门
+    if (id === 't4_4') {
+      this.teleporters = [];
+      for (let i = 0; i < 4; i++) {
+        const p = this.findSafeSpawn(300, size - 300, 30);
+        this.teleporters.push({ x: p.x, y: p.y, r: 28, cd: 0 });
+      }
+    }
+    // T4_5 月见森林：夜间模式
+    if (id === 't4_5') {
+      this.nightMode = true;
+    }
+  }
+
   spawnEntities() {
     const size = CONFIG.expedition.mapSize;
     // 怪物
@@ -1108,6 +1476,7 @@ class Expedition {
       castState:'idle', castTimer:0, castIndex:0, attackAnim:0,
     };
     this.monsters.push(this.boss);
+    this.screenShake = 1;
     showToast(`区域首领「${this.boss.name}」已现身`, 'warning');
   }
 
@@ -1187,6 +1556,7 @@ class Expedition {
     this.beastWave.wave++;
     this.beastWave.active = true;
     this.beastWave.duration = 32 + this.map.tier * 3;
+    if (typeof AudioManager !== 'undefined' && AudioManager.playWaveWarning) AudioManager.playWaveWarning();
     const count = Math.min(60, 16 + this.map.tier * 5 + this.beastWave.wave * 5);
     const types = ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
@@ -1270,12 +1640,14 @@ class Expedition {
       if (e.key === 'F3') { e.preventDefault(); this.selectedSeed = 2; this.showSeedBar(); }
       if (e.key === 'F4') { e.preventDefault(); this.selectedSeed = 3; this.showSeedBar(); }
       if (e.key === 'F5') { e.preventDefault(); this.selectedSeed = 4; this.showSeedBar(); }
-      if (e.key.toLowerCase() === 'e' && !e.shiftKey) this.tryPickWildPlant();
+      if (e.key.toLowerCase() === 'e' && !e.shiftKey) {
+        const picked = this.tryPickWildPlant();
+        if (!picked) this.useConsumable('signal_flare');
+      }
       if (e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
       if (e.key === 'q' && e.shiftKey) { e.preventDefault(); this.cycleWeapon(-1); }
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
       if (e.key.toLowerCase() === 'r') this.useConsumable('thorn_storm');
-      if (e.key.toLowerCase() === 'e') this.useConsumable('signal_flare');
       if (e.key === ' ' || e.key === 'Shift') { e.preventDefault(); if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryDodge(); }
       if (e.key.toLowerCase() === 'f') { if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryUltimate(); }
       if (e.key.toLowerCase() === 'g') { if (typeof CombatEnhancement !== 'undefined') { const ex = this.monsters.find(m => CombatEnhancement.canExecute(m)); if (ex) CombatEnhancement.tryExecute(ex); } }
@@ -1336,37 +1708,77 @@ class Expedition {
     const existing = document.getElementById('inventoryOverlay');
     if (existing) { existing.remove(); return; }
     const inv = this.bag || [];
-    const safe = (GameState.safeBox || []);
-    let html = `<div style="width:480px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;">
+    const safe = this.safeBox || [];
+    const safeCap = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getSafeCapacity() : 1;
+    const usedSlots = inv.reduce((s, i) => s + (i.slots || 1), 0);
+    const totalSlots = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.BAG_SIZE : 16;
+    let html = `<div style="width:520px;max-height:85vh;overflow-y:auto;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;color:#ddd;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="color:#ffd700;margin:0;">🎒 背包</h3>
-        <span style="color:#888;font-size:12px;">${inv.length}/16 格</span>
+        <span style="color:#888;font-size:12px;">背包 ${usedSlots}/${totalSlots} 格 · 安全箱 ${safe.length}/${safeCap} 格</span>
       </div>`;
-    if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:20px;">背包空空如也，打怪捡东西吧</div>';
+    if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:16px;">背包空空如也，打怪捡东西吧</div>';
     inv.forEach((item, i) => {
       const slots = item.slots || 1;
       const canUse = item.type === 'consumable';
-      html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-        <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
-        <span style="display:flex;gap:4px;">
+      const canStore = safe.length < safeCap;
+      html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+        <span>${item.icon||'📦'} <b>${item.name}</b> ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
+        <span style="display:flex;gap:4px;flex-wrap:wrap;">
           ${canUse ? `<button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>` : ''}
+          ${canStore ? `<button class="secondary-btn" style="font-size:11px;color:#ffd700;" onclick="Game.expedition.storeInSafe(${i})">🔒存安全箱</button>` : ''}
           <button class="secondary-btn" style="font-size:11px;color:#ff8888;" onclick="Game.expedition.dropInventoryItem(${i})">丢弃</button>
         </span>
       </div>`;
     });
     if (safe.length > 0) {
-      html += '<div style="margin-top:12px;color:#ffd700;font-size:13px;">🔒 安全箱（死亡保留）</div>';
+      html += `<div style="margin-top:14px;color:#ffd700;font-size:13px;border-top:1px solid #444;padding-top:8px;">🔒 安全箱（死亡保留，不占背包）</div>`;
       safe.forEach((item, i) => {
-        html += `<div style="padding:6px;margin:4px 0;background:rgba(255,215,0,0.05);border-radius:6px;">${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</div>`;
+        html += `<div style="padding:6px;margin:4px 0;background:rgba(255,215,0,0.08);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+          <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</span>
+          <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.retrieveFromSafe(${i})">取回</button>
+        </div>`;
       });
     }
-    html += '<div style="margin-top:12px;text-align:center;font-size:11px;color:#666;">按 Tab 关闭 · 死亡时背包物品全部掉落</div></div>';
+    html += '<div style="margin-top:12px;text-align:center;font-size:11px;color:#666;">按 Tab 关闭 · 存入安全箱的物品死亡时保留，且不占背包格位</div></div>';
     const overlay = document.createElement('div');
     overlay.id = 'inventoryOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = html;
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     document.body.appendChild(overlay);
+  }
+
+  // 存入安全箱（从背包移到安全箱，不占背包格）
+  storeInSafe(bagIdx) {
+    const item = this.bag[bagIdx];
+    if (!item) return;
+    const safeCap = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getSafeCapacity() : 1;
+    if (this.safeBox.length >= safeCap) {
+      showToast('安全箱已满！', 'warning');
+      return;
+    }
+    this.bag.splice(bagIdx, 1);
+    this.safeBox.push(item);
+    showToast(`🔒 ${item.name} 已存入安全箱`, 'gold');
+    this.toggleInventory(); // 刷新面板
+    this.updateHUD();
+  }
+
+  // 从安全箱取回背包
+  retrieveFromSafe(safeIdx) {
+    const item = this.safeBox[safeIdx];
+    if (!item) return;
+    // 检查背包是否有空间
+    if (typeof LoadoutSystem !== 'undefined' && !LoadoutSystem.canAdd(this.bag, item)) {
+      showToast('背包空间不足！', 'warning');
+      return;
+    }
+    this.safeBox.splice(safeIdx, 1);
+    this.bag.push(item);
+    showToast(`📦 ${item.name} 已取回背包`, 'success');
+    this.toggleInventory();
+    this.updateHUD();
   }
 
   useInventoryItem(idx) {
@@ -1390,9 +1802,21 @@ class Expedition {
         this.spawnAoeEffect(this.player.x, this.player.y, range, '#aa5500');
         showToast(`释放${item.name}！`, 'success');
       } else if (item.id === 'signal_flare') {
-        this.useConsumable('signal_flare');
+        // 直接触发信号弹撤离，不查 consumables 计数（背包里的就是信号弹本身）
+        this.startExtract('signal');
+        const flash = document.getElementById('signalFlash');
+        if (flash) {
+          flash.classList.remove('active');
+          void flash.offsetWidth;
+          flash.classList.add('active');
+        }
+        showToast('释放撤离信号弹！全地图敌人正在逼近！', 'warning');
       } else {
-        this.useConsumable(item.id);
+        // 其他消耗品走通用逻辑（草药/荆棘风暴已在上面处理，这里兜底）
+        if (def) {
+          if (def.heal) { this.player.hp = Math.min(this.player.maxHp, this.player.hp + def.heal); }
+          showToast(`使用${item.name}`, 'success');
+        }
       }
       this.bag.splice(idx, 1);
     } else if (item.type === 'gold') {
@@ -1649,9 +2073,10 @@ class Expedition {
         if (!GameState.warehouse.crops) GameState.warehouse.crops = {};
         GameState.warehouse.crops[w.givesSeed] = (GameState.warehouse.crops[w.givesSeed] || 0) + 1;
         showToast(`🌿 采摘到种子：${w.name}！`, 'success');
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   showPauseMenu() {
@@ -1856,9 +2281,16 @@ class Expedition {
       showToast(`🔨 获得临时武器：${item.weapon.name}！按Q滚轮切换`, 'gold');
     } else {
       // v2.9 同类物品无限叠加（金币/材料等堆叠进已有格）
-      const existing = this.bag.find(b => b.id === item.id && b.type === item.type);
+      // v3.7 金币无论从哪捡都合并到同一堆
+      let existing;
+      if (item.type === 'gold') {
+        existing = this.bag.find(b => b.type === 'gold');
+      } else {
+        existing = this.bag.find(b => b.id === item.id && b.type === item.type);
+      }
       if (existing) {
         existing.amount = (existing.amount || 1) + (item.amount || 1);
+        if (item.type === 'gold') existing.name = '金币';
       } else if (typeof LoadoutSystem !== 'undefined' && !LoadoutSystem.canAdd(this.bag, item)) {
         showToast('背包已满！', 'warning');
         this.groundLoot.push({ ...item, x, y, bob: 0 });
@@ -2185,54 +2617,87 @@ class Expedition {
 
   playerAttack() {
     if (this.player.attackCd > 0) return;
-    this.player.attackCd = this.weapon.cooldown;
+    const w = this.weapon;
+    // v2.0 等级词条：攻速/射程/速度修正
+    const cdMult = 1 + (w.cdBonus || 0);
+    this.player.attackCd = Math.max(0.08, w.cooldown * cdMult);
+    const effRange = w.range * (1 + (w.rangeBonus || 0));
+    const effSpeed = w.projectileSpeed * (1 + (w.speedBonus || 0));
     const worldMouseX = this.mouse.x + this.camera.x;
     const worldMouseY = this.mouse.y + this.camera.y;
     const angle = Math.atan2(worldMouseY - this.player.y, worldMouseX - this.player.x);
     this.player.angle = angle;
     this.weaponPulse = 0.18;
     this.attackAnim = 0.28;
-    // 连击序号循环：0 横扫 → 1 反手横斩 → 2 突刺终结
     this.attackCombo = (this.attackCombo + 1) % 3;
     const combo = this.attackCombo;
-    if (this.weapon.mode === 'melee') {
-      // 突进：挥击瞬间沿攻击方向小位移，终结技位移更大
+    if (w.mode === 'melee') {
       const lungePower = [10, 13, 17][combo];
       this.player.lungeX = Math.cos(angle) * lungePower;
       this.player.lungeY = Math.sin(angle) * lungePower;
-      let hitCount = 0;
+      // v2.0 镰刀Lv8 旋风斩：长按（mouse.down持续）360°扫
+      const whirlwind = !!w.whirlwind && this.mouse.down;
+      const arc = whirlwind ? Math.PI * 2 : Math.PI / 2;
+      const reach = whirlwind ? effRange * 1.15 : effRange;
       [...this.monsters, ...this.raiders].forEach(m => {
         const d = dist(m, this.player);
-        if (d < this.weapon.range) {
+        if (d < reach) {
           const mAngle = Math.atan2(m.y - this.player.y, m.x - this.player.x);
           const angleDiff = Math.abs(((mAngle - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-          if (angleDiff < Math.PI / 2) {
-            const dmg = this.weapon.damage * (1 + this.attackBuffMult);
-            this.damageEnemy(m, dmg, this.weapon.color, combo === 2, {
-              x: m.x, y: m.y, angle, weaponId: this.weapon.id, fromPlayer: true
+          if (whirlwind || angleDiff < arc) {
+            let dmg = w.damage * (1 + this.attackBuffMult);
+            if (whirlwind) dmg *= (1 + (w.whirlwindDmg || 0));
+            this.damageEnemy(m, dmg, w.color, combo === 2, {
+              x: m.x, y: m.y, angle, weaponId: w.id, fromPlayer: true
             });
+            // Lv10 割裂：叠流血
+            if (w.bleed) { m.bleedStack = (m.bleedStack || 0) + 1; m.bleedUntil = performance.now() + 3000; }
             m.stunned = Math.max(m.stunned || 0, combo === 2 ? 0.45 : 0.25);
             m.visualVz = Math.max(m.visualVz || 0, combo === 2 ? 120 : 95);
-            hitCount++;
           }
         }
       });
-      // 挥砍弧光按连击切换方向（1 为反手），突刺技弧更大
-      this.spawnSlashEffect(this.player.x, this.player.y, angle, this.weapon.color, combo === 2 ? 70 : 58, combo);
-      this.spawnSwingTrail(this.player.x + Math.cos(angle) * 30, this.player.y + Math.sin(angle) * 30, angle, this.weapon.color, combo === 1 ? -1 : 1, combo === 2 ? 1.05 : 1);
+      this.spawnSlashEffect(this.player.x, this.player.y, angle, w.color, combo === 2 ? 70 : 58, combo);
+      this.spawnSwingTrail(this.player.x + Math.cos(angle) * 30, this.player.y + Math.sin(angle) * 30, angle, w.color, combo === 1 ? -1 : 1, combo === 2 ? 1.05 : 1);
       this.weaponRecoil = combo === 2 ? 0.75 : 0.5;
       AudioManager.playAttack('melee', combo);
+      // v3.7 近战也能打道具（油桶/木箱）
+      if (this.props) {
+        this.props.forEach(pr => {
+          if ((pr.kind === 'barrel' || pr.kind === 'crate') && pr.hp > 0) {
+            const d = dist(pr, this.player);
+            if (d < reach) {
+              this.damageProp(pr, w.damage * (1 + this.attackBuffMult));
+            }
+          }
+        });
+      }
     } else {
-      const p = this.allocProjectile();
-      Object.assign(p, { x: this.player.x + Math.cos(angle) * 24, y: this.player.y + Math.sin(angle) * 24,
-        vx: Math.cos(angle) * this.weapon.projectileSpeed, vy: Math.sin(angle) * this.weapon.projectileSpeed,
-        damage: this.weapon.damage * (1 + this.attackBuffMult), life: this.weapon.range / this.weapon.projectileSpeed, radius: 7,
-        fromPlayer: true, weaponId: this.weapon.id, pierce: this.weapon.pierce || 1, color: this.weapon.color });
-      p.hit = p.hit || []; p.hit.length = 0;
-      this.projectiles.push(p);
-      this.spawnMuzzleEffect(this.player.x, this.player.y, angle, this.weapon.color);
+      // v2.0 多弹道（豌豆Lv8/飞刃Lv8）
+      const shots = w.multiShot || 1;
+      const fanSpread = 0.18; // 扇面
+      for (let s = 0; s < shots; s++) {
+        const offset = shots === 1 ? 0 : (s - (shots - 1) / 2) * fanSpread;
+        const a = angle + offset;
+        const p = this.allocProjectile();
+        Object.assign(p, { x: this.player.x + Math.cos(a) * 24, y: this.player.y + Math.sin(a) * 24,
+          vx: Math.cos(a) * effSpeed, vy: Math.sin(a) * effSpeed,
+          damage: w.damage * (1 + this.attackBuffMult), life: effRange / effSpeed, radius: 7,
+          fromPlayer: true, weaponId: w.id, pierce: (w.pierce || 1) + (w.pierceBonus || 0),
+          color: w.color,
+          explode: w.explode || 0, burnDps: w.burnDps || 0, burnStack: w.burnStack || 1,
+          slowOnHit: w.slowOnHit || 0, slowDur: w.slowDur || 0,
+          rootChance: w.rootChance || 0, rootDur: w.rootDur || 0,
+          instantKillLow: w.instantKillLow || 0, autoAim: !!w.autoAim,
+          ricochet: w.ricochet || 0, plague: !!w.plague,
+          rainArrows: w.rainArrows || 0, nuke: !!w.nuke
+        });
+        p.hit = p.hit || []; p.hit.length = 0;
+        this.projectiles.push(p);
+      }
+      this.spawnMuzzleEffect(this.player.x, this.player.y, angle, w.color);
       this.weaponRecoil = 1;
-      AudioManager.playAttack(this.weapon.id === 'vine_staff' ? 'vine' : 'pea');
+      AudioManager.playAttack(w.id === 'vine_staff' ? 'vine' : 'pea');
     }
   }
 
@@ -2350,9 +2815,22 @@ class Expedition {
     const lostItems = [];
 
     if (this.result === 'success') {
-      // 成功：全部保留
+      // 成功：全部保留（含安全箱里的）
       this.bag.forEach(i => keptItems.push({ ...i, kept: true }));
+      (this.safeBox || []).forEach(i => keptItems.push({ ...i, kept: true }));
       GameState.gold += totalGold;
+      // 安全箱里的物品也一并入库
+      (this.safeBox || []).forEach(i => {
+        if (i.type === 'gold') GameState.gold += i.amount;
+        else if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
+        else if (i.type === 'material') {
+          const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+          if (matId && CONFIG.warehouseItems[matId]) Warehouse.addItem(matId, i.amount);
+          else Warehouse.addItem('materials', i.amount);
+        }
+        else if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
+        else if (i.type === 'farm_item') Warehouse.addItem(i.id, i.amount);
+      });
       this.bag.filter(i => i.type === 'seed').forEach(i => {
         Warehouse.addItem('seeds', i.amount);
         if (i.cropId && !GameState.unlockedCrops.includes(i.cropId)) {
@@ -2361,7 +2839,13 @@ class Expedition {
         }
       });
       this.bag.filter(i => i.type === 'material').forEach(i => {
-        Warehouse.addItem('materials', i.amount);
+        // v3.6 按 matId 分类入库，没有 matId 才归到通用 materials
+        const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+        if (matId && CONFIG.warehouseItems[matId]) {
+          Warehouse.addItem(matId, i.amount);
+        } else {
+          Warehouse.addItem('materials', i.amount);
+        }
       });
       this.bag.filter(i => i.type === 'consumable').forEach(i => {
         Warehouse.addItem(i.id, i.amount);
@@ -2371,26 +2855,28 @@ class Expedition {
       });
       // v3.2 种子入农场仓库
       this.bag.filter(i => i.type === 'seed_item').forEach(i => {
-        GameState.seeds = GameState.seeds || {};
+        if (typeof GameState.seeds !== 'object' || GameState.seeds === null) GameState.seeds = {};
         GameState.seeds[i.seedId] = (GameState.seeds[i.seedId] || 0) + (i.amount || 1);
         showToast(`🌱 收获种子：${i.name} ×${i.amount}`, 'success');
       });
     } else {
-      // v1.0 失败：安全箱内物品必保留，其余全掉
-      const safeSlots = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getSafeCapacity() : 1;
-      let safeIdx = 0;
+      // v3.6 失败：玩家主动存入 this.safeBox 的物品必保留，其余全掉
+      const safeItems = this.safeBox || [];
+      safeItems.forEach(i => keptItems.push({ ...i, kept: true }));
       this.bag.forEach(i => {
-        const inSafe = safeIdx < safeSlots;
-        if (inSafe) {
-          keptItems.push({ ...i, kept: true });
-          if (i.type === 'gold') GameState.gold += i.amount;
-          if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
-          if (i.type === 'material') Warehouse.addItem('materials', i.amount);
-          if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
-          safeIdx++;
-        } else {
-          lostItems.push({ ...i, kept: false });
+        // 安全箱里的物品已经算 kept 过了，这里只处理 bag 里的（非安全箱物品）
+        lostItems.push({ ...i, kept: false });
+      });
+      // 把安全箱物品也入账（金币/材料/消耗品）
+      safeItems.forEach(i => {
+        if (i.type === 'gold') GameState.gold += i.amount;
+        else if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
+        else if (i.type === 'material') {
+          const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+          if (matId && CONFIG.warehouseItems[matId]) Warehouse.addItem(matId, i.amount);
+          else Warehouse.addItem('materials', i.amount);
         }
+        else if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
       });
     }
 
@@ -2400,6 +2886,26 @@ class Expedition {
     }
 
     SaveSystem.save();
+
+    // v3.8 生成本局高光卡片
+    const rs = this.runStats || {};
+    const highlights = [];
+    if (this.killCount >= 50) highlights.push({ icon: '⚔️', title: '杀戮机器', desc: `单局击杀 ${this.killCount} 只怪` });
+    else if (this.killCount >= 30) highlights.push({ icon: '⚔️', title: '老练猎手', desc: `击杀 ${this.killCount} 只怪` });
+    if ((rs.maxDistFromSpawn || 0) > 800) highlights.push({ icon: '🗺️', title: '深度探索', desc: `最远深入 ${Math.round(rs.maxDistFromSpawn)}m` });
+    if ((rs.minHpSeen || 100) < 15) highlights.push({ icon: '❤️‍🩹', title: '丝血逃生', desc: `血量一度低至 ${rs.minHpSeen.toFixed(0)}%` });
+    else if ((rs.minHpSeen || 100) < 30 && this.result === 'success') highlights.push({ icon: '❤️', title: '险象环生', desc: `残血通关（最低 ${rs.minHpSeen.toFixed(0)}%）` });
+    if ((rs.eliteKills || 0) >= 3) highlights.push({ icon: '👑', title: '精英猎人', desc: `击杀 ${rs.eliteKills} 只精英` });
+    if ((rs.bossKills || 0) >= 1) highlights.push({ icon: '💀', title: 'Boss 终结者', desc: `击杀 Boss ${rs.bossKills} 次` });
+    if ((rs.perfectDodgeCount || 0) >= 5) highlights.push({ icon: '💫', title: '风之舞者', desc: `${rs.perfectDodgeCount} 次完美闪避` });
+    if ((rs.barrelsDetonated || 0) >= 3) highlights.push({ icon: '💥', title: '爆炸专家', desc: `引爆 ${rs.barrelsDetonated} 个油桶` });
+    if ((rs.plantsDeployed || 0) >= 5) highlights.push({ icon: '🌱', title: '农场指挥官', desc: `部署 ${rs.plantsDeployed} 株战场植物` });
+    if (this.chestOpened >= 5) highlights.push({ icon: '🎁', title: '宝箱收藏家', desc: `开启 ${this.chestOpened} 个宝箱` });
+    if (this.result === 'success' && (rs.nearDeathCount || 0) >= 3) highlights.push({ icon: '🔥', title: '命悬一线', desc: `3 次以上濒临死亡仍成功撤离` });
+    // 保底：如果一个高光都没有，给个安慰
+    if (highlights.length === 0) {
+      highlights.push({ icon: '🌾', title: '安稳远征', desc: `平安度过，击杀 ${this.killCount} 只怪` });
+    }
 
     // 显示结算
     Game.showResult({
@@ -2411,7 +2917,9 @@ class Expedition {
       damageTaken: this.damageTaken,
       goldEarned: this.result === 'success' ? totalGold : Math.floor(totalGold * 0.2),
       keptItems, lostItems,
-      plantGrowth: this.growthSummary || []
+      plantGrowth: this.growthSummary || [],
+      highlights: highlights.slice(0, 4),
+      runStats: rs,
     });
   }
 
@@ -2589,6 +3097,16 @@ class Expedition {
     m.hp = 0;
   }
 
+  nearestMonster(x, y, maxDist = 600) {
+    let best = null, bd = maxDist * maxDist;
+    for (const m of this.monsters) {
+      if (m.hp <= 0) continue;
+      const dx = m.x - x, dy = m.y - y, d2 = dx * dx + dy * dy;
+      if (d2 < bd) { bd = d2; best = m; }
+    }
+    return best;
+  }
+
   damageEnemy(target, amount, color = '#ffffff', heavy = false, hitInfo = null) {
     if (!target || target.hp <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
@@ -2602,9 +3120,16 @@ class Expedition {
     }
     // quiet：持续伤害/电击链不产生击退顿帧，避免抖动刷屏
     const quiet = !!(hitInfo && hitInfo.quiet);
-    // 玩家来源伤害有 20% 暴击：1.8 倍伤害 + 金色大字 + 暴击点燃（2.5s 灼烧）
-    const isCrit = fromPlayer && hitInfo && hitInfo.crit !== false && Math.random() < 0.20;
-    if (isCrit) { amount *= 1.8; this.applyBurn(target, Math.max(10, amount * 0.35), 2.5); }
+    // v2.0 武器等级：暴击率加成（镰刀Lv6 +10%、飞刃Lv6 +15%）
+    const critBonus = (fromPlayer && this.weapon && this.weapon.critChanceBonus) ? this.weapon.critChanceBonus : 0;
+    const critBase = (fromPlayer && hitInfo && hitInfo.crit !== false) ? (0.20 + critBonus) : 0;
+    const isCrit = critBase > 0 && Math.random() < critBase;
+    if (isCrit) {
+      let critMult = 1.8;
+      if (fromPlayer && this.weapon && this.weapon.critDmgBonus) critMult += this.weapon.critDmgBonus;
+      amount *= critMult;
+      this.applyBurn(target, Math.max(10, amount * 0.35), 2.5);
+    }
     const _prevSeg = typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 ? Math.min(CombatEnhancement.getSegments(target), Math.ceil((target.hp/target.maxHp)*CombatEnhancement.getSegments(target))) : 0;
     target.hp -= amount;
     if (typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 && target.hp > 0) {
@@ -2622,6 +3147,10 @@ class Expedition {
     }
     target.state = target.hp <= 0 ? 'death' : 'hit';
     target.stateTimer = target.hp <= 0 ? .4 : .18;
+    // v2.0 镰刀Lv7 击杀回血
+    if (target.hp <= 0 && fromPlayer && this.weapon && this.weapon.lifesteal) {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.weapon.lifesteal);
+    }
     const dmgColor = isCrit ? '#ffd968' : color;
     this.damageNumbers.push({
       x: target.x + rand(-8, 8), y: target.y - target.radius - 8,
@@ -2780,6 +3309,7 @@ class Expedition {
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.update(dt);
     if (typeof DifficultySystem !== 'undefined') { DifficultySystem.tick(dt, this); DifficultySystem.tickPoison(dt, this); }
     this.updateWorldSystems(dt);
+    if (typeof WorldFX !== 'undefined') WorldFX.update(this, dt);
     this.fogUpdateTimer -= dt;
     if (this.fogUpdateTimer <= 0) {
       this.fogUpdateTimer += this.fogUpdateInterval;
@@ -2828,6 +3358,9 @@ class Expedition {
       }
     }
     if (this.player.slow > 0) terrainModifier *= 0.56;
+    // v3.7 洼地减速
+    const hz = this.getHeightAt(this.player.x, this.player.y);
+    if (hz === 'low') terrainModifier *= 0.7;
     speed *= terrainModifier;
     const previousX = this.player.x;
     const previousY = this.player.y;
@@ -2860,6 +3393,40 @@ class Expedition {
     }
     this.updateVision();
 
+    // v3.4 地图危险区（坑/泥/毒雾）
+    if (this.hazardZones) {
+      for (const hz of this.hazardZones) {
+        const d = dist(this.player, hz);
+        if (d < hz.r) {
+          if (hz.type === 'mud') {
+            terrainModifier = Math.min(terrainModifier, hz.slow);
+          } else if (hz.type === 'pit' || hz.type === 'poison') {
+            hz.tick = (hz.tick || 0) + dt;
+            if (hz.tick >= 0.8) {
+              hz.tick = 0;
+              this.damagePlayer(hz.damage, { cause: hz.type });
+            }
+          }
+        }
+      }
+    }
+    // v3.4 时空裂隙：传送门
+    if (this.teleporters && this.teleporters.length >= 2) {
+      for (let i = 0; i < this.teleporters.length; i++) {
+        const tp = this.teleporters[i];
+        tp.cd = Math.max(0, tp.cd - dt);
+        if (tp.cd > 0) continue;
+        if (dist(this.player, tp) < tp.r) {
+          const j = (i + 1 + randInt(0, this.teleporters.length - 2)) % this.teleporters.length;
+          this.player.x = this.teleporters[j].x;
+          this.player.y = this.teleporters[j].y;
+          this.teleporters[j].cd = 2.0;
+          tp.cd = 2.0;
+          showToast('✨ 时空传送！', 'info');
+        }
+      }
+    }
+
     // 能量恢复
     this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + CONFIG.player.energyRegen * dt);
 
@@ -2867,6 +3434,66 @@ class Expedition {
     this.player.attackCd = Math.max(0, this.player.attackCd - dt);
     this.player.invuln = Math.max(0, this.player.invuln - dt);
     this.player.stealth = Math.max(0, this.player.stealth - dt);
+    // v3.8 脚印衰减 + 走路留印
+    if (this.footprints) {
+      for (const f of this.footprints) f.life -= dt;
+    }
+    if (Math.hypot(this.player.vx || 0, this.player.vy || 0) > 50) {
+      this._footTimer = (this._footTimer || 0) - dt;
+      if (this._footTimer <= 0) {
+        this.addFootprint(this.player.x + (Math.random()-0.5)*8, this.player.y + 6);
+        // v3.9 走路扬尘
+        this.particles.push({
+          x: this.player.x + (Math.random()-0.5)*10,
+          y: this.player.y + 6,
+          vx: (Math.random()-0.5)*20,
+          vy: -20 - Math.random()*15,
+          life: 0.5, maxLife: 0.5,
+          size: 3 + Math.random()*3,
+          color: 'rgba(140,120,90,0.5)',
+          grav: 60, drag: 2
+        });
+        this._footTimer = 0.25;
+      }
+    }
+    // v3.8 本局高光统计
+    const rs = this.runStats;
+    if (rs) {
+      const distFromSpawn = Math.hypot(this.player.x - this.spawnX, this.player.y - this.spawnY);
+      if (distFromSpawn > rs.maxDistFromSpawn) rs.maxDistFromSpawn = distFromSpawn;
+      const hpPct = this.player.hp / (this.player.maxHp || 100) * 100;
+      if (hpPct < rs.minHpSeen) rs.minHpSeen = hpPct;
+      if (hpPct < 25) rs.nearDeathCount++;
+    }
+    // v3.7 高草隐身 + 骷髅/推车拾取
+    if (this.props) {
+      let inGrass = false;
+      this.props.forEach(pr => {
+        const d = Math.hypot(pr.x - this.player.x, pr.y - this.player.y);
+        if (pr.kind === 'grass' && d < pr.size/2) inGrass = true;
+        // 骷髅：走近给临时武器/材料
+        if (pr.kind === 'skeleton' && !pr.looted && d < 40) {
+          pr.looted = true;
+          // 50% 给材料，50% 给临时武器
+          if (Math.random() < 0.5) {
+            this.spawnGroundLoot({ type: 'material', id: 'iron', matId: 'iron', name: '铁块', amount: randInt(2,5), icon: '⚙️' }, pr.x, pr.y);
+          } else {
+            this.spawnGroundLoot({ type: 'gold', name: '金币', amount: randInt(20,50), icon: '💰' }, pr.x, pr.y);
+          }
+          this.spawnAoeEffect(pr.x, pr.y, 40, '#cccccc');
+          showToast('💀 搜刮了一具骷髅', 'gold');
+        }
+        // 推车：走近给材料
+        if (pr.kind === 'cart' && !pr.looted && d < 50) {
+          pr.looted = true;
+          this.spawnGroundLoot({ type: 'material', id: 'herb', matId: 'herb', name: '草药', amount: randInt(1,3), icon: '🌿' }, pr.x, pr.y);
+          this.spawnGroundLoot({ type: 'gold', name: '金币', amount: randInt(10,30), icon: '💰' }, pr.x + 20, pr.y);
+          this.spawnAoeEffect(pr.x, pr.y, 50, '#c5a75d');
+          showToast('🛒 翻倒的推车里有物资', 'success');
+        }
+      });
+      if (inGrass) this.player.stealth = Math.max(this.player.stealth, 0.5);
+    }
     this.player.slow = Math.max(0, this.player.slow - dt);
     this.weaponPulse = Math.max(0, this.weaponPulse - dt);
     this.attackAnim = Math.max(0, this.attackAnim - dt);
@@ -2923,8 +3550,8 @@ class Expedition {
     const shakeY = this.screenShake > 0 ? rand(-1, 1) * this.screenShake * 5 : 0;
     const cameraTargetX = clamp(this.player.x - CONFIG.canvas.width / 2 + lookX + shakeX, 0, size - CONFIG.canvas.width);
     const cameraTargetY = clamp(this.player.y - CONFIG.canvas.height / 2 + lookY + shakeY, 0, size - CONFIG.canvas.height);
-    this.camera.x = lerp(this.camera.x, cameraTargetX, 0.085);
-    this.camera.y = lerp(this.camera.y, cameraTargetY, 0.085);
+    this.camera.x = lerp(this.camera.x, cameraTargetX, 0.07);
+    this.camera.y = lerp(this.camera.y, cameraTargetY, 0.07);
 
     // 怪物AI
     this.monsters.forEach(m => {
@@ -2937,6 +3564,15 @@ class Expedition {
       m.stateTimer = Math.max(0, (m.stateTimer || 0) - dt);
       m.animTime = (m.animTime || 0) + dt * (1.8 + m.speed / 120);
       this.updateBurn(m, dt);
+      // v2.0 镰刀Lv10 割裂：流血DOT
+      if (m.bleedUntil && performance.now() < m.bleedUntil && m.hp > 0) {
+        m.bleedTick = (m.bleedTick || 0) - dt;
+        if (m.bleedTick <= 0) {
+          m.bleedTick = 0.5;
+          const stacks = Math.min(m.bleedStack || 1, 5);
+          this.damageEnemy(m, 3 * stacks, '#cc3344', false, { quiet: true, crit: false });
+        }
+      } else if (m.bleedUntil) { m.bleedUntil = 0; m.bleedStack = 0; }
       // v3.3 攻击前摇（telegraph）
       if (m.windupT > 0) {
         m.windupT -= dt;
@@ -2965,11 +3601,56 @@ class Expedition {
         }
         return; // 前摇期间不移动
       }
+      // v2.0 减速到期
+      if (m.slowUntil && performance.now() > m.slowUntil) { m.slow = 0; m.slowUntil = 0; }
       const slowMul = m.slow > 0 ? clamp(1 - m.slow, 0.35, 1) : 1;
       if (m.stunned > 0) return;
 
       const d = dist(m, this.player);
       const canSee = this.beastWave.active || (this.player.stealth <= 0 && d < 400);
+
+      // v3.7 巡逻队 AI：玩家不在视野内时沿路线走
+      if (m.patrolRoute && !this.beastWave.active) {
+        const aggroRange = 250;
+        if (d < aggroRange && this.player.stealth <= 0) {
+          // 发现玩家，进入追击
+          m.state = 'chase';
+          m.lostPlayerTimer = 0;
+        } else if (m.state === 'chase') {
+          // 追了一阵但玩家跑远了
+          m.lostPlayerTimer = (m.lostPlayerTimer || 0) + dt;
+          if (m.lostPlayerTimer > 3) {
+            m.state = 'patrol';
+            // 回到最近的巡逻点
+            let nearest = 0, nd = 1e9;
+            m.patrolRoute.forEach((wp, i) => {
+              const dd = Math.hypot(wp.x - m.x, wp.y - m.y);
+              if (dd < nd) { nd = dd; nearest = i; }
+            });
+            m.patrolWpIndex = nearest;
+          }
+        }
+        if (m.state === 'patrol') {
+          // 沿巡逻路线走
+          const wp = m.patrolRoute[m.patrolWpIndex];
+          const dx = wp.x + (m.patrolOffset || 0) - m.x;
+          const dy = wp.y + (m.patrolOffset || 0) - m.y;
+          const dd = Math.hypot(dx, dy);
+          if (dd < 20) {
+            // 到达当前点，去下一个
+            m.patrolWpIndex = (m.patrolWpIndex + 1) % m.patrolRoute.length;
+            m.state = 'idle';
+            m.stateTimer = 0.5 + Math.random() * 0.5;
+          } else {
+            const ang = Math.atan2(dy, dx);
+            m.facing = ang;
+            // 巡逻速度 60%
+            const spd = m.speed * slowMul * 0.6;
+            this.moveEntityWithCollisions(m, Math.cos(ang) * spd * dt, Math.sin(ang) * spd * dt);
+          }
+          return; // 巡逻时不触发普通追击 AI
+        }
+      }
 
       // 反制兵种（食草兽/厚甲猪）优先攻击植物防线
       let plantTarget = null, plantDist = 0;
@@ -3039,6 +3720,10 @@ class Expedition {
         m.deathTimer = .42;
         m.state = 'death';
         this.killCount++;
+        if (this.runStats) {
+          if (m.elite) this.runStats.eliteKills++;
+          if (m.boss) this.runStats.bossKills++;
+        }
         this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff8868');
         if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.onEliteDeath(m);
@@ -3054,6 +3739,25 @@ class Expedition {
           // v1.0 Boss 掉蓝图/高级材料
           this.spawnGroundLoot({ type: 'material', name: 'Boss獠牙', amount: 1, icon: '🦷', matId: 'bossFang' }, m.x, m.y+15);
           this.boss = null;
+        }
+        // v2.0 法杖Lv7 击杀小爆炸
+        if (this.weapon && this.weapon.explosionOnKill) {
+          [...this.monsters, ...this.raiders].forEach(o => {
+            if (o === m || o.hp <= 0) return;
+            if (dist(o, m) < 60) this.damageEnemy(o, this.weapon.damage * 0.8, '#c9a7e8', false, { quiet: true });
+          });
+          this.spawnImpact(m.x, m.y, '#c9a7e8', 1.3);
+        }
+        // v2.0 法杖Lv10 瘟疫：带毒标记的怪死亡释放毒雾
+        if (m.plagueMark) {
+          [...this.monsters, ...this.raiders].forEach(o => {
+            if (o === m || o.hp <= 0) return;
+            if (dist(o, m) < 80) {
+              this.applyBurn(o, 12, 2.5);
+              o.slow = Math.max(o.slow || 0, 0.4);
+            }
+          });
+          this.spawnImpact(m.x, m.y, '#8a4ad8', 1.8);
         }
         // v1.0 击杀计数成就
         if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('kill');
@@ -3094,6 +3798,7 @@ class Expedition {
           const wp = pool[Math.floor(Math.random() * pool.length)];
           if (wp) {
             GameState.seeds = GameState.seeds || {};
+            if (typeof GameState.seeds !== 'object' || GameState.seeds === null) GameState.seeds = {};
             GameState.seeds[wp.givesSeed] = (GameState.seeds[wp.givesSeed] || 0) + 1;
             this.spawnGroundLoot({ type: 'seed_pickup', name: wp.name + '种子', icon: wp.icon, seedId: wp.givesSeed, amount: 1 }, m.x, m.y);
             showToast(`🌟 稀有掉落：${wp.name}种子！`, 'gold');
@@ -3206,10 +3911,34 @@ class Expedition {
       const hash = this.entitySpatialHash;
       for (let i = arr.length - 1; i >= 0; i--) {
         const p = arr[i];
+        // v2.0 飞刃Lv10 自动追踪
+        if (p.autoAim && p.fromPlayer && !p._aimInit) {
+          const near = this.nearestMonster(p.x, p.y, 600);
+          if (near) {
+            const a = Math.atan2(near.y - p.y, near.x - p.x);
+            const sp = Math.hypot(p.vx, p.vy);
+            p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+          }
+          p._aimInit = true;
+        }
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.life -= dt;
         let dead = p.life <= 0;
+        // v3.7 弹道打道具（油桶/木箱）
+        if (!dead && p.fromPlayer && this.props) {
+          for (const pr of this.props) {
+            if ((pr.kind === 'barrel' || pr.kind === 'crate') && pr.hp > 0) {
+              const dx = pr.x - p.x, dy = pr.y - p.y;
+              const rr = pr.size/2 + p.radius;
+              if (dx*dx + dy*dy <= rr*rr) {
+                this.damageProp(pr, p.damage);
+                dead = true;
+                break;
+              }
+            }
+          }
+        }
         if (!dead && (p.fromPlayer || p.fromPlant)) {
           const candidates = hash.queryCircle(p.x, p.y, 56);
           for (let c = 0; c < candidates.length; c++) {
@@ -3218,13 +3947,50 @@ class Expedition {
             const ddx = target.x - p.x, ddy = target.y - p.y;
             const rr = target.radius + p.radius;
             if (ddx * ddx + ddy * ddy <= rr * rr) {
-              this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff', {
-                x: p.x, y: p.y,
-                angle: Math.atan2(p.vy, p.vx),
-                weaponId: p.weaponId || '',
-                fromPlayer: !!p.fromPlayer
-              });
+              // v2.0 豌豆Lv10 夺命豆：直接斩杀30%血以下小怪
+              if (p.instantKillLow && !target.elite && target.type !== 'boss' && target.hp < target.maxHp * p.instantKillLow) {
+                target.hp = 0; target.state = 'death'; target.stateTimer = 0.4;
+              } else {
+                this.damageEnemy(target, p.damage, p.color, p.weaponId === 'vine_staff', {
+                  x: p.x, y: p.y,
+                  angle: Math.atan2(p.vy, p.vx),
+                  weaponId: p.weaponId || '',
+                  fromPlayer: !!p.fromPlayer
+                });
+              }
               target.visualVz = Math.max(target.visualVz || 0, p.weaponId === 'vine_staff' ? 82 : 52);
+              // v2.0 等级词条：燃烧/减速/定身
+              if (p.burnDps) {
+                const stack = Math.min(p.burnStack || 1, 3);
+                this.applyBurn(target, p.burnDps * stack, 3);
+              }
+              if (p.slowOnHit) { target.slow = Math.max(target.slow || 0, p.slowOnHit); target.slowUntil = performance.now() + p.slowDur * 1000; }
+              if (p.rootChance && Math.random() < p.rootChance) { target.stunned = Math.max(target.stunned || 0, p.rootDur); }
+              // v2.0 法杖Lv10 瘟疫：怪死后毒雾
+              if (p.plague) target.plagueMark = true;
+              // v2.0 烈焰长弓Lv5 爆炸
+              if (p.explode) {
+                [...this.monsters, ...this.raiders].forEach(o => {
+                  if (o === target || o.hp <= 0) return;
+                  if (dist(o, target) < p.explode) this.damageEnemy(o, p.damage * 0.6, '#ffaa55', false, { quiet: true });
+                });
+                this.spawnImpact(target.x, target.y, '#ff8833', 1.6);
+              }
+              // v2.0 长弓Lv8 火箭雨：命中召3支落箭
+              if (p.rainArrows) {
+                for (let k = 0; k < p.rainArrows; k++) {
+                  const rx = target.x + rand(-40, 40), ry = target.y + rand(-40, 40);
+                  this.aoeTimers.push({ x: rx, y: ry, r: 55, delay: 0.35 + k * 0.12, dmg: p.damage * 0.5, color: '#ffcc55' });
+                }
+              }
+              // v2.0 长弓Lv10 核爆
+              if (p.nuke) {
+                [...this.monsters, ...this.raiders].forEach(o => {
+                  if (o.hp <= 0) return;
+                  if (dist(o, target) < 120) this.damageEnemy(o, p.damage * 1.5, '#ff5522', false, { quiet: true });
+                });
+                this.spawnImpact(target.x, target.y, '#ff3300', 2.5);
+              }
               p.hit.push(target);
               p.pierce--;
               if (p.weaponId === 'vine_staff') {
@@ -3245,9 +4011,38 @@ class Expedition {
           }
         }
         if (dead) {
+          // v2.0 飞刃Lv5 弹道回旋：死前弹向最近敌人
+          if (p.ricochet > 0 && p.fromPlayer) {
+            const near = this.nearestMonster(p.x, p.y, 400);
+            if (near) {
+              const a = Math.atan2(near.y - p.y, near.x - p.x);
+              const sp = Math.hypot(p.vx, p.vy);
+              p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+              p.life = 0.35; p.ricochet--; p.hit.length = 0;
+              dead = false;
+            }
+          }
+        }
+        if (dead) {
           arr[i] = arr[arr.length - 1];
           arr.pop();
           this.projectilePool.push(p);
+        }
+      }
+    }
+
+    // v2.0 长弓Lv8 延迟落箭（aoeTimers）
+    if (this.aoeTimers) {
+      for (let i = this.aoeTimers.length - 1; i >= 0; i--) {
+        const t = this.aoeTimers[i];
+        t.delay -= dt;
+        if (t.delay <= 0) {
+          [...this.monsters, ...this.raiders].forEach(o => {
+            if (o.hp <= 0) return;
+            if (dist(o, t) < t.r) this.damageEnemy(o, t.dmg, t.color, false, { quiet: true });
+          });
+          this.spawnImpact(t.x, t.y, t.color, 1.2);
+          this.aoeTimers.splice(i, 1);
         }
       }
     }
@@ -3365,10 +4160,43 @@ class Expedition {
     ctx.restore();
   }
 
+  // v3.8 去黑底：把生成图的黑色背景变透明（缓存处理结果）
+  drawNoBlack(ctx, img, dx, dy, dw, dh) {
+    if ((img.src||'').includes('_t.png')) { ctx.drawImage(img, dx, dy, dw, dh); return; }
+    if (!this._noBlackCache) this._noBlackCache = new Map();
+    let processed = this._noBlackCache.get(img);
+    if (!processed) {
+      // 首次处理：把近黑像素变透明
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const cctx = c.getContext('2d');
+      cctx.drawImage(img, 0, 0);
+      try {
+        const data = cctx.getImageData(0, 0, c.width, c.height);
+        const px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const r = px[i], g = px[i+1], b = px[i+2];
+          // 近黑像素（RGB 都 < 30）变透明
+          if (r < 30 && g < 30 && b < 30) {
+            px[i+3] = 0;
+          } else if (r < 50 && g < 50 && b < 50) {
+            // 边缘半透明过渡
+            px[i+3] = Math.min(px[i+3], (r+g+b) / 150 * 255);
+          }
+        }
+        cctx.putImageData(data, 0, 0);
+      } catch(e) { /* 跨域时跳过 */ }
+      processed = c;
+      this._noBlackCache.set(img, processed);
+    }
+    ctx.drawImage(processed, dx, dy, dw, dh);
+  }
+
   renderHeroWeapon(ctx, angle, swing, combo = 0, recoil = 0) {
     const dir = combo === 1 ? -1 : 1;
     ctx.save();
-    ctx.translate(24, -10 - recoil * 3);
+    // v3.8 武器放大+放到手上（原来 24,-10 太小太靠下）
+    ctx.translate(28, -18 - recoil * 3);
     const targetRot = Math.atan2(Math.sin(angle), Math.cos(angle));
     ctx.rotate(targetRot + swing * 0.3 * dir);
     if (this.weaponSheet && this.weaponSheet.naturalWidth) {
@@ -3377,8 +4205,31 @@ class Expedition {
       const rowMap = { harvest_sickle: 0, pea_repeater: 1, vine_staff: 2, throwing_knife: 3, flame_bow: 4 };
       const row = rowMap[this.weapon.id] || 0;
       const sw = this.weaponSheet.naturalWidth, sh = slotH;
-      const dw = 95, dh = dw * sh / sw;
-      ctx.drawImage(this.weaponSheet, 0, row * slotH, sw, sh, -dw/2, -dh/2, dw, dh);
+      const dw = 150, dh = dw * sh / sw;
+      if (!this._weaponCache) this._weaponCache = {};
+      let proc = this._weaponCache[this.weapon.id];
+      if (!proc) {
+        proc = document.createElement('canvas');
+        proc.width = sw; proc.height = sh;
+        const pctx = proc.getContext('2d');
+        pctx.drawImage(this.weaponSheet, 0, row*slotH, sw, sh, 0, 0, sw, sh);
+        if (!this.weaponSheetPrekeyed) {
+          try {
+            const data = pctx.getImageData(0, 0, sw, sh);
+            const px = data.data;
+            for (let i = 0; i < px.length; i += 4) {
+              const r = px[i], g = px[i+1], b = px[i+2];
+              const lum = 0.299*r + 0.587*g + 0.114*b;
+              // 旧武器图是白底：去掉近白
+              if (lum > 200) px[i+3] = 0;
+              else if (lum > 170) px[i+3] = Math.min(px[i+3], (200 - lum) / 30 * 255);
+            }
+            pctx.putImageData(data, 0, 0);
+          } catch(e) {}
+        }
+        this._weaponCache[this.weapon.id] = proc;
+      }
+      ctx.drawImage(proc, -dw/2, -dh/2, dw, dh);
     }
     ctx.restore();
   }
@@ -3398,13 +4249,24 @@ class Expedition {
     });
   }
 
-  renderPlants(ctx, cam) {
-    // 植物只在增删时重排，避免每帧 slice().sort() 分配
-    if (this.plantsDirty || !this.plantsSorted) {
-      this.plantsSorted = [...this.plants].sort((a, b) => a.y - b.y);
-      this.plantsDirty = false;
-    }
-    this.plantsSorted.forEach(p => {
+  // v3.5 远征植物 id -> CropArt id 映射
+  _plantArtId(type) {
+    const map = {
+      chili: 'chili', garlic: 'garlic', mint: 'mint', cactus: 'cactus',
+      sun_flower: 'sunflower', sunflower: 'sunflower',
+      vine: 'rosemary', pea_plant: 'pea', frost_vine: 'frost_flower',
+      bind_flower: 'shadow_flower', sacred_tree: 'rainbow_flower',
+      firegrass: 'fire_grass', frost: 'frost_flower', lightning: 'lightning_vine',
+      shadow: 'shadow_flower', rainbow: 'rainbow_flower',
+    };
+    return map[type] || null;
+  }
+
+  renderPlants(ctx, cam, list) {
+    const items = list || (this.plantsDirty || !this.plantsSorted
+      ? (this.plantsSorted = [...this.plants].sort((a, b) => a.y - b.y), this.plantsDirty = false, this.plantsSorted)
+      : this.plantsSorted);
+    items.forEach(p => {
       if (!this.isWorldVisible(p.x, p.y)) return;
       const sx = p.x - cam.x, sy = p.y - cam.y;
       // 血条 + 寿命条
@@ -3415,9 +4277,16 @@ class Expedition {
       // 图标（受击闪烁）
       const flash = p.hitFlash > 0 ? (Math.floor(p.hitFlash * 20) % 2 ? 0.4 : 1) : 1;
       ctx.globalAlpha = flash;
-      ctx.font = `${p.type === 'ultimate' ? 36 : 28}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(p.icon, sx, sy + 9);
+      const pScale = this.getDepthScale(p.y);
+      const drawSize = (p.type === 'ultimate' ? 44 : 34) * pScale;
+      // v3.5 优先用真实贴图，失败回退 emoji
+      const artId = this._plantArtId(p.type);
+      const usedArt = (typeof CropArt !== 'undefined' && artId) ? CropArt.draw(ctx, artId, sx, sy, drawSize) : false;
+      if (!usedArt) {
+        ctx.font = `${(p.type === 'ultimate' ? 36 : 28) * pScale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(p.icon, sx, sy + 9 * pScale);
+      }
       ctx.globalAlpha = 1;
       // 攻击动画
       if (p.attackAnim > 0) {
@@ -3559,20 +4428,28 @@ class Expedition {
       fog.addColorStop(0, 'rgba(190,215,220,.02)'); fog.addColorStop(.55, 'rgba(150,180,185,.18)'); fog.addColorStop(1, 'rgba(12,23,28,.72)');
       ctx.fillStyle=fog; ctx.fillRect(0,0,CONFIG.canvas.width,CONFIG.canvas.height);
     }
-    this.renderPlants(ctx, cam);
+    // v3.5 植物改由下方 Y-sort 统一绘制（避免双绘）
+    // this.renderPlants(ctx, cam);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (this.wildPlants) {
       for (const w of this.wildPlants) {
         if (w.picked) continue;
         const sx = w.x - cam.x, sy = w.y - cam.y;
-        ctx.font = '24px serif';
-        ctx.fillText(w.icon, sx, sy);
+        const artId = this._plantArtId(w.givesSeed || w.id);
+        const used = (typeof CropArt !== 'undefined' && artId) ? CropArt.draw(ctx, artId, sx, sy, 30) : false;
+        if (!used) {
+          ctx.font = '24px serif';
+          ctx.fillText(w.icon, sx, sy);
+        }
       }
     }
 
     // 分层地形：道路、水域、田块、树林和地图专属地标。
     this.renderTerrain(ctx, cam);
+    if (typeof WorldFX !== 'undefined') WorldFX.renderGround(ctx, this);
+    // v3.8 脚印
+    this.renderFootprints(ctx, cam);
 
     // 地图边界
     ctx.strokeStyle = this.map.accentColor;
@@ -3592,12 +4469,6 @@ class Expedition {
       ctx.font = '16px sans-serif';
       ctx.fillText('按 ESC 继续', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 28);
       ctx.textAlign = 'left';
-    }
-
-    // 障碍物按 Y 轴分为玩家身后与身前两层，形成遮挡关系和俯视伪 3D 深度。
-    // 使用预排序数组，避免每帧 filter+sort 分配。
-    for (let i = 0; i < this.obstaclesByY.length && this.obstaclesByY[i].y <= this.player.y; i++) {
-      this.renderObstacle(ctx, this.obstaclesByY[i], cam);
     }
 
     // 环境陷阱
@@ -3684,6 +4555,46 @@ class Expedition {
       ctx.fillText('🚁 撤离点', sx, sy - ep.radius - 8);
     });
 
+    // v3.4 地图危险区
+    if (this.hazardZones) {
+      for (const hz of this.hazardZones) {
+        const sx = hz.x - cam.x, sy = hz.y - cam.y;
+        if (sx < -150 || sx > CONFIG.canvas.width + 150 || sy < -150 || sy > CONFIG.canvas.height + 150) continue;
+        ctx.beginPath();
+        ctx.arc(sx, sy, hz.r, 0, Math.PI * 2);
+        if (hz.type === 'pit') {
+          ctx.fillStyle = 'rgba(40,30,25,0.55)';
+          ctx.fill();
+          ctx.strokeStyle = '#5a4030';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else if (hz.type === 'mud') {
+          ctx.fillStyle = 'rgba(90,70,40,0.45)';
+          ctx.fill();
+        } else if (hz.type === 'poison') {
+          const pulse = 0.35 + 0.15 * Math.sin(performance.now() / 300);
+          ctx.fillStyle = `rgba(150,80,200,${pulse})`;
+          ctx.fill();
+        }
+      }
+    }
+    // v3.4 时空传送门
+    if (this.teleporters) {
+      for (const tp of this.teleporters) {
+        const sx = tp.x - cam.x, sy = tp.y - cam.y;
+        ctx.beginPath();
+        ctx.arc(sx, sy, tp.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(120,160,255,0.35)';
+        ctx.fill();
+        ctx.strokeStyle = '#7aa8ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = '22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🌀', sx, sy + 8);
+      }
+    }
+
     // 宝箱
     this.chests.forEach(c => {
       if (!this.isWorldVisible(c.x, c.y)) return;
@@ -3727,39 +4638,167 @@ class Expedition {
       }
     });
 
-    // 植物防线
-    this.renderPlants(ctx, cam);
-
+    // v3.5 2.5D：所有实体按 y 轴排序绘制（前后遮挡）
+    const drawables = [];
+    // 植物
+    this.plants.forEach(p => drawables.push({ y: p.y, type: 'plant', obj: p }));
     // 怪物
     this.monsters.forEach(m => {
       if (!this.isWorldVisible(m.x, m.y)) return;
-      const sx = m.x - cam.x, sy = m.y - cam.y;
-      if (sx < -50 || sx > CONFIG.canvas.width + 50 || sy < -50 || sy > CONFIG.canvas.height + 50) return;
-      // 血条
-      /* health is rendered as part of the dimensional creature model */
-      // 图标
-      this.renderMonster(ctx, m, cam);
-      this.renderMonsterStatus(ctx, m, sx, sy);
-      if (m.stunned > 0) {
-        ctx.fillStyle = '#ffff00';
-        ctx.font = '14px sans-serif';
-        ctx.fillText('💫', sx, sy - m.radius - 18);
-      }
+      drawables.push({ y: m.y, type: 'monster', obj: m });
     });
-
-    // AI掠夺者
+    // 掠夺者
     this.raiders.forEach(r => {
       if (!this.isWorldVisible(r.x, r.y)) return;
-      const sx = r.x - cam.x, sy = r.y - cam.y;
-      const hpPct = r.hp / r.maxHp;
-      ctx.fillStyle = '#333';
-      ctx.fillRect(sx - 20, sy - r.radius - 12, 40, 5);
-      ctx.fillStyle = '#ff6644';
-      ctx.fillRect(sx - 20, sy - r.radius - 12, 40 * hpPct, 5);
-      ctx.font = '24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🥷', sx, sy + 8);
+      drawables.push({ y: r.y, type: 'raider', obj: r });
     });
+    // 障碍物
+    this.obstaclesByY.forEach(o => {
+      if (o.fxOnly) return;
+      if (!this.isWorldVisible(o.x, o.y)) return;
+      drawables.push({ y: o.y, type: 'obstacle', obj: o });
+    });
+    if (this.fxWalls) this.fxWalls.forEach(w => { if (this.isWorldVisible(w.x, w.y)) drawables.push({ y: w.y, type: 'wallfx', obj: w }); });
+    if (this.fxProps) this.fxProps.forEach(pp => { if (this.isWorldVisible(pp.x, pp.y)) drawables.push({ y: pp.y, type: 'fxprop', obj: pp }); });
+    // 地标（大物件，Y-sort 挡在玩家前面）
+    if (this.landmarks) this.landmarks.forEach(lm => {
+      if (!this.isWorldVisible(lm.x, lm.y)) return;
+      drawables.push({ y: lm.y, type: 'landmark', obj: lm });
+    });
+    // 道具（油桶/木箱/高草/骷髅/推车）
+    if (this.props) this.props.forEach(pr => {
+      if (!this.isWorldVisible(pr.x, pr.y)) return;
+      drawables.push({ y: pr.y, type: 'prop', obj: pr });
+    });
+    // 玩家（y 位置 + 1，保证站在怪脚下时怪在身后）
+    drawables.push({ y: this.player.y + 1, type: 'player' });
+    drawables.sort((a, b) => a.y - b.y);
+
+    // v3.8 落地投影
+    const self = this;
+    this._drawShadow = function(sx, sy, r, alpha) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,' + (alpha || 0.28) + ')';
+      ctx.beginPath();
+      ctx.ellipse(sx + r * 0.16, sy + r * 0.32, r * 0.9, r * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    for (const d of drawables) {
+      if (d.type === 'plant') {
+        this.renderPlants(ctx, cam, [d.obj]);
+      } else if (d.type === 'monster') {
+        const m = d.obj;
+        const sx = m.x - cam.x, sy = m.y - cam.y;
+        self._drawShadow(sx, sy, m.radius || 18, m.elite ? 0.35 : 0.25);
+        this.renderMonster(ctx, m, cam);
+        this.renderMonsterStatus(ctx, m, sx, sy);
+        if (m.stunned > 0) {
+          ctx.fillStyle = '#ffff00';
+          ctx.font = '14px sans-serif';
+          ctx.fillText('💫', sx, sy - m.radius - 18);
+        }
+      } else if (d.type === 'raider') {
+        const r = d.obj;
+        const sx = r.x - cam.x, sy = r.y - cam.y;
+        self._drawShadow(sx, sy, r.radius || 16, 0.3);
+        const hpPct = r.hp / r.maxHp;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(sx - 20, sy - r.radius - 12, 40, 5);
+        ctx.fillStyle = '#ff6644';
+        ctx.fillRect(sx - 20, sy - r.radius - 12, 40 * hpPct, 5);
+        ctx.font = '24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🥷', sx, sy + 8);
+      } else if (d.type === 'obstacle') {
+        this.renderObstacle(ctx, d.obj, cam);
+      } else if (d.type === 'landmark') {
+        const lm = d.obj;
+        const img = this.landmarkImgs && this.landmarkImgs[lm.type];
+        const sx = lm.x - cam.x, sy = lm.y - cam.y;
+        self._drawShadow(sx, sy, lm.size * 0.4, 0.35);
+        if (img && img.complete && img.naturalWidth > 0) {
+          const s = lm.size;
+          this.drawNoBlack(ctx, img, sx - s/2, sy - s, s, s);
+        } else {
+          ctx.fillStyle = '#4a3a2a';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 30, 0, Math.PI*2);
+          ctx.fill();
+        }
+      } else if (d.type === 'prop') {
+        const pr = d.obj;
+        const prsx = pr.x - cam.x, prsy = pr.y - cam.y;
+        if (pr.kind !== 'grass') self._drawShadow(prsx, prsy, pr.size * 0.4, 0.25);
+        if (pr.kind === 'grass' && pr.used === false) {
+          const img = this.propImgs && this.propImgs.grass;
+          const sx = pr.x - cam.x, sy = pr.y - cam.y;
+          if (img && img.complete && img.naturalWidth > 0) {
+            this.drawNoBlack(ctx, img, sx - pr.size/2, sy - pr.size/2, pr.size, pr.size*0.7);
+          } else {
+            ctx.fillStyle = '#4a7a3a';
+            ctx.beginPath(); ctx.arc(sx, sy, pr.size/2, 0, Math.PI*2); ctx.fill();
+          }
+        } else if (pr.kind === 'skeleton' && !pr.looted) {
+          const img = this.propImgs && this.propImgs.skeleton;
+          const sx = pr.x - cam.x, sy = pr.y - cam.y;
+          if (img && img.complete && img.naturalWidth > 0) {
+            this.drawNoBlack(ctx, img, sx - pr.size/2, sy - pr.size/2, pr.size, pr.size);
+          } else {
+            ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('💀', sx, sy + 8);
+          }
+        } else if (pr.kind === 'cart' && !pr.looted) {
+          const img = this.propImgs && this.propImgs.cart;
+          const sx = pr.x - cam.x, sy = pr.y - cam.y;
+          if (img && img.complete && img.naturalWidth > 0) {
+            this.drawNoBlack(ctx, img, sx - pr.size/2, sy - pr.size/2, pr.size, pr.size*0.7);
+          } else {
+            ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('🛒', sx, sy + 8);
+          }
+        } else if (pr.kind === 'barrel' && pr.hp > 0) {
+          const img = this.propImgs && this.propImgs.barrel;
+          const sx = pr.x - cam.x, sy = pr.y - cam.y;
+          if (img && img.complete && img.naturalWidth > 0) {
+            this.drawNoBlack(ctx, img, sx - pr.size/2, sy - pr.size/2, pr.size, pr.size);
+          } else {
+            ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('🛢️', sx, sy + 8);
+          }
+        } else if (pr.kind === 'crate' && pr.hp > 0) {
+          const img = this.propImgs && this.propImgs.crate;
+          const sx = pr.x - cam.x, sy = pr.y - cam.y;
+          if (img && img.complete && img.naturalWidth > 0) {
+            this.drawNoBlack(ctx, img, sx - pr.size/2, sy - pr.size/2, pr.size, pr.size);
+          } else {
+            ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('📦', sx, sy + 8);
+          }
+        }
+      } else if (d.type === 'wallfx') {
+        WorldFX.renderWall(ctx, this, d.obj);
+      } else if (d.type === 'fxprop') {
+        WorldFX.renderSetProp(ctx, this, d.obj);
+      } else if (d.type === 'player') {
+        const psx = this.player.x - cam.x, psy = this.player.y - cam.y;
+        self._drawShadow(psx, psy, 18, 0.32);
+        ctx.globalAlpha = this.player.stealth > 0 ? 0.4 : 1;
+        if (this.player.invuln > 0 && Math.floor(this.player.invuln * 10) % 2 === 0) {
+          ctx.globalAlpha *= 0.5;
+        }
+        // v3.5 玩家也应用深度缩放
+        const dScale = this.getDepthScale(this.player.y);
+        ctx.save();
+        ctx.translate(psx, psy);
+        ctx.scale(dScale, dScale);
+        ctx.translate(-psx, -psy);
+        this.renderHero(ctx, psx, psy);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+    }
 
     // 子弹
     this.projectiles.forEach(p => {
@@ -3783,18 +4822,8 @@ class Expedition {
       ctx.restore();
     });
 
-    // 玩家
-    const psx = this.player.x - cam.x, psy = this.player.y - cam.y;
-    // 隐身效果
-    ctx.globalAlpha = this.player.stealth > 0 ? 0.4 : 1;
-    // 无敌闪烁
-    if (this.player.invuln > 0 && Math.floor(this.player.invuln * 10) % 2 === 0) {
-      ctx.globalAlpha *= 0.5;
-    }
-    this.renderHero(ctx, psx, psy);
-    ctx.globalAlpha = 1;
-
     // Active weapon range and aim line.
+    const psx = this.player.x - cam.x, psy = this.player.y - cam.y;
     const worldMouseX = this.mouse.x + cam.x;
     const worldMouseY = this.mouse.y + cam.y;
     const angle = Math.atan2(worldMouseY - this.player.y, worldMouseX - this.player.x);
@@ -3807,13 +4836,6 @@ class Expedition {
 
     // Foreground geometry is drawn after the hero so trunks and ruins create real occlusion.
     // Nearby blockers fade through isBehindHero(), keeping the character readable.
-    // 预排序数组 + 边界定位，避免每帧 filter+sort。
-    for (let i = 0; i < this.obstaclesByY.length; i++) {
-      if (this.obstaclesByY[i].y <= this.player.y) continue;
-      for (; i < this.obstaclesByY.length; i++) this.renderObstacle(ctx, this.obstaclesByY[i], cam);
-      break;
-    }
-
     // 防线部署预览（选中植物时鼠标处显示半透明图标 + 可用性）
     if (this.selectedPlantId) {
       const selPlant = CONFIG.plants.find(p => p.id === this.selectedPlantId);
@@ -4116,11 +5138,22 @@ class Expedition {
 
     this.renderWeather(ctx);
 
+    // v3.7 昼夜光照循环
+    this.renderDayNight(ctx);
+
+    // v3.7 远景雾 + 地平线剪影
+    this.renderHorizonSilhouettes(ctx);
+
     // 小地图
     this.renderMinimap();
 
     // 交互提示
     this.renderInteractPrompt();
+    // v3.9 前景草遮挡 + 全局后处理
+    if (typeof WorldFX !== 'undefined') {
+      WorldFX.renderForeground(ctx, this);
+      WorldFX.postProcess(ctx, this);
+    }
   }
 
   updateWorldSystems(dt) {
@@ -4271,26 +5304,172 @@ class Expedition {
     ctx.restore();
   }
 
+  // v3.7 昼夜光照循环
+  // 周期 180s：day(0-60) -> dusk(60-90) -> night(90-150) -> dawn(150-180)
+  renderDayNight(ctx) {
+    const t = (this.elapsed || 0) % 180;
+    let phase, overlayAlpha, tint;
+    if (t < 60) {
+      phase = 'day'; overlayAlpha = 0; tint = null;
+    } else if (t < 90) {
+      const k = (t - 60) / 30; // 0..1
+      overlayAlpha = 0.35 * k;
+      tint = { r: 255, g: 140, b: 60, a: 0.18 * k };
+    } else if (t < 150) {
+      const k = (t - 90) / 60;
+      overlayAlpha = 0.55;
+      tint = { r: 20, g: 30, b: 70, a: 0.45 };
+    } else {
+      const k = (t - 150) / 30;
+      overlayAlpha = 0.55 * (1 - k);
+      tint = { r: 20, g: 30, b: 70, a: 0.45 * (1 - k) };
+    }
+    this.dayNightPhase = phase;
+    this.nightVisionRadius = (t >= 90 && t < 150) ? 180 : 0; // 夜晚视野半径
+
+    // 整体色调叠加
+    if (tint && tint.a > 0.01) {
+      ctx.fillStyle = `rgba(${tint.r|0},${tint.g|0},${tint.b|0},${tint.a})`;
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+    }
+
+    // 夜晚：黑边+火把照明
+    if (overlayAlpha > 0.01) {
+      const px = this.player.x - this.camera.x;
+      const py = this.player.y - this.camera.y;
+      // 火把照明半径：有火把道具更大
+      const torchBonus = (this.player.torchTime && this.player.torchTime > 0) ? 80 : 0;
+      const R = this.nightVisionRadius + torchBonus;
+      // 径向渐变挖洞
+      const g = ctx.createRadialGradient(px, py, R * 0.3, px, py, R);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.7, `rgba(0,0,0,${overlayAlpha * 0.6})`);
+      g.addColorStop(1, `rgba(0,0,0,${overlayAlpha})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+    }
+
+    // 白天/夜晚 HUD 提示
+    if (phase === 'day' && t > 55) {
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('☀️ 白天即将结束…', CONFIG.canvas.width / 2, 28);
+    } else if (phase === 'night' && Math.floor(this.elapsed) % 2 === 0) {
+      ctx.fillStyle = '#aaccff';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🌙 夜晚：视野缩小，小心黑暗中的怪物', CONFIG.canvas.width / 2, 28);
+    }
+  }
+
+  // v3.7 远景雾 + 地平线剪影
+  renderHorizonSilhouettes(ctx) {
+    const W = CONFIG.canvas.width, H = CONFIG.canvas.height;
+    // 远景雾（屏幕边缘渐暗，营造深度）
+    const fog = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.45, W/2, H/2, Math.max(W,H)*0.75);
+    fog.addColorStop(0, 'rgba(0,0,0,0)');
+    fog.addColorStop(1, 'rgba(10,15,20,0.35)');
+    ctx.fillStyle = fog;
+    ctx.fillRect(0, 0, W, H);
+
+    // v3.9 三层视差远景：远山（蓝灰空气透视，0.15x）+ 中景树林团（0.4x）
+    const nightSky = this.dayNightPhase === 'night';
+    const drawRidge = (parallax, baseY, amp, color, step) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-step, baseY + 80);
+      const off = this.camera.x * parallax;
+      for (let x = -step; x <= W + step; x += step) {
+        const wx = x + off;
+        const y = baseY
+          - (Math.sin(wx * 0.0042) * 0.5 + 0.5) * amp
+          - (Math.sin(wx * 0.011 + 1.7) * 0.5 + 0.5) * amp * 0.55;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W + step, baseY + 80);
+      ctx.closePath();
+      ctx.fill();
+    };
+    drawRidge(0.15, 104, 42, nightSky ? 'rgba(28,36,56,0.6)' : 'rgba(74,90,108,0.5)', 22);
+    drawRidge(0.24, 116, 30, nightSky ? 'rgba(22,30,40,0.55)' : 'rgba(56,70,80,0.45)', 20);
+    // 中景：团状远树剪影（替代三角山）
+    ctx.fillStyle = nightSky ? 'rgba(16,24,22,0.62)' : 'rgba(42,56,46,0.5)';
+    const treeOff = this.camera.x * 0.4;
+    for (let i = -1; i < W / 64 + 2; i++) {
+      const wx = i * 64 - (((treeOff % 64) + 64) % 64);
+      const h = 18 + ((Math.abs(Math.floor((i * 64 + treeOff) * 7.91)) % 40));
+      ctx.beginPath();
+      ctx.arc(wx + 32, 108 - h * 0.35, 22 + (h % 12), 0, Math.PI * 2);
+      ctx.arc(wx + 10, 112 - h * 0.28, 17, 0, Math.PI * 2);
+      ctx.arc(wx + 56, 112 - h * 0.32, 19, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // v3.8 脚印：玩家走过留下逐渐淡出的印记
+  addFootprint(x, y) {
+    if (!this.footprints) this.footprints = [];
+    this.footprints.push({ x, y, life: 5 });
+    if (this.footprints.length > 40) this.footprints.shift();
+  }
+  renderFootprints(ctx, cam) {
+    if (!this.footprints) return;
+    const W = CONFIG.canvas.width, H = CONFIG.canvas.height;
+    this.footprints = this.footprints.filter(f => f.life > 0);
+    for (const f of this.footprints) {
+      const sx = f.x - cam.x, sy = f.y - cam.y;
+      if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
+      const a = (f.life / 5) * 0.25;
+      ctx.fillStyle = 'rgba(60,45,30,' + a + ')';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 6, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   renderMinimap() {
     const mm = document.getElementById('minimapCanvas');
     const mctx = mm.getContext('2d');
     const size = CONFIG.expedition.mapSize;
     const scale = 160 / size;
 
-    mctx.fillStyle = 'rgba(0,0,0,0.8)';
+    // v3.7 战争迷雾：记录已探索格子（32px 一格）
+    if (!this.exploredSet) this.exploredSet = new Set();
+    const TILE = 64;
+    const viewR = 180; // 视野半径（世界坐标）
+    const px = this.player.x, py = this.player.y;
+    for (let dy = -viewR; dy <= viewR; dy += TILE) {
+      for (let dx = -viewR; dx <= viewR; dx += TILE) {
+        if (dx*dx + dy*dy > viewR*viewR) continue;
+        const tx = Math.floor((px + dx) / TILE);
+        const ty = Math.floor((py + dy) / TILE);
+        this.exploredSet.add(tx + ',' + ty);
+      }
+    }
+
+    mctx.fillStyle = 'rgba(0,0,0,0.9)';
     mctx.fillRect(0, 0, 160, 160);
 
+    // 地形斑块（只画已探索的）
     this.terrainPatches.forEach(patch => {
+      const key = Math.floor(patch.x / TILE) + ',' + Math.floor(patch.y / TILE);
+      if (!this.exploredSet.has(key)) return;
       mctx.globalAlpha = patch.type === 'water' ? 0.7 : 0.18;
       mctx.fillStyle = patch.color;
       mctx.beginPath();
       mctx.ellipse(patch.x * scale, patch.y * scale, Math.max(1, patch.rx * scale), Math.max(1, patch.ry * scale), patch.rotation, 0, Math.PI * 2);
       mctx.fill();
     });
+    // 道路（已探索才画）
     mctx.globalAlpha = 0.35;
     mctx.strokeStyle = this.map.terrain.path;
     mctx.lineWidth = 2;
     this.terrainRoads.forEach(road => {
+      const k1 = Math.floor(road.x1 / TILE) + ',' + Math.floor(road.y1 / TILE);
+      const k2 = Math.floor(road.x2 / TILE) + ',' + Math.floor(road.y2 / TILE);
+      if (!this.exploredSet.has(k1) && !this.exploredSet.has(k2)) return;
       mctx.beginPath();
       mctx.moveTo(road.x1 * scale, road.y1 * scale);
       mctx.lineTo(road.x2 * scale, road.y2 * scale);
@@ -4298,51 +5477,48 @@ class Expedition {
     });
     mctx.globalAlpha = 1;
 
-    // 撤离点
+    // 撤离点（已探索才显示）
     this.extractPoints.forEach(ep => {
-      if (!this.isWorldVisible(ep.x, ep.y)) return;
+      const k = Math.floor(ep.x / TILE) + ',' + Math.floor(ep.y / TILE);
+      if (!this.exploredSet.has(k)) return;
       mctx.fillStyle = '#7fff7f';
       mctx.beginPath();
       mctx.arc(ep.x * scale, ep.y * scale, 4, 0, Math.PI * 2);
       mctx.fill();
     });
-    // 宝箱
+    // 宝箱（已探索过记住）
     this.chests.forEach(c => {
-      if (!this.isWorldVisible(c.x, c.y)) return;
-      if (!c.opened) {
-        mctx.fillStyle = '#ffd700';
-        mctx.fillRect(c.x * scale - 2, c.y * scale - 2, 4, 4);
-      }
+      if (c.opened) return;
+      const k = Math.floor(c.x / TILE) + ',' + Math.floor(c.y / TILE);
+      if (!this.exploredSet.has(k)) return;
+      mctx.fillStyle = '#ffd700';
+      mctx.fillRect(c.x * scale - 2, c.y * scale - 2, 4, 4);
     });
-    // 怪物
+    // 怪物（只显示玩家附近 200px 内的）
     this.monsters.forEach(m => {
-      if (!this.isWorldVisible(m.x, m.y)) return;
+      const d = Math.hypot(m.x - px, m.y - py);
+      if (d > 200) return;
       mctx.fillStyle = '#ff4444';
       mctx.fillRect(m.x * scale - 1, m.y * scale - 1, 3, 3);
     });
     // 掠夺者
     this.raiders.forEach(r => {
-      if (!this.isWorldVisible(r.x, r.y)) return;
+      const d = Math.hypot(r.x - px, r.y - py);
+      if (d > 250) return;
       mctx.fillStyle = '#ff8800';
       mctx.fillRect(r.x * scale - 2, r.y * scale - 2, 4, 4);
     });
-    // 防御塔
+    // 防御塔（已探索才显示）
     this.towers.forEach(t => {
-      if (!this.isWorldVisible(t.x, t.y)) return;
-      if (t.state === 'player') mctx.fillStyle = '#7fff7f';
-      else if (t.state === 'enemy') mctx.fillStyle = '#ff4444';
-      else mctx.fillStyle = '#666';
+      const k = Math.floor(t.x / TILE) + ',' + Math.floor(t.y / TILE);
+      if (!this.exploredSet.has(k)) return;
+      mctx.fillStyle = t.state === 'player' ? '#7fff7f' : t.state === 'enemy' ? '#ff4444' : '#666';
       mctx.fillRect(t.x * scale - 2, t.y * scale - 2, 4, 4);
     });
-    // 陷阱与地面战利品
-    this.traps.forEach(trap => {
-      if (!this.isWorldVisible(trap.x, trap.y)) return;
-      mctx.globalAlpha = 0.65;
-      mctx.fillStyle = trap.color;
-      mctx.fillRect(trap.x * scale - 1, trap.y * scale - 1, 3, 3);
-    });
+    // 地面战利品（附近才显示）
     this.groundLoot.forEach(item => {
-      if (!this.isWorldVisible(item.x, item.y)) return;
+      const d = Math.hypot(item.x - px, item.y - py);
+      if (d > 180) return;
       mctx.globalAlpha = 1;
       mctx.fillStyle = '#f6c75b';
       mctx.beginPath();

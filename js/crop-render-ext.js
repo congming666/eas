@@ -37,10 +37,17 @@
       const needsWater = plot.moisture !== undefined && plot.moisture < 30;
       const hasPest = plot.status === 'pest' || plot.status === 'mold';
 
+      // v3.5 用真实图片替换 emoji（按阶段缩放大小）
+      const stageSizes = [28, 18, 22, 26, 30];
+      const imgSize = stageSizes[stage] || 28;
+      const cropArt = (typeof CropArt !== 'undefined' && CropArt.ready(crop.id))
+        ? CropArt.dom(crop.id, stageIcon, imgSize)
+        : `<span class="crop-icon stage-${stage}">${stageIcon}</span>`;
+
       element.innerHTML = `
-        <div class="crop-visual ${ready ? 'ready' : ''} ${needsWater ? 'thirsty' : ''} ${hasPest ? 'diseased' : ''}" 
+        <div class="crop-visual ${ready ? 'ready' : ''} ${needsWater ? 'thirsty' : ''} ${hasPest ? 'diseased' : ''}"
              style="color:${ready ? qualityColor : '#88cc88'};">
-          <span class="crop-icon stage-${stage}">${stageIcon}</span>
+          ${cropArt}
           ${combo.combos.length > 0 ? '<div class="combo-indicator">✨</div>' : ''}
           ${env.droughtImmune ? '<div class="aura-indicator" title="仙人掌庇护">🛡️</div>' : ''}
           ${needsWater ? '<div class="water-indicator">💧</div>' : ''}

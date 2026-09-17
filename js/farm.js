@@ -348,16 +348,44 @@ const Farm = {
     container.innerHTML = '';
     const prepGold = document.getElementById('prepGoldDisplay');
     if (prepGold) prepGold.textContent = GameState.gold;
+
+    // 随机地图按钮
+    const randDiv = document.createElement('div');
+    randDiv.className = 'map-option map-random';
+    randDiv.style.cssText = 'border:2px dashed #f2d28a;background:rgba(242,210,138,0.08);cursor:pointer;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;';
+    randDiv.innerHTML = `
+      <div style="font-size:32px;">🎲</div>
+      <div style="font-weight:700;color:#f2d28a;font-size:14px;">随机地图</div>
+      <div style="font-size:11px;color:#aab;">从已解锁层级随机一张</div>
+    `;
+    randDiv.onclick = () => {
+      const affordable = CONFIG.maps.filter(m => GameState.gold >= m.entryFee);
+      if (!affordable.length) return;
+      GameState.selectedMap = affordable[Math.floor(Math.random() * affordable.length)].id;
+      SaveSystem.save();
+      this.renderMapSelect();
+    };
+    container.appendChild(randDiv);
+
     CONFIG.maps.forEach(map => {
       const div = document.createElement('div');
       const locked = GameState.gold < map.entryFee;
       div.className = 'map-option' + (GameState.selectedMap === map.id ? ' selected' : '') + (locked ? ' locked' : '');
+      div.style.cssText += ';position:relative;overflow:hidden;';
+      const thumb = map.bgImage ? `<img src="${map.bgImage}" style="position:absolute;top:0;left:0;width:100%;height:60%;object-fit:cover;opacity:0.85;z-index:0;" onerror="this.style.display='none'"/>` : '';
+      const modifierTag = map.modifier && map.modifier !== '标准'
+        ? `<div style="display:inline-block;margin-top:4px;padding:2px 8px;background:rgba(255,120,80,0.2);border:1px solid #ff8866;border-radius:10px;font-size:11px;color:#ffaa88;">⚡ ${map.modifier}</div>`
+        : '';
       div.innerHTML = `
-        <div class="map-name">T${map.tier} ${map.name} <span style="font-size:12px;color:#ff8866;">[${map.danger}]</span></div>
-        <div class="map-info">
-          <span>💰 入场: ${map.entryFee}</span>
-          <span>👹 怪物: ${map.monsterCount}</span>
-          <span>📦 宝箱: ${map.chestCount}</span>
+        ${thumb}
+        <div style="position:relative;z-index:1;background:linear-gradient(transparent,rgba(0,0,0,0.85) 40%);padding-top:60px;">
+          <div class="map-name">T${map.tier} ${map.name} <span style="font-size:12px;color:#ff8866;">[${map.danger}]</span></div>
+          ${modifierTag}
+          <div class="map-info">
+            <span>💰 ${map.entryFee}</span>
+            <span>👹 ${map.monsterCount}</span>
+            <span>📦 ${map.chestCount}</span>
+          </div>
         </div>
       `;
       if (!locked) div.onclick = () => {

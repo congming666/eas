@@ -317,6 +317,26 @@ const Game = {
 
     const lootList = document.getElementById('lootList');
     const plantGrowth = Array.isArray(data.plantGrowth) ? data.plantGrowth : [];
+
+    // v3.8 本局高光卡片
+    let highlightHtml = '';
+    if (Array.isArray(data.highlights) && data.highlights.length > 0) {
+      highlightHtml = '<div style="margin:10px 0;">';
+      data.highlights.forEach(h => {
+        highlightHtml += `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin:6px 0;
+                      background:linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04));
+                      border:1px solid rgba(255,215,0,0.3);border-radius:8px;">
+            <div style="font-size:28px;">${h.icon}</div>
+            <div style="flex:1;">
+              <div style="color:#ffd700;font-weight:600;font-size:14px;">${h.title}</div>
+              <div style="color:#aaa;font-size:12px;">${h.desc}</div>
+            </div>
+          </div>`;
+      });
+      highlightHtml += '</div>';
+    }
+
     let plantHtml = '';
     if (plantGrowth.length > 0) {
       plantHtml = '<div style="font-size:14px;color:#7dff9a;margin:10px 0 6px;">🌿 植物培育</div>';
@@ -326,7 +346,7 @@ const Game = {
         plantHtml += `<div class="loot-item kept" style="margin-bottom:4px;"><span>${p.icon} ${p.name}</span><span style="color:${color};">${sign}${p.delta} 培育进度</span></div>`;
       });
     }
-    lootList.innerHTML = '<div style="font-size:14px;color:#888;margin-bottom:8px;">战利品清单</div>' + plantHtml;
+    lootList.innerHTML = highlightHtml + '<div style="font-size:14px;color:#888;margin:12px 0 8px;">战利品清单</div>' + plantHtml;
     data.keptItems.forEach(i => {
       lootList.innerHTML += `<div class="loot-item kept"><span>${i.icon} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
     });
@@ -366,7 +386,10 @@ const Game = {
   // v1.0 武器锻造台
   openBlacksmith() {
     if (typeof LoadoutSystem === 'undefined') return;
+    // 只关动态创建的锻造台面板（不能删静态 modal-overlay 如卡牌工坊）
+    document.querySelectorAll('.modal-overlay[data-dynamic="1"]').forEach(el => el.remove());
     const overlay = document.createElement('div');
+    overlay.setAttribute('data-dynamic', '1');
     overlay.className = 'overlay modal-overlay';
     overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
     let html = '<div style="width:620px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
@@ -423,8 +446,10 @@ const Game = {
   // v1.0 安全箱
   openSafeBox() {
     if (typeof LoadoutSystem === 'undefined') return;
+    document.querySelectorAll('.modal-overlay[data-dynamic="1"]').forEach(el => el.remove());
     const overlay = document.createElement('div');
     overlay.className = 'overlay modal-overlay';
+    overlay.setAttribute('data-dynamic', '1');
     overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
     const slots = LoadoutSystem.getSafeCapacity();
     const cost = LoadoutSystem.upgradeSafeCost();
@@ -441,7 +466,7 @@ const Game = {
     }
     html += '</div>';
     if (cost) {
-      html += `<button class="secondary-btn" onclick="LoadoutSystem.upgradeSafe();Game.openSafeBox();location.reload()">升级到${slots+1}格（${cost}金币）</button>`;
+      html += `<button class="secondary-btn" onclick="if(LoadoutSystem.upgradeSafe()){Game.openSafeBox();}">升级到${slots+1}格（${cost}金币）</button>`;
     } else {
       html += '<p style="color:#ffd700;">安全箱已满级（3格）</p>';
     }

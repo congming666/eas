@@ -22,6 +22,7 @@
     execTarget: null,
     execTimer: 0,
     branchActive: false,
+    branchUsed: false,
     branchOptions: [],
     destructibles: [],
     elapsed: 0,
@@ -36,7 +37,7 @@
       this.torchFuel = 100; this.bossPhase = 1;
       this.bossPhaseTriggered = {};
       this.executing = false; this.execTarget = null; this.execTimer = 0;
-      this.branchActive = false; this.branchOptions = [];
+      this.branchActive = false; this.branchUsed = false; this.branchOptions = [];
       this.destructibles = []; this.elapsed = 0;
       this.spawnDestructibles();
     },
@@ -566,7 +567,8 @@
       const boss = this.exp.monsters.find(m => m.type === 'boss' && m.hp > 0);
       if (boss) this.updateBossPhase(boss);
       // 每2分钟触发一次岔路选择
-      if (this.elapsed > 120 && !this.branchActive && Math.floor(this.elapsed) % 120 === 0) {
+      if (this.elapsed > 120 && !this.branchActive && !this.branchUsed) {
+        this.branchUsed = true;
         this.triggerBranch();
       }
     },

@@ -9,10 +9,11 @@ const SaveSystem = {
       if (!data || data.version !== 1) return false;
 
       GameState.gold = Number.isFinite(data.gold) ? data.gold : GameState.gold;
-      GameState.seeds = Number.isFinite(data.seeds) ? data.seeds : GameState.seeds;
-      GameState.materials = Number.isFinite(data.materials) ? data.materials : GameState.materials;
+      // seeds 必须是对象（旧存档可能误存为数字）
+      GameState.seeds = (data.seeds && typeof data.seeds === 'object' && !Array.isArray(data.seeds)) ? data.seeds : (GameState.seeds || {});
+      GameState.materials = (data.materials && typeof data.materials === 'object') ? data.materials : (GameState.materials || {});
       GameState.unlockedPlots = clamp(Number(data.unlockedPlots) || 8, 8, 36);
-      GameState.selectedMap = CONFIG.maps.some(map => map.id === data.selectedMap) ? data.selectedMap : 't1';
+      GameState.selectedMap = CONFIG.maps.some(map => map.id === data.selectedMap) ? data.selectedMap : 't1_1';
       GameState.selectedWeapon = CONFIG.weapons.some(weapon => weapon.id === data.selectedWeapon)
         ? data.selectedWeapon : 'harvest_sickle';
       GameState.selectedCrop = CONFIG.crops.some(crop => crop.id === data.selectedCrop) ? data.selectedCrop : 'wheat';

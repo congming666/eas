@@ -152,7 +152,28 @@ const AudioManager = {
       this.ctx = new AudioContextClass();
       this.master = this.ctx.createGain();
       this.master.gain.value = this.enabled ? this.volume : 0;
-      this.master.connect(this.ctx.destination);
+      // v3.8 压缩器防爆音
+      this.comp = this.ctx.createDynamicsCompressor();
+      this.comp.threshold.value = -18;
+      this.comp.knee.value = 24;
+      this.comp.ratio.value = 4;
+      this.comp.attack.value = 0.003;
+      this.comp.release.value = 0.25;
+      // v3.8 简单混响（延迟反馈）
+      this.reverb = this.ctx.createGain();
+      this.reverbGain = this.ctx.createGain();
+      this.reverbGain.gain.value = 0.18;
+      this.delay = this.ctx.createDelay(0.5);
+      this.delay.delayTime.value = 0.18;
+      this.feedback = this.ctx.createGain();
+      this.feedback.gain.value = 0.35;
+      this.reverb.connect(this.delay);
+      this.delay.connect(this.feedback);
+      this.feedback.connect(this.delay);
+      this.delay.connect(this.reverbGain);
+      this.reverbGain.connect(this.comp);
+      this.master.connect(this.comp);
+      this.comp.connect(this.ctx.destination);
       this.restartScheduler();
       return true;
     } catch (error) {
@@ -163,9 +184,61 @@ const AudioManager = {
     }
   },
 
+  startAmbient(scene) {
+    if (!this.ctx) return;
+    if (this._ambientNodes) {
+      try { this._ambientNodes.forEach(n => { try{n.stop()}catch(e){} try{n.disconnect()}catch(e){} }); } catch(e){}
+      this._ambientNodes = null;
+    }
+    if (this._ambientTimer) { clearInterval(this._ambientTimer); this._ambientTimer = null; }
+    const nodes = [];
+    const len = this.ctx.sampleRate * 2;
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = scene === 't3' ? 280 : (scene === 'night' ? 400 : 600);
+    const g = this.ctx.createGain();
+    g.gain.value = scene === 't3' ? 0.06 : 0.035;
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start();
+    nodes.push(src);
+    const chirp = () => {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const og = this.ctx.createGain();
+      o.type = 'sine';
+      if (scene === 'night') {
+        o.frequency.value = 4200 + Math.random()*400;
+        og.gain.setValueAtTime(0, now);
+        og.gain.linearRampToValueAtTime(0.04, now+0.02);
+        og.gain.linearRampToValueAtTime(0, now+0.15);
+      } else if (scene === 't1') {
+        o.frequency.value = 1800 + Math.random()*600;
+        og.gain.setValueAtTime(0, now);
+        og.gain.linearRampToValueAtTime(0.05, now+0.03);
+        og.gain.exponentialRampToValueAtTime(0.001, now+0.25);
+      } else {
+        o.frequency.value = 2500 + Math.random()*300;
+        og.gain.setValueAtTime(0, now);
+        og.gain.linearRampToValueAtTime(0.03, now+0.02);
+        og.gain.linearRampToValueAtTime(0, now+0.2);
+      }
+      o.connect(og); og.connect(this.master);
+      o.start(now); o.stop(now+0.3);
+    };
+    this._ambientTimer = setInterval(chirp, scene === 'night' ? 900 : 2200);
+    this._ambientNodes = nodes;
+  },
+
   start(scene = 'menu') {
     this.scene = scene;
     if (this.init() && this.ctx.state === 'suspended') this.ctx.resume();
+    this.startAmbient(scene);
   },
 
   setScene(scene) {
@@ -519,6 +592,79 @@ const AudioManager = {
       this.playTone(600, 0.3, 'square', 0.08);
       setTimeout(() => this.playTone(1200, 0.3, 'square', 0.08), 300);
     }
+  },
+
+  // v3.8 新音效：拾取
+  playPickup(kind) {
+    kind = kind || 'gold';
+    if (!this.ctx || !this.enabled) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastPickupAt || 0) < 0.05) return;
+    this._lastPickupAt = now;
+    if (kind === 'gold') {
+      this.playTone(880, 0.08, 'triangle', 0.06);
+      this.playTone(1320, 0.1, 'sine', 0.04);
+    } else if (kind === 'item') {
+      this.playTone(660, 0.08, 'triangle', 0.06);
+      const self = this;
+      setTimeout(() => self.playTone(990, 0.1, 'sine', 0.05), 50);
+    } else if (kind === 'rare') {
+      const self = this;
+      [880, 1108, 1318, 1760].forEach((f, i) => setTimeout(() => self.playTone(f, 0.15, 'triangle', 0.06), i * 40));
+    }
+  },
+
+  // v3.8 UI 点击
+  playUIClick() {
+    if (!this.ctx || !this.enabled) return;
+    this.playTone(1200, 0.04, 'square', 0.03);
+  },
+
+  // v3.8 完美闪避
+  playPerfectDodge() {
+    if (!this.ctx || !this.enabled) return;
+    this.playTone(1568, 0.12, 'triangle', 0.08);
+    this.playTone(2093, 0.18, 'sine', 0.06);
+    this.playNoise(0.06, 0.03, 6000, 'highpass');
+  },
+
+  // v3.8 兽潮警告
+  playWaveWarning() {
+    if (!this.ctx || !this.enabled) return;
+    const self = this;
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        self.playTone(140, 0.25, 'sawtooth', 0.12);
+        self.playTone(70, 0.3, 'sine', 0.10);
+      }, i * 280);
+    }
+  },
+
+  // v3.8 撤离开始
+  playExtractStart() {
+    if (!this.ctx || !this.enabled) return;
+    const self = this;
+    this.playTone(520, 0.15, 'square', 0.08);
+    setTimeout(() => self.playTone(520, 0.15, 'square', 0.08), 200);
+    setTimeout(() => self.playTone(780, 0.25, 'square', 0.08), 400);
+  },
+
+  // v3.8 脚步
+  playStep() {
+    if (!this.ctx || !this.enabled) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastStepAt || 0) < 0.22) return;
+    this._lastStepAt = now;
+    this.playNoise(0.05, 0.025, 300 + Math.random() * 100, 'lowpass');
+  },
+
+  // v3.8 怪物前摇低吼
+  playWindup() {
+    if (!this.ctx || !this.enabled) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastWindupAt || 0) < 0.3) return;
+    this._lastWindupAt = now;
+    this.playTone(180 + Math.random() * 40, 0.18, 'sawtooth', 0.05);
   }
 };
 
