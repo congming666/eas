@@ -151,10 +151,12 @@ class Expedition {
     this.eventModifiers = { enemySpeed: 1, enemyDamage: 1, loot: 1, vision: 1 };
     this.beastWave = {
       wave: 0,
-      nextIn: 20,
+      nextIn: 20,          // 首波固定 20 秒
+      interval: 40,        // 之后每 40 秒一波（固定节奏）
       active: false,
       remaining: 0,
-      duration: 0
+      duration: 0,
+      rewarded: {}         // 每波守塔奖励是否已发（按波次号记录）
     };
     this.camera = { x: 0, y: 0 };
     this.visionCellSize = 96;
@@ -237,7 +239,7 @@ class Expedition {
       // v3.4 地图词条：视野修正
       if (this.map.visibilityBonus) this.visionRadius *= (1 + this.map.visibilityBonus);
       if (this.map.visionPenalty) this.visionRadius *= (1 - this.map.visionPenalty);
-      this.beastWave.nextIn = DifficultySystem.getTierMechanic(this.map.tier).beastWaveInterval || 48;
+      this.beastWave.nextIn = 20; // v4.1 首波固定 20 秒，之后固定 40 秒节奏
     }
     this.generateTerrain();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
@@ -1574,10 +1576,11 @@ class Expedition {
         speed: data.speed * this.balance.enemySpeed * 0.88,
         attackCd: 0, stunned: 0, target: null, vx: 0, vy: 0,
         facing: angle + Math.PI, animTime: rand(0, 10), hitFlash: 0,
-        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true, state: 'idle', stateTimer: 0
+        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), beastWave: true, waveNo: this.beastWave.wave, state: 'idle', stateTimer: 0
       });
     }
     this.beastWave.remaining = count;
+    this.beastWave.nextIn = this.beastWave.interval; // v4.1 下一波倒计时从本波刷出即开始（不清完也照刷）
     this.screenShake = 1;
     showToast(`第 ${this.beastWave.wave} 波兽潮来袭！立即进入已占领防御塔射程`, 'warning');
   }
@@ -4311,7 +4314,7 @@ class Expedition {
     const ownedTowers = this.towers.filter(t => t.state === 'player').length;
     const protectedByTower = this.towers.some(t => t.state === 'player' && dist(t, this.player) <= t.range);
     const waveMarkup = this.beastWave.active
-      ? `<div class="wave-status active"><b>⚠ 第 ${this.beastWave.wave} 波兽潮</b><span>剩余 ${this.beastWave.remaining} 只 · ${protectedByTower ? '防御塔护盾生效' : '未受保护，伤害提升'}</span></div>`
+      ? `<div class="wave-status active"><b>⚠ 第 ${this.beastWave.wave} 波兽潮</b><span>剩余 ${this.beastWave.remaining} 只 · 下一波 ${Math.ceil(this.beastWave.nextIn)}s · ${protectedByTower ? '防御塔护盾生效' : '未受保护，伤害提升'}</span></div>`
       : `<div class="wave-status"><b>兽潮预警 ${Math.ceil(this.beastWave.nextIn)}s</b><span>已占塔 ${ownedTowers} · 提前进入绿色射程</span></div>`;
     panel.innerHTML = `<div class="mission-label">远征任务</div><strong>${objective.title}${objective.complete ? ' · 已完成' : ''}</strong><span>${objective.description}</span><div class="mission-progress"><i style="width:${progress/objective.target*100}%"></i></div><small>${progress}/${objective.target}</small>${waveMarkup}${eventMarkup}${this.boss && this.boss.hp > 0 ? `<div class="boss-hud"><b>${this.boss.name}</b><span>阶段 ${this.boss.phase}</span><i style="width:${this.boss.hp/this.boss.maxHp*100}%"></i></div>` : ''}`;
   }
@@ -5158,22 +5161,26 @@ class Expedition {
 
   updateWorldSystems(dt) {
     this.elapsed += dt;
-    let waveMonsterCount = 0;
+    // v4.1 固定节奏兽潮：倒计时始终走，当前波没清完下一波照样刷（波次叠加、强度滚大）
+    const aliveByWave = {};
     for (let i = 0; i < this.monsters.length; i++) {
-      if (this.monsters[i].beastWave && this.monsters[i].hp > 0) waveMonsterCount++;
+      const mm = this.monsters[i];
+      if (mm.beastWave && mm.hp > 0 && mm.waveNo) aliveByWave[mm.waveNo] = (aliveByWave[mm.waveNo] || 0) + 1;
     }
+    let waveMonsterCount = 0;
+    for (const wk in aliveByWave) waveMonsterCount += aliveByWave[wk];
     this.beastWave.remaining = waveMonsterCount;
-    if (this.beastWave.active) {
-      if (waveMonsterCount === 0) {
-        this.beastWave.active = false;
-        this.beastWave.nextIn = 40; // v1.4 每40秒一波
-        GameState.gold += 20 * this.beastWave.wave * this.map.tier;
-        showToast(`第 ${this.beastWave.wave} 波兽潮已击退，获得守塔奖励`, 'success');
+    this.beastWave.active = waveMonsterCount > 0;
+    // 每波各自清完各发一次奖励（允许晚于下一波刷出才清完）
+    for (let wn = 1; wn <= this.beastWave.wave; wn++) {
+      if (!this.beastWave.rewarded[wn] && !aliveByWave[wn]) {
+        this.beastWave.rewarded[wn] = true;
+        GameState.gold += 20 * wn * this.map.tier;
+        showToast(`第 ${wn} 波兽潮已击退，获得守塔奖励`, 'success');
       }
-    } else {
-      this.beastWave.nextIn -= dt;
-      if (this.beastWave.nextIn <= 0) this.spawnBeastWave();
     }
+    this.beastWave.nextIn -= dt;
+    if (this.beastWave.nextIn <= 0) this.spawnBeastWave();
     if (this.elapsed >= this.nextEventAt && !this.activeEvent) {
       this.startMapEvent();
       this.nextEventAt += 90 + rand(0, 35);
