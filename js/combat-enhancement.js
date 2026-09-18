@@ -249,6 +249,12 @@
     assignAIType(m) {
       if (m.type === 'boss') { m.aiType = 'boss'; return; }
       if (m.type === 'boar') { m.aiType = 'charger'; return; }
+      // v5.0：新精英/怪物按 CONFIG 行为标志分配 AI
+      const mdef = (typeof CONFIG !== 'undefined' && CONFIG.monsters && CONFIG.monsters[m.type]) || {};
+      if (mdef.ai) { m.aiType = mdef.ai; m.aiState = 'chase'; m.aiTimer = 1 + Math.random() * 2; return; }
+      if (mdef.charger) { m.aiType = 'charger'; m.aiState = 'chase'; m.aiTimer = 1.5; return; }
+      if (mdef.healer) { m.aiType = 'healer'; return; }
+      if (mdef.flying || mdef.ranged) { m.aiType = 'ranged'; m.aiState = 'chase'; m.aiTimer = 1 + Math.random(); return; }
       // 按波次/地图等级混合AI类型
       const roll = Math.random();
       const tier = this.exp.map.tier;
@@ -499,10 +505,11 @@
     updateTorch(dt) {
       this.torchFuel = Math.max(0, this.torchFuel - dt * 0.5); // 每分钟消耗30
       // 火把耗尽时视野缩小（通过迷雾系统实现）
+      const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(this.exp) : 1;
       if (this.torchFuel <= 0) {
-        this.exp.visionRadius = 120; // 正常是300+
+        this.exp.visionRadius = 120 * _vm; // 正常是300+
       } else {
-        this.exp.visionRadius = 300 + this.torchFuel * 0.5;
+        this.exp.visionRadius = (300 + this.torchFuel * 0.5) * _vm;
       }
     },
     useTorchItem() {

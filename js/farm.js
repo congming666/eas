@@ -177,6 +177,7 @@ const Farm = {
     if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.recordCollection(crop.id, plot.quality);
     // 作物存入仓库
     const added = Warehouse.addItem(crop.id, yieldQty);
+    if (window.CharacterSystem) CharacterSystem.onCropHarvested(crop.id, yieldQty, plot.quality);
     let rewardText = `${crop.name} ×${added} 已入仓`;
     // 30% 概率额外获得种子，存入仓库
     if (Math.random() < 0.3) {
@@ -423,7 +424,17 @@ const Farm = {
     CONFIG.skills.forEach(baseSkill => {
       const extra = boosts[baseSkill.id] || 0;
       const skill = getSkillStats(baseSkill, extra);
-      const power = skill.damage || skill.stunDuration || skill.dashDistance || skill.stealthDuration;
+      const pct100 = v => Math.round(v * 100) + '%';
+      let power = skill.damage || skill.stunDuration || skill.dashDistance || skill.stealthDuration ||
+        skill.shield || skill.hot || skill.dot || skill.thornsDps || skill.jumps;
+      if (!power) {
+        if (skill.reflect) power = '反弹' + pct100(skill.reflect);
+        else if (skill.reduce) power = '减伤' + pct100(skill.reduce);
+        else if (skill.atkSpd || skill.moveSpd) power = '攻速' + pct100(skill.atkSpd || 0) + '/移速' + pct100(skill.moveSpd || 0);
+        else if (skill.slow) power = '减速' + pct100(skill.slow);
+        else if (skill.duration) power = skill.duration + '秒';
+        else power = '—';
+      }
       const div = document.createElement('div');
       div.className = 'prep-skill';
       const skArt = (typeof CropArt!=='undefined' && CropArt.ready(baseSkill.id)) ? CropArt.dom(baseSkill.id, skill.icon, 34) : skill.icon;

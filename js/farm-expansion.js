@@ -89,6 +89,21 @@
   const Weathers = ['sunny','sunny','sunny','rain','rain','fog','storm'];
   const Seasons = ['spring','summer','autumn','winter'];
   const FarmCareSystem = {
+    // 收获品质浮动文字（fixed 定位，上浮渐隐后移除）；crop-expansion 的品质特效依赖此方法
+    _spawnFloatText(x, y, text, color) {
+      if (!text) return;
+      const el = document.createElement('div');
+      el.textContent = text;
+      el.style.cssText = `position:fixed;left:${x}px;top:${y}px;transform:translate(-50%,-50%);
+        color:${color || '#fff'};font-weight:700;font-size:15px;text-shadow:0 1px 3px rgba(0,0,0,.8);
+        pointer-events:none;z-index:10000;transition:all .9s ease-out;`;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.top = `${y - 46}px`;
+        el.style.opacity = '0';
+      });
+      setTimeout(() => el.remove(), 950);
+    },
     tick(dt) {
       GameState.weatherTimer -= dt;
       if (GameState.weatherTimer <= 0) {
@@ -181,9 +196,22 @@
       const recipe = this.getRecipe(recipeId);
       if (!recipe) return false;
       if (recipe.workshopLevel > GameState.workshopLevel) { showToast('需要工坊等级 ' + recipe.workshopLevel, 'warning'); return false; }
-      const have = Warehouse.getCount(recipe.inputCrop);
-      if (have < recipe.inputQty * qty) { showToast('原料不足：需要 ' + (recipe.inputQty*qty) + ' ' + recipe.inputCrop, 'warning'); return false; }
-      Warehouse.removeItem(recipe.inputCrop, recipe.inputQty * qty);
+      if (recipe.inputs) {
+        // v5 多原料配方（可含具体资源，走 ResourceSystem）
+        const need = {};
+        for (const k in recipe.inputs) need[k] = recipe.inputs[k] * qty;
+        if (window.ResourceSystem) {
+          for (const k in need) { if (ResourceSystem.count(k) < need[k]) { showToast('原料不足：' + k + ' ×' + need[k], 'warning'); return false; } }
+          if (!ResourceSystem.pay(need)) { showToast('原料不足', 'warning'); return false; }
+        } else {
+          for (const k in need) { if (Warehouse.getCount(k) < need[k]) { showToast('原料不足：' + k, 'warning'); return false; } }
+          for (const k in need) Warehouse.removeItem(k, need[k]);
+        }
+      } else {
+        const have = Warehouse.getCount(recipe.inputCrop);
+        if (have < recipe.inputQty * qty) { showToast('原料不足：需要 ' + (recipe.inputQty*qty) + ' ' + recipe.inputCrop, 'warning'); return false; }
+        Warehouse.removeItem(recipe.inputCrop, recipe.inputQty * qty);
+      }
       GameState.processingQueue.push({ recipeId, remaining: recipe.time, total: recipe.time, qty });
       showToast('开始加工：' + recipe.name + ' ×' + qty, 'success');
       SaveSystem.save();
@@ -196,7 +224,9 @@
         if (job.remaining <= 0) {
           const recipe = this.getRecipe(job.recipeId);
           if (recipe) {
-            Warehouse.addItem(recipe.outputId, recipe.outputQty * job.qty);
+            const outN = recipe.outputQty * job.qty;
+            if (window.ResourceSystem && window.CONFIG && CONFIG.resources && CONFIG.resources[recipe.outputId]) ResourceSystem.add(recipe.outputId, outN);
+            else Warehouse.addItem(recipe.outputId, outN);
             if (recipe.outputId === 'pumpkin_lantern') GameState.farmBeauty += 5;
             showToast('加工完成：' + recipe.outputName + ' ×' + (recipe.outputQty*job.qty), 'gold');
           }

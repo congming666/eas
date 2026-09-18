@@ -40,6 +40,12 @@ const AchievementSystem = {
 
   init() {
     if (!GameState.achievements) GameState.achievements = { unlocked: [], progress: {}, stats: { kills: 0, harvests: 0, extracts: 0, bossKills: {}, materials: {}, consecutiveExtracts: 0 } };
+    const a = GameState.achievements;
+    if (!Array.isArray(a.unlocked)) a.unlocked = [];
+    if (!a.progress) a.progress = {};
+    if (!a.stats) a.stats = { kills: 0, harvests: 0, extracts: 0, bossKills: {}, materials: {}, consecutiveExtracts: 0 };
+    if (!a.stats.bossKills) a.stats.bossKills = {};
+    if (!a.stats.materials) a.stats.materials = {};
   },
 
   getUnlocked() { return GameState.achievements.unlocked; },
@@ -48,6 +54,7 @@ const AchievementSystem = {
 
   // 追踪统计
   track(key, value) {
+    this.init();
     if (!GameState.achievements.stats[key]) GameState.achievements.stats[key] = 0;
     GameState.achievements.stats[key] += value || 1;
     this.checkAll();
@@ -55,6 +62,7 @@ const AchievementSystem = {
 
   // 追踪事件（如boss击杀、材料收集）
   trackEvent(type, subId) {
+    this.init();
     const s = GameState.achievements.stats;
     if (type === 'boss') {
       s.bossKills[subId] = (s.bossKills[subId] || 0) + 1;

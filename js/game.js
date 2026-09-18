@@ -116,7 +116,8 @@ const Game = {
       const inBag = carriedEntry ? carriedEntry.count : 0;
       const div = document.createElement('div');
       div.style.cssText = 'padding:6px;border:2px solid ' + (inBag>0?'#7fff7f':'#444') + ';border-radius:6px;cursor:pointer;text-align:center;width:80px;background:rgba(0,0,0,0.3);';
-      div.innerHTML = '<div style="font-size:20px;">' + plantDef.icon + '</div>' +
+      const seedArt = (typeof CropArt!=='undefined' && CropArt.ready(deployId)) ? CropArt.dom(deployId, plantDef.icon, 28) : plantDef.icon;
+      div.innerHTML = '<div style="display:flex;justify-content:center;">' + seedArt + '</div>' +
         '<div style="font-size:10px;color:#ccc;">' + plantDef.name + '</div>' +
         '<div style="font-size:9px;color:#888;">仓库x' + count + '</div>' +
         '<div style="font-size:9px;color:' + (inBag>0?'#7fff7f':'#666') + ';">带x' + inBag + '</div>';
@@ -310,7 +311,7 @@ const Game = {
       <div class="result-stat"><div class="result-stat-label">用时</div><div class="result-stat-value">${data.timeUsed}秒</div></div>
       <div class="result-stat"><div class="result-stat-label">击杀数</div><div class="result-stat-value">${data.kills}</div></div>
       <div class="result-stat"><div class="result-stat-label">开启宝箱</div><div class="result-stat-value">${data.chests}</div></div>
-      <div class="result-stat"><div class="result-stat-label">受到伤害</div><div class="result-stat-value">${data.damageTaken}</div></div>
+      <div class="result-stat"><div class="result-stat-label">受到伤害</div><div class="result-stat-value">${Math.round(data.damageTaken||0)}</div></div>
       <div class="result-stat"><div class="result-stat-label">获得金币</div><div class="result-stat-value" style="color:#ffd700;">+${data.goldEarned}</div></div>
       <div class="result-stat"><div class="result-stat-label">地图</div><div class="result-stat-value">${data.mapName}</div></div>
     `;
@@ -527,5 +528,5 @@ function renderMenuBg() {
 }
 renderMenuBg();
 
-console.log('农庄牌：荒野远征 v1.9 已加载');
+console.log(`${GAME_NAME} v${GAME_VERSION} 已加载`);
 console.log('Ruleset ID:', CONFIG.ruleset_id);

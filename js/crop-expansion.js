@@ -54,6 +54,30 @@
       rarity: 'rare', trait: 'cdr_buff', buffType: 'cooldown_reduction', buffValue: 0.10, buffDuration: 1,
       reharvest: 3, legendaryBonus: 0.25,
       description: '可反复收获。收获后获得记忆buff，远征技能冷却-10%（传说-25%）'
+    },
+    {
+      id: 'frost_flower', name: '寒霜花', icon: '❄️', growTime: 30, sellPrice: 55, seedPrice: 18,
+      rarity: 'rare', trait: 'dodge_buff', buffType: 'dodge_window', buffValue: 25, buffDuration: 1,
+      qualityBonus: { common: 0.10, fine: 0.15, rare: 0.20, legendary: 0.30 },
+      description: '远征寒霜花种子培育而成。收获后获得寒霜护体，完美闪避窗口+25ms'
+    },
+    {
+      id: 'lightning_vine', name: '电藤', icon: '⚡', growTime: 36, sellPrice: 80, seedPrice: 22,
+      rarity: 'rare', trait: 'cdr_buff', buffType: 'cooldown_reduction', buffValue: 0.12, buffDuration: 1,
+      qualityBonus: { common: 0.10, fine: 0.15, rare: 0.20, legendary: 0.30 },
+      description: '缠绕电光的藤蔓。收获后获得疾电buff，远征技能冷却-12%'
+    },
+    {
+      id: 'shadow_flower', name: '暗影花', icon: '🌑', growTime: 45, sellPrice: 100, seedPrice: 32,
+      rarity: 'epic', trait: 'dodge_buff', buffType: 'dodge_window', buffValue: 40, buffDuration: 2,
+      qualityBonus: { common: 0.12, fine: 0.18, rare: 0.24, legendary: 0.35 },
+      description: '只在阴影中绽放。收获后获得暗影步，完美闪避窗口+40ms，持续2场'
+    },
+    {
+      id: 'deathcap', name: '亡语菇', icon: '🍄', growTime: 48, sellPrice: 120, seedPrice: 35,
+      rarity: 'epic', trait: 'combat_buff', buffType: 'attack', buffValue: 0.20, buffDuration: 3,
+      qualityBonus: { common: 0.12, fine: 0.18, rare: 0.24, legendary: 0.35 },
+      description: 'T3远征亡语菇种子培育而成。收获后获得剧毒之力，下一次远征攻击+20%（可叠加3层）'
     }
   ];
 

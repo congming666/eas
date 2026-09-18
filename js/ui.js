@@ -30,7 +30,7 @@ const RewardSystem = {
   },
 
   isReliefEligible() {
-    return GameState.lastReliefClaim !== this.dateKey() && (GameState.gold < 60 || GameState.seeds <= 0);
+    return GameState.lastReliefClaim !== this.dateKey() && (GameState.gold < 60 || Warehouse.getCount('seeds') <= 0);
   },
 
   claimDaily() {
@@ -44,7 +44,7 @@ const RewardSystem = {
     const day = ((GameState.dailyStreak - 1) % 7) + 1;
     const reward = this.dailyRewards[day - 1];
     GameState.gold += reward.gold;
-    GameState.seeds += reward.seeds;
+    Warehouse.addItem('seeds', reward.seeds);
     GameState.materials += reward.materials || 0;
     GameState.lastDailyClaim = today;
     SaveSystem.save();
@@ -63,9 +63,9 @@ const RewardSystem = {
       return;
     }
     const goldAdded = Math.max(0, 120 - GameState.gold);
-    const seedsAdded = Math.max(0, 3 - GameState.seeds);
+    const seedsAdded = Math.max(0, 3 - Warehouse.getCount('seeds'));
     GameState.gold += goldAdded;
-    GameState.seeds += seedsAdded;
+    Warehouse.addItem('seeds', seedsAdded);
     GameState.lastReliefClaim = this.dateKey();
     SaveSystem.save();
     Farm.render();

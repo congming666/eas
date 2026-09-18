@@ -71,7 +71,7 @@ const Greenhouse = {
         cell.classList.add(`rarity-${plot.plant.rarity || 'common'}`);
         const progressPct = Math.floor(progress * 100);
         cell.innerHTML = `
-          <div class="gh-plant-icon">${plot.plant.icon}</div>
+          <div class="gh-plant-icon">${(typeof CropArt!=="undefined")?CropArt.dom(plot.plant.id,plot.plant.icon,34):plot.plant.icon}</div>
           <div class="gh-plant-name">${plot.plant.name}</div>
           ${plot.ready ? '<div class="gh-ready-tag">可收获</div>' : `<div class="gh-progress"><div class="gh-progress-fill" style="width:${progressPct}%"></div></div><div class="gh-progress-text">${progressPct}%</div>`}
         `;
@@ -99,7 +99,7 @@ const Greenhouse = {
       const button = document.createElement('div');
       button.className = `gh-plant-choice ${plant.rarity} ${GameState.greenhouse.selectedPlant === plant.id ? 'selected' : ''} ${!unlocked ? 'locked' : ''}`;
       button.innerHTML = `
-        <div class="gh-plant-icon">${unlocked ? plant.icon : '🔒'}</div>
+        <div class="gh-plant-icon">${unlocked ? ((typeof CropArt!=="undefined")?CropArt.dom(plant.id,plant.icon,34):plant.icon) : '🔒'}</div>
         <div class="gh-plant-name">${plant.name}</div>
         <div class="gh-plant-time">${plant.growTime}秒</div>
       `;
@@ -131,7 +131,7 @@ const Greenhouse = {
       const div = document.createElement('div');
       div.className = 'gh-drop-item';
       div.innerHTML = `
-        <div class="gh-drop-icon">${item.icon}</div>
+        <div class="gh-drop-icon">${(typeof CropArt!=="undefined")?CropArt.dom(item.id,item.icon,28):item.icon}</div>
         <div class="gh-drop-info">
           <div class="gh-drop-name">${item.name} ×${count}</div>
           <div class="gh-drop-desc">${item.desc}</div>
@@ -197,10 +197,18 @@ const Greenhouse = {
           GameState.gold += amount;
           rewards.push(`💰+${amount}`);
         } else {
-          const added = Warehouse.addItem(drop.id, amount);
-          if (added > 0) {
-            const itemDef = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
-            if (itemDef) rewards.push(`${itemDef.icon}×${added}`);
+          // v5.0 修为类产物直接转化为修为
+          const _gd = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
+          if (_gd && _gd.type === 'cultivation' && window.CharacterSystem) {
+            const _cult = (_gd.cult || 0) * amount;
+            CharacterSystem.addExp(_cult);
+            rewards.push(`修为+${_cult}`);
+          } else {
+            const added = Warehouse.addItem(drop.id, amount);
+            if (added > 0) {
+              const itemDef = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
+              if (itemDef) rewards.push(`${itemDef.icon}×${added}`);
+            }
           }
         }
       }

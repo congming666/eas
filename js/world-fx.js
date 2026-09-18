@@ -157,8 +157,9 @@ const WorldFX = (() => {
     w.wet += (wetTarget - w.wet) * Math.min(1, dt * 0.5);
     // 雾天压缩战争迷雾视野到约 200px
     if (g._baseVision == null) g._baseVision = g.visionRadius;
-    if (w.state === 'fog') g.visionRadius = g._baseVision * 0.55;
-    else if (Math.abs(g.visionRadius - g._baseVision) > 0.5) g.visionRadius = g._baseVision;
+    const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(g) : 1;
+    if (w.state === 'fog') g.visionRadius = g._baseVision * 0.55 * _vm;
+    else if (Math.abs(g.visionRadius - g._baseVision * _vm) > 0.5) g.visionRadius = g._baseVision * _vm;
     if (w.timer <= 0) {
       const order = ['clear', 'cloud', 'rain', 'storm', 'fog'];
       const idx = order.indexOf(w.state);

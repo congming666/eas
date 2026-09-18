@@ -1,12 +1,45 @@
 // ==================== 物资仓库系统 ====================
+const WAREHOUSE_BASE_CAPACITY = 120;   // 基础容量（件）
+const WAREHOUSE_EXPAND_STEP = 50;      // 每次扩建增加（件）
 const Warehouse = {
+  // 批量入库上下文（远征结算时抑制逐条 toast，统一汇总）
+  _batch: null,
+
   // 初始化仓库
   init() {
     if (!GameState.warehouse) {
-      GameState.warehouse = { capacity: 50, items: {} };
+      GameState.warehouse = { capacity: WAREHOUSE_BASE_CAPACITY, items: {}, capVersion: 2 };
     }
     if (!GameState.warehouse.items) GameState.warehouse.items = {};
-    if (!GameState.warehouse.capacity) GameState.warehouse.capacity = 50;
+    if (!GameState.warehouse.capacity) GameState.warehouse.capacity = WAREHOUSE_BASE_CAPACITY;
+    // v4.2 旧档容量迁移（仅一次）：旧档 50 起步、+25/级，提升到新基础容量
+    if (GameState.warehouse.capVersion !== 2) {
+      if (GameState.warehouse.capacity < WAREHOUSE_BASE_CAPACITY) {
+        GameState.warehouse.capacity = WAREHOUSE_BASE_CAPACITY;
+      }
+      GameState.warehouse.capVersion = 2;
+    }
+  },
+
+  // 开始批量入库（远征结算）
+  beginBatch() {
+    this.init();
+    this._batch = { requested: 0, added: 0, unknown: 0 };
+  },
+
+  // 结束批量入库，汇总爆仓/未注册物品并一次性提示
+  endBatch() {
+    const b = this._batch;
+    this._batch = null;
+    if (!b) return null;
+    const lost = b.requested - b.added;
+    if (lost > 0) {
+      showToast(`仓库已满，${lost} 件物品未能存入，请出售或扩建仓库`, 'warning');
+    }
+    if (b.unknown > 0) {
+      console.warn(`批量入库中有 ${b.unknown} 件未注册物品未入仓`);
+    }
+    return b;
   },
 
   // 获取物品定义
@@ -37,16 +70,21 @@ const Warehouse = {
     const def = this.getItemDef(itemId);
     if (!def) {
       console.warn('未知物品:', itemId);
+      if (this._batch) this._batch.unknown += count;
       return 0;
     }
     const free = this.getFreeCapacity();
     const actual = Math.min(count, free);
+    if (this._batch) {
+      this._batch.requested += count;
+      this._batch.added += actual;
+    }
     if (actual <= 0) {
-      showToast('仓库已满！请出售或扩建仓库', 'warning');
+      if (!this._batch) showToast('仓库已满！请出售或扩建仓库', 'warning');
       return 0;
     }
     GameState.warehouse.items[itemId] = (GameState.warehouse.items[itemId] || 0) + actual;
-    if (actual < count) {
+    if (actual < count && !this._batch) {
       showToast(`仓库空间不足，只存入${actual}个${def.name}`, 'warning');
     }
     return actual;
@@ -118,7 +156,7 @@ const Warehouse = {
       return false;
     }
     GameState.gold -= cost;
-    GameState.warehouse.capacity += 25;
+    GameState.warehouse.capacity += WAREHOUSE_EXPAND_STEP;
     showToast(`仓库扩建成功！容量提升至${GameState.warehouse.capacity}`, 'success');
     SaveSystem.save();
     this.render();
@@ -129,7 +167,7 @@ const Warehouse = {
   // 获取扩建费用
   getUpgradeCost() {
     this.init();
-    const level = Math.floor((GameState.warehouse.capacity - 50) / 25) + 1;
+    const level = Math.floor((GameState.warehouse.capacity - WAREHOUSE_BASE_CAPACITY) / WAREHOUSE_EXPAND_STEP) + 1;
     return 100 * level;
   },
 
@@ -210,7 +248,7 @@ const Warehouse = {
         <div class="warehouse-actions">
           <button class="warehouse-btn sell-all-btn" onclick="Warehouse.sellAllByCategory('crop')">一键出售作物</button>
           <button class="warehouse-btn upgrade-btn" onclick="Warehouse.upgradeCapacity()">
-            扩建仓库 (+25)<br><span style="font-size:11px;">💰${upgradeCost}</span>
+            扩建仓库 (+${WAREHOUSE_EXPAND_STEP})<br><span style="font-size:11px;">💰${upgradeCost}</span>
           </button>
         </div>
       </div>
@@ -249,7 +287,7 @@ const Warehouse = {
         ` : '<div class="item-not-sellable">不可出售</div>';
         html += `
           <div class="warehouse-item ${item.rarity || ''}">
-            <div class="item-icon">${item.icon}</div>
+            <div class="item-icon">${(typeof CropArt!=="undefined")?CropArt.dom(item.id,item.icon,36):item.icon}</div>
             <div class="item-name">${item.name}</div>
             <div class="item-count">×${item.count}</div>
             ${sellable}

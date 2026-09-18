@@ -15,20 +15,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 测试关卡：语法检查 + Playwright 端到端冒烟，任何一项失败都不发布
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax check (node --check)
+        run: npm run check
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test (E2E)
+        run: npm test
+      - name: Build publishable dist/
+        run: npm run build
+      - name: Upload smoke test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site artifact (dist only)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
   deploy:
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

@@ -319,7 +319,7 @@
     const r = rewards[questId];
     if (r) {
       if (r.gold) GameState.gold += r.gold;
-      if (r.seeds) GameState.seeds += r.seeds;
+      if (r.seeds) Warehouse.addItem('seeds', r.seeds);
       if (typeof showToast === 'function') showToast(`任务完成！获得 ${r.gold ? r.gold + '金币 ' : ''}${r.item || ''}`, 'gold');
     }
   }
@@ -346,7 +346,7 @@
     GameState.npcEvents = GameState.npcEvents || {};
     GameState.npcEvents.travelerEvent = ev.event;
     if (ev.event === 'gold_boost') GameState.expeditionGoldBonus = 0.2;
-    if (ev.event === 'mystery_seed') { GameState.seeds++; if (typeof showToast === 'function') showToast('获得神秘种子！', 'gold'); }
+    if (ev.event === 'mystery_seed') { Warehouse.addItem('seeds', 1); if (typeof showToast === 'function') showToast('获得神秘种子！', 'gold'); }
     return ev;
   }
 

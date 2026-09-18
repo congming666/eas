@@ -1,5 +1,13 @@
+// ==================== 版本号（唯一数据源） ====================
+// 发版流程：node tools/bump-version.js [x.y.z]
+//   带版本号参数：先更新此处，再同步 index.html 的标题、meta 与所有本地 js/css 的 ?v= 缓存戳；
+//   不带参数：按当前版本刷新 index.html。
+const GAME_NAME = '农庄牌：荒野远征';
+const GAME_VERSION = '5.0.0';
+
 const CONFIG = {
-  ruleset_id: 'farm-cards-expedition-v1.9',
+  version: GAME_VERSION,
+  ruleset_id: 'farm-cards-expedition-v' + GAME_VERSION,
   canvas: { width: 1280, height: 720 },
   player: {
     maxHp: 100, maxEnergy: 100, speed: 220,
@@ -366,11 +374,11 @@ const CONFIG = {
   // 远征地图野生植物（采摘带回种子）
   wildPlants: [
     { id: 'wild_chili', icon: '🌶️', name: '野生辣椒', givesSeed: 'chili', tier: 1 },
-    { id: 'wild_mint', icon: '🌿', name: '野生藤蔓', givesSeed: 'vine', tier: 1 },
+    { id: 'wild_mint', icon: '🌿', name: '野生薄荷', givesSeed: 'mint', tier: 1 },
     { id: 'wild_sun', icon: '🌻', name: '野生向日葵', givesSeed: 'sunflower', tier: 1 },
-    { id: 'wild_frost', icon: '❄️', name: '寒霜花', givesSeed: 'frost', tier: 2 },
-    { id: 'wild_electric', icon: '⚡', name: '电藤', givesSeed: 'electric', tier: 2 },
-    { id: 'wild_shadow', icon: '🌑', name: '暗影花', givesSeed: 'shadow', tier: 3 },
+    { id: 'wild_frost', icon: '❄️', name: '寒霜花', givesSeed: 'frost_flower', tier: 2 },
+    { id: 'wild_electric', icon: '⚡', name: '电藤', givesSeed: 'lightning_vine', tier: 2 },
+    { id: 'wild_shadow', icon: '🌑', name: '暗影花', givesSeed: 'shadow_flower', tier: 3 },
     { id: 'wild_death', icon: '💀', name: '亡语菇', givesSeed: 'deathcap', tier: 3 }
   ],
   // v0.9.0 新作物在crop-expansion.js中动态注册
@@ -406,6 +414,11 @@ const CONFIG = {
     crystal: { name: '灵晶', icon: '💎', category: 'resource', sellPrice: 60 },
     bossFang: { name: 'Boss獠牙', icon: '🦷', category: 'resource', sellPrice: 200 },
     ancientSeeds: { name: '天外晶屑', icon: '◆', category: 'resource', sellPrice: 120 },
+    herb: { name: '草药', icon: '🌿', category: 'resource', sellPrice: 10 },
+    // 工坊加工品（中间原料）
+    flour: { name: '面粉', icon: '🌾', category: 'resource', sellPrice: 50 },
+    oil: { name: '植物油', icon: '🫒', category: 'resource', sellPrice: 150 },
+    feed: { name: '饲料', icon: '🥣', category: 'resource', sellPrice: 150 },
     // 消耗品类
     herb_kit: { name: '草药包扎包', icon: '💊', category: 'consumable' },
     thorn_storm: { name: '荆棘狂潮', icon: '🌵', category: 'consumable' },
@@ -420,7 +433,15 @@ const CONFIG = {
     transform_card: { name: '作物转化卡', icon: '🔄', category: 'consumable', sellPrice: 150 },
     rare_seed_pack: { name: '稀有种子包', icon: '🌱', category: 'consumable', sellPrice: 100 },
     exp_boost_card: { name: '经验加成卡', icon: '📈', category: 'consumable', sellPrice: 120 },
-    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', category: 'consumable', sellPrice: 300 }
+    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', category: 'consumable', sellPrice: 300 },
+    // 工坊加工品（成品食物/道具）
+    bread: { name: '面包', icon: '🍞', category: 'consumable', sellPrice: 120 },
+    juice: { name: '西瓜汁', icon: '🧃', category: 'consumable', sellPrice: 60 },
+    egg: { name: '鸡蛋', icon: '🥚', category: 'consumable', sellPrice: 170 },
+    torch: { name: '火把', icon: '🔥', category: 'consumable', sellPrice: 300 },
+    insecticide: { name: '驱虫剂', icon: '🧪', category: 'consumable', sellPrice: 50 },
+    // 装饰/其他
+    pumpkin_lantern: { name: '南瓜灯', icon: '🎃', category: 'other', sellPrice: 100 }
   },
   // 育种温室 - 稀有植物
   greenhousePlants: [
@@ -541,4 +562,9 @@ const GameState = {
   defenseLoadout: ['pea_plant', 'frost_vine']
 };
 
-// ==================== 本地存档 ====================
+// ==================== 运行时版本同步（双保险：静态值由 tools/bump-version.js 维护） ====================
+if (typeof document !== 'undefined') {
+  document.title = GAME_NAME + ' v' + GAME_VERSION;
+  const _versionMeta = document.querySelector('meta[name="game-version"]');
+  if (_versionMeta) _versionMeta.setAttribute('content', GAME_VERSION);
+}

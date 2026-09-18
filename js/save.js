@@ -6,7 +6,7 @@ const SaveSystem = {
       const raw = localStorage.getItem(this.key);
       if (!raw) return false;
       const data = JSON.parse(raw);
-      if (!data || data.version !== 1) return false;
+      if (!data || (data.version !== 1 && data.version !== 2)) return false;
 
       GameState.gold = Number.isFinite(data.gold) ? data.gold : GameState.gold;
       // seeds 必须是对象（旧存档可能误存为数字）
@@ -23,6 +23,13 @@ const SaveSystem = {
       GameState.loadout = { ...GameState.loadout, ...(data.loadout || {}) };
       GameState.farmItems = { ...GameState.farmItems, ...(data.farmItems || {}) };
       GameState.skillLevels = { ...GameState.skillLevels, ...(data.skillLevels || {}) };
+      // v5.0 修行台 / 技能 / 档案 / 收获统计
+      GameState.level = clamp(Number(data.level) || 1, 1, 100);
+      GameState.cultivation = Number(data.cultivation) || 0;
+      GameState.unlockedSkills = Array.isArray(data.unlockedSkills) ? data.unlockedSkills : (GameState.unlockedSkills || ['straw_smash']);
+      GameState.equippedSkills = Array.isArray(data.equippedSkills) ? data.equippedSkills : (GameState.equippedSkills || ['straw_smash']);
+      GameState.harvestCount = (data.harvestCount && typeof data.harvestCount === 'object') ? data.harvestCount : {};
+      GameState.archive = (data.archive && typeof data.archive === 'object') ? data.archive : null;
       GameState.cardInventory = Array.isArray(data.cardInventory) ? data.cardInventory : [];
       GameState.selectedBoostCards = Array.isArray(data.selectedBoostCards)
         ? data.selectedBoostCards.filter(id => GameState.cardInventory.some(card => card.id === id)).slice(0, 3)
@@ -68,10 +75,12 @@ const SaveSystem = {
       if (data.warehouse && typeof data.warehouse === 'object') {
         GameState.warehouse = {
           capacity: Number(data.warehouse.capacity) || 50,
-          items: data.warehouse.items && typeof data.warehouse.items === 'object' ? data.warehouse.items : {}
+          items: data.warehouse.items && typeof data.warehouse.items === 'object' ? data.warehouse.items : {},
+          materials: data.warehouse.materials && typeof data.warehouse.materials === 'object' ? data.warehouse.materials : (data.materials && typeof data.materials === 'object' ? data.materials : {}),
+          crops: data.warehouse.crops && typeof data.warehouse.crops === 'object' ? data.warehouse.crops : {}
         };
       } else {
-        GameState.warehouse = { capacity: 50, items: {} };
+        GameState.warehouse = { capacity: 50, items: {}, materials: (data.materials && typeof data.materials === 'object' ? data.materials : {}), crops: {} };
       }
       // 加载育种温室
       if (data.greenhouse && typeof data.greenhouse === 'object') {
@@ -116,7 +125,7 @@ const SaveSystem = {
   save() {
     try {
       localStorage.setItem(this.key, JSON.stringify({
-        version: 1,
+        version: 2,
         gold: GameState.gold,
         seeds: GameState.seeds,
         materials: GameState.materials,
@@ -128,6 +137,12 @@ const SaveSystem = {
         loadout: GameState.loadout,
         farmItems: GameState.farmItems,
         skillLevels: GameState.skillLevels,
+        level: GameState.level || 1,
+        cultivation: GameState.cultivation || 0,
+        unlockedSkills: GameState.unlockedSkills || ['straw_smash'],
+        equippedSkills: GameState.equippedSkills || ['straw_smash'],
+        harvestCount: GameState.harvestCount || {},
+        archive: GameState.archive || null,
         cardInventory: GameState.cardInventory,
         selectedBoostCards: GameState.selectedBoostCards,
         lastDailyClaim: GameState.lastDailyClaim,
