@@ -318,16 +318,48 @@ const Game = {
     const lootList = document.getElementById('lootList');
     const plantGrowth = Array.isArray(data.plantGrowth) ? data.plantGrowth : [];
 
-    // v3.8 本局高光卡片
-    let highlightHtml = '';
+    // v4.2 本局 MVP 主卡（最高连击 / 最远深入 / 丝血反杀 / 最值钱战利品）
+    const rs = data.runStats || {};
+    const iconOf = (it, sz) => (typeof CropArt !== 'undefined') ? CropArt.domFor(it, sz || 22) : (it.icon || '');
+    const mvpTiles = [
+      { key:'combo', art:'mvp_combo', label:'最高连击', value:(rs.maxCombo||0)+' 连击', score:(rs.maxCombo||0) },
+      { key:'dist', art:'mvp_dist', label:'最远深入', value:Math.round(rs.maxDistFromSpawn||0)+' m', score:(rs.maxDistFromSpawn||0)/40 },
+      { key:'clutch', art:'mvp_clutch', label:'丝血反杀', value:(rs.clutchKills||0)+' 杀', score:(rs.clutchKills||0)*8 },
+      { key:'loot', art:'mvp_loot', label:'最值钱战利品', value:rs.topLoot ? (rs.topLoot.name+' · '+rs.topLoot.value+'金') : '无', score:rs.topLoot?rs.topLoot.value/30:0 },
+    ];
+    let bestIdx = 0, bestScore = 0;
+    mvpTiles.forEach((t,i)=>{ if(t.score>bestScore){bestScore=t.score;bestIdx=i;} });
+    const hasMvp = bestScore > 0;
+    let mvpHtml = '<div style="margin:12px 0 6px;padding:12px;border-radius:10px;background:linear-gradient(135deg,rgba(255,190,60,0.18),rgba(120,70,10,0.10));border:1px solid rgba(255,200,80,0.55);box-shadow:0 0 18px rgba(255,180,40,0.15) inset;">';
+    mvpHtml += '<div style="text-align:center;color:#ffd700;font-weight:800;letter-spacing:2px;font-size:15px;margin-bottom:8px;">★ 本 局 M V P ★</div>';
+    mvpHtml += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    mvpTiles.forEach((t,i)=>{
+      const art = (typeof CropArt!=='undefined' && CropArt.ready(t.art)) ? CropArt.dom(t.art,'',34) : '';
+      const crown = hasMvp && i===bestIdx;
+      mvpHtml += '<div style="text-align:center;padding:8px 4px;border-radius:8px;background:'+(crown?'rgba(255,215,0,0.22)':'rgba(0,0,0,0.28)')+';border:1px solid '+(crown?'rgba(255,215,0,0.9)':'rgba(255,255,255,0.08)')+';">'
+        + '<div style="height:36px;display:flex;align-items:center;justify-content:center;">'+(art||'<span style="font-size:22px;">★</span>')+'</div>'
+        + '<div style="color:#cbb36a;font-size:10px;margin-top:3px;">'+t.label+(crown?' <span style="color:#ffd700;font-weight:800;">[MVP]</span>':'')+'</div>'
+        + '<div style="color:#fff;font-size:11px;font-weight:600;margin-top:2px;line-height:1.3;word-break:break-all;">'+t.value+'</div>'
+        + '</div>';
+    });
+    mvpHtml += '</div></div>';
+
+    // v3.8 本局高光卡片（v4.2 图标统一为写实素材/金色字徽）
+    let highlightHtml = mvpHtml;
     if (Array.isArray(data.highlights) && data.highlights.length > 0) {
-      highlightHtml = '<div style="margin:10px 0;">';
+      highlightHtml += '<div style="margin:6px 0 10px;">';
       data.highlights.forEach(h => {
+        let hIcon;
+        const hlArtMap = {'杀戮机器':'mvp_combo','老练猎手':'mvp_combo','深度探索':'mvp_dist','丝血逃生':'mvp_clutch','险象环生':'mvp_clutch','精英猎人':'mvp_loot','Boss 终结者':'mvp_loot','宝箱收藏家':'mvp_loot','爆炸专家':'mvp_loot','命悬一线':'mvp_clutch'};
+        const hlArt = hlArtMap[h.title];
+        if (typeof CropArt !== 'undefined' && hlArt && CropArt.ready(hlArt)) hIcon = CropArt.dom(hlArt, '', 26);
+        else if (typeof CropArt !== 'undefined' && h.icon && CropArt.ready(h.icon)) hIcon = CropArt.dom(h.icon, '', 26);
+        else hIcon = '<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6a5320,#3a2e12);color:#f2d078;font-weight:700;font-size:14px;">'+(h.title?h.title.slice(0,1):'★')+'</span>';
         highlightHtml += `
           <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin:6px 0;
                       background:linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04));
                       border:1px solid rgba(255,215,0,0.3);border-radius:8px;">
-            <div style="font-size:28px;">${h.icon}</div>
+            <div style="width:30px;text-align:center;">${hIcon}</div>
             <div style="flex:1;">
               <div style="color:#ffd700;font-weight:600;font-size:14px;">${h.title}</div>
               <div style="color:#aaa;font-size:12px;">${h.desc}</div>
@@ -347,11 +379,12 @@ const Game = {
       });
     }
     lootList.innerHTML = highlightHtml + '<div style="font-size:14px;color:#888;margin:12px 0 8px;">战利品清单</div>' + plantHtml;
+    const lootIcon = (i) => (typeof CropArt !== 'undefined') ? CropArt.domFor(i, 20) : (i.icon || '📦');
     data.keptItems.forEach(i => {
-      lootList.innerHTML += `<div class="loot-item kept"><span>${i.icon} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
+      lootList.innerHTML += `<div class="loot-item kept"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
     });
     data.lostItems.forEach(i => {
-      lootList.innerHTML += `<div class="loot-item lost"><span>${i.icon} ${i.name} ×${i.amount}</span><span>✗ 丢失</span></div>`;
+      lootList.innerHTML += `<div class="loot-item lost"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✗ 丢失</span></div>`;
     });
     if (data.keptItems.length === 0 && data.lostItems.length === 0) {
       lootList.innerHTML += '<div style="color:#666;text-align:center;padding:20px;">本次远征没有获得物资</div>';
@@ -455,14 +488,14 @@ const Game = {
     const cost = LoadoutSystem.upgradeSafeCost();
     let html = '<div style="width:420px;background:#1a1f1a;border-radius:12px;border:1px solid #4a6a8a;padding:20px;">';
     html += '<h3 style="color:#7ec8ff;margin:0 0 12px;">🔐 安全箱</h3>';
-    html += `<p style="color:#aaa;font-size:13px;">安全箱内的物品在远征失败时<b style="color:#7fff7f;">必定保留</b>。<br>当前：${slots}格 | 背包：16格（金币50个占1格）</p>`;
+    html += `<p style="color:#aaa;font-size:13px;">安全箱内的物品在远征失败时<b style="color:#7fff7f;">必定保留</b>，且不占背包格位。<br>当前：${slots}格 | 背包16格（金币每100个占1格）· 远征中按 Tab 打开背包自由存取</p>`;
     html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">';
     if (GameState.safeBox && GameState.safeBox.length) {
       GameState.safeBox.forEach((item,i) => {
         html += `<div style="padding:4px;">${item.icon||'📦'} ${item.name} ×${item.amount||1}</div>`;
       });
     } else {
-      html += '<p style="color:#666;font-size:12px;">安全箱为空。远征中按拾取顺序前'+slots+'个物品视为安全箱物品。</p>';
+      html += '<p style="color:#666;font-size:12px;">安全箱为空。远征中按 Tab 打开背包，可把任意物品自由存入安全箱。</p>';
     }
     html += '</div>';
     if (cost) {

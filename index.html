@@ -1744,7 +1744,7 @@
       <p class="nebula-sub nebula-glow-soft">星云之下 · 守望农场 · 远征在即</p>
       <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
       <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
-      <div class="version-info nebula-ver nebula-glow-soft">v1.9 · 植物防线 × 育种温室 × 物资仓库 · WebGL 星云引擎</div>
+      <div class="version-info nebula-ver nebula-glow-soft">v4.2 · 结算 MVP 高光 × 信号弹伏击战 × 全 HUD 写实图标 · WebGL 星云引擎</div>
     </div>
     <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
@@ -1843,7 +1843,7 @@
   <!-- 独立远征准备大厅 -->
   <div id="expeditionPrepScreen" class="overlay hidden">
     <div class="prep-header">
-      <div class="prep-title"><h2>⚔️ 荒野远征准备大厅</h2><p>SELECT REGION · CHECK SKILLS · PACK SUPPLIES</p></div>
+      <div class="prep-title"><h2>荒野远征准备大厅</h2><p>SELECT REGION · CHECK SKILLS · PACK SUPPLIES</p></div>
       <div class="resource-display">
         <div class="resource-item"><span class="resource-icon" style="background:#ffd700;">💰</span><span id="prepGoldDisplay">500</span></div>
         <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回家园</button>
@@ -1852,7 +1852,7 @@
     <div class="prep-content">
       <div class="prep-column">
         <div class="prep-panel prep-map-panel">
-          <div class="panel-title">🗺️ 选择远征区域</div>
+          <div class="panel-title">选择远征区域</div>
           <div class="map-select" id="mapSelect"></div>
         </div>
         <div class="prep-panel">
@@ -1866,11 +1866,11 @@
       </div>
       <div class="prep-column">
         <div class="prep-panel prep-loadout">
-          <div class="panel-title">🎒 携带消耗品</div>
+          <div class="panel-title">携带消耗品</div>
           <div class="loadout-grid" id="loadoutGrid"></div>
         </div>
         <div class="prep-panel prep-loadout">
-          <div class="panel-title">🌿 携带植物防线（培育满100可部署）</div>
+          <div class="panel-title">携带植物防线（培育满100可部署）</div>
           <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
         </div>
         <div class="prep-panel">
@@ -1878,7 +1878,7 @@
           <div class="boost-card-grid" id="boostCardGrid"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">⚔️ 带入武器（死亡永久失去！）</div>
+          <div class="panel-title">带入武器（死亡永久失去！）</div>
           <div id="weaponLoadoutSelect" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
           <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">⚠️ 失败将永久失去此武器，成功撤离自动回仓</div>
         </div>
@@ -1892,7 +1892,7 @@
           <div id="heatSelect" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title">🌿 作物 buff（收获作物获得，带入远征）</div>
+          <div class="panel-title">作物 buff（收获作物获得，带入远征）</div>
           <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得</div>
         </div>
         <div class="prep-panel">
@@ -1967,7 +1967,7 @@
   <div id="cardWorkshopModal" class="overlay modal-overlay hidden" onclick="if(event.target===this) Game.closeCardWorkshop()">
     <div class="workshop-window">
       <div class="workshop-header">
-        <div><h2>🛠️ 卡牌工坊</h2><p>收获作物有概率掉落强化卡，使用后永久提升基础技能。</p></div>
+        <div><h2>卡牌工坊</h2><p>收获作物有概率掉落强化卡，使用后永久提升基础技能。</p></div>
         <button class="secondary-btn" onclick="Game.closeCardWorkshop()">关闭</button>
       </div>
       <div class="workshop-section"><div class="panel-title">基础技能等级</div><div class="workshop-skills" id="workshopSkills"></div></div>
@@ -2024,30 +2024,30 @@
   <div id="toastContainer"></div>
 </div>
 
-  <script src="js/config.js?v=438"></script>
-  <script src="js/crop-art.js?v=438"></script>
-  <script src="js/save.js?v=438"></script>
-  <script src="js/ui.js?v=438"></script>
-  <script src="js/card.js?v=438"></script>
-  <script src="js/farm.js?v=438"></script>
-  <script src="js/farm-expansion.js?v=438"></script>
-  <script src="js/warehouse.js?v=438"></script>
-  <script src="js/greenhouse.js?v=438"></script>
-  <script src="js/performance.js?v=438"></script>
+  <script src="js/config.js?v=439"></script>
+  <script src="js/crop-art.js?v=439"></script>
+  <script src="js/save.js?v=439"></script>
+  <script src="js/ui.js?v=439"></script>
+  <script src="js/card.js?v=439"></script>
+  <script src="js/farm.js?v=439"></script>
+  <script src="js/farm-expansion.js?v=439"></script>
+  <script src="js/warehouse.js?v=439"></script>
+  <script src="js/greenhouse.js?v=439"></script>
+  <script src="js/performance.js?v=439"></script>
   <script src="vendor/pixi.min.js"></script>
-  <script src="js/pixi-renderer.js?v=438"></script>
-  <script src="js/expedition.js?v=438"></script>
-  <script src="js/world-fx.js?v=438"></script>
-  <script src="js/difficulty-system.js?v=438"></script>
-  <script src="js/npc-system.js?v=438"></script>
-  <script src="js/tech-system.js?v=438"></script>
-  <script src="js/v080-ui.js?v=438"></script>
-  <script src="js/crop-expansion.js?v=438"></script>
-  <script src="js/crop-render-ext.js?v=438"></script>
-  <script src="js/combat-enhancement.js?v=438"></script>
-  <script src="js/achievement-system.js?v=438"></script>
-  <script src="js/loadout-system.js?v=438"></script>
-  <script src="js/game.js?v=438"></script>
+  <script src="js/pixi-renderer.js?v=439"></script>
+  <script src="js/expedition.js?v=439"></script>
+  <script src="js/world-fx.js?v=439"></script>
+  <script src="js/difficulty-system.js?v=439"></script>
+  <script src="js/npc-system.js?v=439"></script>
+  <script src="js/tech-system.js?v=439"></script>
+  <script src="js/v080-ui.js?v=439"></script>
+  <script src="js/crop-expansion.js?v=439"></script>
+  <script src="js/crop-render-ext.js?v=439"></script>
+  <script src="js/combat-enhancement.js?v=439"></script>
+  <script src="js/achievement-system.js?v=439"></script>
+  <script src="js/loadout-system.js?v=439"></script>
+  <script src="js/game.js?v=439"></script>
 
   <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -2058,8 +2058,8 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js?v=438"></script>
-  <script src="js/nebula-text.js?v=438"></script>
+  <script src="js/nebula.js?v=439"></script>
+  <script src="js/nebula-text.js?v=439"></script>
 
   <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">

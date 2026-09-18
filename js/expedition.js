@@ -137,6 +137,8 @@ class Expedition {
       propsDestroyed: 0,         // 破坏物数
       plantsDeployed: 0,         // 战场种植数
       highestWave: 0,            // 最高兽潮波次
+      clutchKills: 0,            // v4.2 丝血反杀（血量<25%时击杀）
+      topLoot: null,             // v4.2 最值钱战利品 {name,icon,value}
     };
     this.spawnX = CONFIG.expedition.mapSize / 2;
     this.spawnY = CONFIG.expedition.mapSize / 2;
@@ -1717,16 +1719,17 @@ class Expedition {
     const totalSlots = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.BAG_SIZE : 16;
     let html = `<div style="width:520px;max-height:85vh;overflow-y:auto;background:#1a1f1a;border:1px solid #6a4a2a;border-radius:12px;padding:16px;color:#ddd;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 style="color:#ffd700;margin:0;">🎒 背包</h3>
+        <h3 style="color:#ffd700;margin:0;">背包</h3>
         <span style="color:#888;font-size:12px;">背包 ${usedSlots}/${totalSlots} 格 · 安全箱 ${safe.length}/${safeCap} 格</span>
       </div>`;
     if (inv.length === 0) html += '<div style="color:#666;text-align:center;padding:16px;">背包空空如也，打怪捡东西吧</div>';
+    const invIcon = (it) => (typeof CropArt !== 'undefined') ? CropArt.domFor(it, 22) : (it.icon || '📦');
     inv.forEach((item, i) => {
       const slots = item.slots || 1;
       const canUse = item.type === 'consumable';
       const canStore = safe.length < safeCap;
       html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
-        <span>${item.icon||'📦'} <b>${item.name}</b> ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">${invIcon(item)} <b>${item.name}</b> ${item.amount>1?'×'+item.amount:''} <span style="color:#888;font-size:10px;">占${slots}格</span></span>
         <span style="display:flex;gap:4px;flex-wrap:wrap;">
           ${canUse ? `<button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.useInventoryItem(${i})">使用</button>` : ''}
           ${canStore ? `<button class="secondary-btn" style="font-size:11px;color:#ffd700;" onclick="Game.expedition.storeInSafe(${i})">🔒存安全箱</button>` : ''}
@@ -1738,7 +1741,7 @@ class Expedition {
       html += `<div style="margin-top:14px;color:#ffd700;font-size:13px;border-top:1px solid #444;padding-top:8px;">🔒 安全箱（死亡保留，不占背包）</div>`;
       safe.forEach((item, i) => {
         html += `<div style="padding:6px;margin:4px 0;background:rgba(255,215,0,0.08);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-          <span>${item.icon||'📦'} ${item.name} ${item.amount>1?'×'+item.amount:''}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;">${invIcon(item)} ${item.name} ${item.amount>1?'×'+item.amount:''}</span>
           <button class="secondary-btn" style="font-size:11px;" onclick="Game.expedition.retrieveFromSafe(${i})">取回</button>
         </div>`;
       });
@@ -2227,6 +2230,30 @@ class Expedition {
     this.updateHUD();
   }
 
+  // v4.2 估算单件战利品价值（MVP 最值钱战利品）
+  getLootValue(item) {
+    if (!item) return 0;
+    const amt = item.amount || 1;
+    if (item.type === 'gold') return amt;
+    const wi = (CONFIG.warehouseItems || {})[item.id];
+    if (wi && wi.sellPrice) return wi.sellPrice * amt;
+    if (item.type === 'consumable') {
+      const cd = (CONFIG.consumables || []).find(c => c.id === item.id);
+      return (cd && cd.value ? cd.value : 40) * amt;
+    }
+    if (item.type === 'material') {
+      const mid = item.matId || item.id;
+      const m = (CONFIG.warehouseItems || {})[mid];
+      return (m && m.sellPrice ? m.sellPrice : 10) * amt;
+    }
+    if (item.type === 'seed_item' || item.type === 'seed_pickup') {
+      const crop = (CONFIG.crops || []).find(c => c.id === item.seedId);
+      return ((crop && (crop.sellPrice || crop.price)) || 30) * amt;
+    }
+    if (item.type === 'farm_item') return (wi && wi.sellPrice) || 50;
+    return 0;
+  }
+
   spawnGroundLoot(item, x, y) {
     this.groundLoot.push({
       ...item,
@@ -2300,6 +2327,12 @@ class Expedition {
         return false;
       } else {
         this.bag.push(item);
+      }
+      if (this.runStats) {
+        const v = this.getLootValue(item);
+        if (v > (this.runStats.topLoot ? this.runStats.topLoot.value : 0)) {
+          this.runStats.topLoot = { name: item.name, icon: item.icon || '', artId: (typeof CropArt !== 'undefined' && CropArt.resolveArtId) ? CropArt.resolveArtId(item) : null, value: Math.round(v) };
+        }
       }
       this.spawnAoeEffect(x, y, 34, '#f6c75b');
       showToast(`拾取 ${item.icon} ${item.name} ×${item.amount}`, 'gold');
@@ -2765,7 +2798,39 @@ class Expedition {
     this.extracting = true;
     this.extractType = type;
     this.extractProgress = 0;
-    showToast(type === 'signal' ? '信号弹撤离启动！坚持20秒！' : '开始撤离读条，坚持15秒！', 'warning');
+    this.signalReinforced = false;
+    if (type === 'signal') this.spawnSignalAmbush(0);
+    showToast(type === 'signal' ? '信号弹撤离启动！坚持20秒，伏击正在逼近！' : '开始撤离读条，坚持15秒！', 'warning');
+  }
+
+  // v4.2 信号弹伏击：信号弹把全图怪物引来，读条开始第一波，中段增援第二波
+  spawnSignalAmbush(wave) {
+    const tier = (this.map && this.map.tier) || 1;
+    const count = (wave === 0 ? 8 : 6) + tier * 2;
+    const types = tier >= 3 ? ['wolf', 'spider', 'bat', 'locust'] : ['boar', 'bat', 'spider', 'locust', 'wolf'];
+    for (let i = 0; i < count; i++) {
+      const type = types[randInt(0, types.length - 1)];
+      const data = CONFIG.monsters[type];
+      if (!data) continue;
+      const angle = Math.PI * 2 * i / count + rand(-0.25, 0.25);
+      const distance = rand(380, 560);
+      const x = clamp(this.player.x + Math.cos(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
+      const y = clamp(this.player.y + Math.sin(angle) * distance, 80, CONFIG.expedition.mapSize - 80);
+      const hpScale = this.balance.enemyHp * 0.85;
+      this.monsters.push({
+        type, ...data, x, y,
+        hp: Math.round(data.hp * hpScale), maxHp: Math.round(data.hp * hpScale),
+        damage: Math.max(3, Math.round(data.damage * this.balance.enemyDamage * 0.85)),
+        speed: data.speed * this.balance.enemySpeed * 1.12,
+        attackCd: 0, stunned: 0, target: this.player, vx: 0, vy: 0,
+        facing: angle + Math.PI, animTime: rand(0, 10), hitFlash: 0,
+        elite: false, abilityCd: rand(1, 4), packOffset: rand(-1, 1), signalAmbush: true,
+        state: 'idle', stateTimer: 0
+      });
+    }
+    this.screenShake = Math.min(1, this.screenShake + 0.6);
+    this.spawnRadialBurst(this.player.x, this.player.y, '#ff5a3c', 26);
+    showToast(wave === 0 ? '信号弹引来伏击怪，守住撤离点！' : '第二波伏击怪增援！', 'warning');
   }
 
   cancelExtract() {
@@ -3726,6 +3791,7 @@ class Expedition {
         if (this.runStats) {
           if (m.elite) this.runStats.eliteKills++;
           if (m.boss) this.runStats.bossKills++;
+          if (this.player.hp / (this.player.maxHp || 100) < 0.25) this.runStats.clutchKills++;
         }
         this.spawnKillFeedback(m);
         this.spawnHitParticles(m.x, m.y, '#ff8868');
@@ -4091,6 +4157,10 @@ class Expedition {
         if (!inPoint) { this.cancelExtract(); showToast('离开了撤离点，撤离取消', 'warning'); }
       }
       const extractTime = this.extractType === 'signal' ? CONFIG.expedition.signalExtractTime : CONFIG.expedition.extractTime;
+      if (this.extractType === 'signal' && !this.signalReinforced && this.extractProgress >= extractTime * 0.5) {
+        this.signalReinforced = true;
+        this.spawnSignalAmbush(1);
+      }
       this.extractProgress += dt;
       if (this.extractProgress >= extractTime) {
         this.completeExtract();
@@ -4367,9 +4437,10 @@ class Expedition {
       const powerText = skill.damage > 0
         ? `⚔ ${skill.damage}`
         : (skill.stunDuration ? `控 ${skill.stunDuration}s` : (skill.dashDistance ? `移 ${skill.dashDistance}` : `隐 ${skill.stealthDuration}s`));
+      const skillArt = (typeof CropArt !== 'undefined' && CropArt.ready(baseSkill.id)) ? CropArt.dom(baseSkill.id, skill.icon, 26) : skill.icon;
       div.innerHTML = `
         <span class="skill-key">${skill.key}</span>
-        <span class="skill-icon">${skill.icon}</span>
+        <span class="skill-icon">${skillArt}</span>
         <span class="skill-name">${skill.name} · Lv.${skill.level}${skill.extraLevels ? ` (+${skill.extraLevels})` : ''}</span>
         <div class="skill-meta"><span>${powerText}</span><span>⚡ ${skill.energyCost}</span><span>CD ${skill.cooldown}s</span></div>
         ${cd > 0 ? `<div class="skill-cd-ring" style="--progress:${clamp(cd / skill.cooldown, 0, 1)}"><span>${cd.toFixed(1)}</span></div>` : ''}
@@ -4385,9 +4456,10 @@ class Expedition {
       div.className = 'skill-slot consumable' + (count > 0 ? ' ready' : '') + ((this.consumableFlashes[item.id] || 0) > 0 ? ' spent' : '');
       div.title = item.desc;
       const effectText = item.heal ? `治疗 ${item.heal}` : (item.damage ? `伤害 ${item.damage}` : '撤离 20s');
+      const consArt = (typeof CropArt !== 'undefined' && CropArt.ready(item.id)) ? CropArt.dom(item.id, item.icon, 26) : item.icon;
       div.innerHTML = `
         <span class="skill-key">${item.key}</span>
-        <span class="skill-icon">${item.icon}</span>
+        <span class="skill-icon">${consArt}</span>
         <span class="skill-name">${item.name}</span>
         <div class="skill-meta"><span>${effectText}</span><span>一次性</span></div>
         <span class="skill-count">×${count}</span>
@@ -4398,12 +4470,15 @@ class Expedition {
     // 背包显示
     const bagDisplay = document.getElementById('bagDisplay');
     const gold = this.bag.filter(i => i.type === 'gold').reduce((s, i) => s + i.amount, 0);
-    const seeds = this.bag.filter(i => i.type === 'seed').length;
+    const seeds = this.bag.filter(i => i.type === 'seed_item' || i.type === 'seed' || i.type === 'plant_seed').reduce((s, i) => s + (i.amount || 1), 0);
+    const safeCap = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getSafeCapacity() : 1;
+    const coinArt = (typeof CropArt !== 'undefined' && CropArt.ready('coin')) ? CropArt.dom('coin', '💰', 18) : '💰';
+    const pouchArt = (typeof CropArt !== 'undefined' && CropArt.ready('seed_pouch')) ? CropArt.dom('seed_pouch', '🌱', 18) : '🌱';
     bagDisplay.innerHTML = `
-      <div class="bag-item">💰 ${gold}</div>
-      <div class="bag-item">🌱 ${seeds}</div>
-      <div class="bag-item">📦 ${this.bag.length}件</div>
-      <div class="bag-item" style="border-color:#d7a83d;color:#f2d078;">🔐 安全箱 2格</div>
+      <div class="bag-item">${coinArt} ${gold}</div>
+      <div class="bag-item">${pouchArt} ${seeds}</div>
+      <div class="bag-item">🎒 ${this.bag.length}件</div>
+      <div class="bag-item" style="border-color:#d7a83d;color:#f2d078;">🔐 ${this.safeBox.length}/${safeCap}</div>
     `;
 
     // 防线槽（本局可部署植物）
@@ -4415,8 +4490,9 @@ class Expedition {
         : list.map((p, i) => {
             const selected = this.selectedPlantId === p.id;
             const avail = p.maxPerRun - p.deployed;
+            const pArt = (typeof CropArt !== 'undefined' && CropArt.ready(p.id)) ? CropArt.dom(p.id, p.icon, 26) : p.icon;
             return `<div class="defense-slot${selected ? ' selected' : ''}${avail <= 0 ? ' spent' : ''}" title="${p.name}：预扣养分${p.deployCost}，每${p.sustain}维持/s，寿命${p.life}s，本局可再种${avail}株">
-              <span class="defense-key">${i + 5}</span><span class="defense-icon">${p.icon}</span>
+              <span class="defense-key">${i + 5}</span><span class="defense-icon">${pArt}</span>
               <span class="defense-name">${p.name}</span><span class="defense-meta">养分${p.deployCost} · 剩余${avail}</span>
             </div>`;
           }).join('');
@@ -4507,9 +4583,14 @@ class Expedition {
       glow.addColorStop(1, 'rgba(246,199,91,0)');
       ctx.fillStyle = glow;
       ctx.fillRect(sx - 30, sy - 30, 60, 60);
-      ctx.font = '25px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(item.icon, sx, sy + 7);
+      const lootArtId = (typeof CropArt !== 'undefined') ? CropArt.resolveArtId(item) : null;
+      if (lootArtId && CropArt.ready(lootArtId)) {
+        CropArt.draw(ctx, lootArtId, sx, sy - 2, 34);
+      } else {
+        ctx.font = '25px sans-serif';
+        ctx.fillText(item.icon, sx, sy + 7);
+      }
       if (near) {
         ctx.fillStyle = '#f6d77e';
         ctx.font = '10px sans-serif';

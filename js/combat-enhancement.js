@@ -47,6 +47,10 @@
       this.combo++;
       this.comboTimer = 3.0; // 3秒内不命中则清零
       this.addRage(2);
+      // v4.2 记录本局最高连击（MVP 高光）
+      if (this.exp && this.exp.runStats && this.combo > (this.exp.runStats.maxCombo || 0)) {
+        this.exp.runStats.maxCombo = this.combo;
+      }
     },
     onPlayerHit() {
       if (this.combo > 5) showToast(`连击中断！${this.combo} 连击`, 'warning');

@@ -35,7 +35,8 @@ const CardSystem = {
     const container = document.getElementById('cardDropContainer');
     const banner = document.createElement('div');
     banner.className = `card-drop-banner ${card.rarity}`;
-    banner.innerHTML = `<div style="color:#f3d68d;font-size:10px;">收获掉落 · ${this.rarityNames[card.rarity]}</div><div style="font-size:16px;font-weight:800;margin-top:3px;">${card.icon} ${card.name}</div><div style="font-size:10px;color:#b8c9c0;margin-top:3px;">已送入卡牌工坊</div>`;
+    const bArt = (typeof CropArt!=='undefined' && card.skillId && CropArt.ready(card.skillId)) ? CropArt.dom(card.skillId, card.icon, 22) : card.icon;
+    banner.innerHTML = `<div style="color:#f3d68d;font-size:10px;">收获掉落 · ${this.rarityNames[card.rarity]}</div><div style="font-size:16px;font-weight:800;margin-top:3px;display:flex;align-items:center;gap:6px;justify-content:center;">${bArt} ${card.name}</div><div style="font-size:10px;color:#b8c9c0;margin-top:3px;">已送入卡牌工坊</div>`;
     container.appendChild(banner);
     setTimeout(() => banner.remove(), 3100);
   },
@@ -101,7 +102,8 @@ const CardSystem = {
       const div = document.createElement('div');
       div.className = `boost-card ${card.rarity}${selected ? ' selected' : ''}`;
       div.onclick = () => this.toggleBoost(card.id);
-      div.innerHTML = `${selected ? '<span class="boost-check">✓ 已携带</span>' : ''}<div style="font-size:23px;">${card.icon}</div><div style="font-size:10px;font-weight:800;color:#effff4;">${skill.name} +${card.power}</div><div style="font-size:8px;color:#91a69b;margin-top:4px;">${this.rarityNames[card.rarity]}卡 · 点击${selected ? '卸下' : '携带'}</div>`;
+      const bcArt = (typeof CropArt!=='undefined' && CropArt.ready(card.skillId)) ? CropArt.dom(card.skillId, card.icon, 30) : card.icon;
+      div.innerHTML = `${selected ? '<span class="boost-check">✓ 已携带</span>' : ''}<div style="height:32px;display:flex;align-items:center;justify-content:center;">${bcArt}</div><div style="font-size:10px;font-weight:800;color:#effff4;">${skill.name} +${card.power}</div><div style="font-size:8px;color:#91a69b;margin-top:4px;">${this.rarityNames[card.rarity]}卡 · 点击${selected ? '卸下' : '携带'}</div>`;
       grid.appendChild(div);
     });
   },
@@ -116,7 +118,8 @@ const CardSystem = {
       const div = document.createElement('div');
       div.className = 'workshop-skill';
       const effect = skill.damage ? `伤害 ${skill.damage}` : (skill.stunDuration ? `控制 ${skill.stunDuration}s` : (skill.dashDistance ? `位移 ${skill.dashDistance}` : `隐身 ${skill.stealthDuration}s`));
-      div.innerHTML = `<div style="font-size:25px;">${skill.icon}</div><div style="font-size:12px;font-weight:800;">${skill.name}</div><div class="level">Lv.${skill.level}</div><div style="font-size:9px;color:#9eb2a7;margin-top:4px;">${effect} · 能量 ${skill.energyCost} · CD ${skill.cooldown}s</div>`;
+      const wsArt = (typeof CropArt!=='undefined' && CropArt.ready(baseSkill.id)) ? CropArt.dom(baseSkill.id, skill.icon, 32) : skill.icon;
+      div.innerHTML = `<div style="height:34px;display:flex;align-items:center;justify-content:center;">${wsArt}</div><div style="font-size:12px;font-weight:800;">${skill.name}</div><div class="level">Lv.${skill.level}</div><div style="font-size:9px;color:#9eb2a7;margin-top:4px;">${effect} · 能量 ${skill.energyCost} · CD ${skill.cooldown}s</div>`;
       skills.appendChild(div);
     });
     cards.innerHTML = '';
@@ -128,7 +131,8 @@ const CardSystem = {
       const div = document.createElement('div');
       div.className = `upgrade-card ${card.rarity}`;
       div.onclick = () => this.apply(card.id);
-      div.innerHTML = `<div class="card-rarity">${this.rarityNames[card.rarity]}强化卡</div><div class="card-icon">${card.icon}</div><div class="card-name">${card.name}</div><div class="card-desc">${card.desc}<br><span style="color:#f0c866;">点击使用</span></div>`;
+      const wcArt = (typeof CropArt!=='undefined' && CropArt.ready(card.skillId)) ? CropArt.dom(card.skillId, card.icon, 34) : card.icon;
+      div.innerHTML = `<div class="card-rarity">${this.rarityNames[card.rarity]}强化卡</div><div class="card-icon" style="display:flex;align-items:center;justify-content:center;">${wcArt}</div><div class="card-name">${card.name}</div><div class="card-desc">${card.desc}<br><span style="color:#f0c866;">点击使用</span></div>`;
       cards.appendChild(div);
     });
   }

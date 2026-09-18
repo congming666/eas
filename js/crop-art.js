@@ -52,6 +52,28 @@ const CropArt = {
     anvil: 'buildings/anvil_t.png',
     fence_gate: 'buildings/fence_gate_t.png',
     well: 'buildings/well_t.png',
+    // v4.2 统一 HUD/技能/卡片图标
+    herb_kit: 'icons/herb_kit_t.png',
+    thorn_storm: 'icons/thorn_storm_t.png',
+    signal_flare: 'icons/signal_flare_t.png',
+    growth_catalyst: 'icons/growth_catalyst_t.png',
+    straw_smash: 'icons/straw_smash_t.png',
+    vine_bind: 'icons/vine_bind_t.png',
+    earth_dash: 'icons/earth_dash_t.png',
+    smoke_screen: 'icons/smoke_screen_t.png',
+    invincible_core: 'icons/invincible_core_t.png',
+    seed_pouch: 'icons/seed_pouch_t.png',
+    wood: 'icons/wood_t.png',
+    herb_mat: 'icons/herb_mat_t.png',
+    pea_plant: 'icons/pea_plant_t.png',
+    frost_vine: 'icons/frost_vine_t.png',
+    bind_flower: 'icons/bind_flower_t.png',
+    sun_flower: 'crops/sunflower_t.png',
+    sacred_tree: 'icons/sacred_tree_t.png',
+    mvp_combo: 'icons/mvp_combo_t.png',
+    mvp_clutch: 'icons/mvp_clutch_t.png',
+    mvp_loot: 'icons/mvp_loot_t.png',
+    mvp_dist: 'icons/mvp_dist_t.png',
   },
   imgs: {},
   loaded: {},
@@ -89,6 +111,37 @@ const CropArt = {
       return `<img src="assets/${this.map[id]}" alt="${emoji}" style="${style}" />`;
     }
     return `<span style="font-size:${size}px;vertical-align:middle;">${emoji}</span>`;
+  },
+
+  // v4.2 业务对象 -> 素材 id（无映射返回 null）
+  resolveArtId(item) {
+    if (!item) return null;
+    if (item.type === 'gold') return 'coin';
+    if (item.type === 'invincible') return 'invincible_core';
+    const direct = {
+      herb_kit: 'herb_kit', thorn_storm: 'thorn_storm', signal_flare: 'signal_flare',
+      growth_catalyst: 'growth_catalyst', invincible: 'invincible_core',
+      iron: 'iron', crystal: 'crystal', bossFang: 'fang', wood: 'wood', herb: 'herb_mat',
+      pea_plant: 'pea_plant', frost_vine: 'frost_vine', bind_flower: 'bind_flower',
+      sun_flower: 'sun_flower', sacred_tree: 'sacred_tree',
+    };
+    if (direct[item.id]) return direct[item.id];
+    if (item.matId && direct[item.matId]) return direct[item.matId];
+    if (item.plantId && direct[item.plantId]) return direct[item.plantId];
+    if (this.map[item.id]) return item.id;
+    if (item.seedId && this.map[item.seedId]) return item.seedId;
+    return null;
+  },
+
+  // v4.2 业务对象 -> <img>，无图时用金色圆形字徽兜底（替代 emoji）
+  domFor(item, size = 20) {
+    const id = this.resolveArtId(item);
+    const em = (item && item.icon) || '';
+    if (id && this.ready(id)) return this.dom(id, em, size);
+    const ch = (item && item.name ? item.name.slice(0, 1) : '物');
+    return '<span style="display:inline-flex;align-items:center;justify-content:center;width:' + size + 'px;height:' + size +
+      'px;border-radius:50%;background:linear-gradient(135deg,#6a5320,#3a2e12);color:#f2d078;font-size:' +
+      Math.round(size * 0.52) + 'px;font-weight:700;vertical-align:middle;">' + ch + '</span>';
   },
 
   // Canvas 绘制：在 (x,y) 居中画 size×size，带圆角裁切去白边

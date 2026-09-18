@@ -382,9 +382,9 @@ const Farm = {
           <div class="map-name">T${map.tier} ${map.name} <span style="font-size:12px;color:#ff8866;">[${map.danger}]</span></div>
           ${modifierTag}
           <div class="map-info">
-            <span>💰 ${map.entryFee}</span>
-            <span>👹 ${map.monsterCount}</span>
-            <span>📦 ${map.chestCount}</span>
+            <span style="display:inline-flex;align-items:center;gap:3px;">${(typeof CropArt!=='undefined')?CropArt.dom('coin','',15):''} ${map.entryFee}</span>
+            <span><span style="display:inline-flex;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle,#c0392b,#7b1f15);color:#ffd9d2;font-size:9px;font-weight:700;align-items:center;justify-content:center;vertical-align:-2px;">敌</span> ${map.monsterCount}</span>
+            <span><span style="display:inline-flex;width:15px;height:15px;border-radius:3px;background:linear-gradient(135deg,#a9772f,#6e4c18);color:#ffe2ae;font-size:9px;font-weight:700;align-items:center;justify-content:center;vertical-align:-2px;">箱</span> ${map.chestCount}</span>
           </div>
         </div>
       `;
@@ -426,7 +426,8 @@ const Farm = {
       const power = skill.damage || skill.stunDuration || skill.dashDistance || skill.stealthDuration;
       const div = document.createElement('div');
       div.className = 'prep-skill';
-      div.innerHTML = `<div class="icon">${skill.icon}</div><div class="name">${skill.name} · Lv.${skill.level}${extra ? ` <span style="color:#83f2b2;">(+${extra})</span>` : ''}</div><div class="stats">效果 ${power} · 能量 ${skill.energyCost}<br>冷却 ${skill.cooldown} 秒</div>`;
+      const skArt = (typeof CropArt!=='undefined' && CropArt.ready(baseSkill.id)) ? CropArt.dom(baseSkill.id, skill.icon, 34) : skill.icon;
+      div.innerHTML = `<div class="icon" style="display:flex;align-items:center;justify-content:center;">${skArt}</div><div class="name">${skill.name} · Lv.${skill.level}${extra ? ` <span style="color:#83f2b2;">(+${extra})</span>` : ''}</div><div class="stats">效果 ${power} · 能量 ${skill.energyCost}<br>冷却 ${skill.cooldown} 秒</div>`;
       container.appendChild(div);
     });
   },
@@ -439,8 +440,9 @@ const Farm = {
       const inWarehouse = Warehouse.getCount(item.id);
       const div = document.createElement('div');
       div.className = 'loadout-slot' + (equipped > 0 ? ' filled' : '');
+      const ciArt = (typeof CropArt!=='undefined' && CropArt.ready(item.id)) ? CropArt.dom(item.id, item.icon, 34) : item.icon;
       div.innerHTML = `
-        <div class="item-icon">${item.icon}</div>
+        <div class="item-icon" style="display:flex;align-items:center;justify-content:center;">${ciArt}</div>
         <div>${item.name}</div>
         <div class="loadout-effect">${item.desc}</div>
         <div class="loadout-value">仓库 ${inWarehouse} · 已携带 ${equipped}</div>
@@ -475,8 +477,9 @@ const Farm = {
       const div = document.createElement('div');
       div.className = 'loadout-slot' + (equipped ? ' filled' : '') + (rec.count <= 0 ? ' muted' : '');
       const stage = rec.progress >= g.deployable ? '可部署' : (rec.progress >= g.mature ? '成熟' : (rec.progress >= g.seedling ? '幼苗' : '未培育'));
+      const plArt = (typeof CropArt!=='undefined' && CropArt.ready(plant.id)) ? CropArt.dom(plant.id, plant.icon, 34) : plant.icon;
       div.innerHTML = `
-        <div class="item-icon">${plant.icon}</div>
+        <div class="item-icon" style="display:flex;align-items:center;justify-content:center;">${plArt}</div>
         <div>${plant.name} <small style="color:#8fa;font-size:10px;">${stage}</small></div>
         <div class="loadout-effect">${plant.desc}</div>
         <div class="loadout-value">持有 ${rec.count} · 培育 ${Math.floor(rec.progress)}/100</div>
