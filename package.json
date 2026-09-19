@@ -1,6 +1,6 @@
 {
   "name": "farm-cards-expedition",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "private": true,
   "description": "农庄牌：荒野远征（网页版）—— Canvas2D 原生 JS 双端卡牌生存游戏",
   "scripts": {
@@ -9,7 +9,8 @@
     "build": "node tools/build-dist.js",
     "version:sync": "node tools/bump-version.js",
     "test:boss": "node boss_test.js",
-    "test:ui": "node final_ui_check.js"
+    "test:ui": "node final_ui_check.js",
+    "balance": "node tools/balance-bot.js"
   },
   "devDependencies": {
     "playwright": "^1.62.0"

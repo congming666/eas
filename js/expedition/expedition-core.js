@@ -423,6 +423,7 @@ class Expedition {
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
+      this._timeoutDeath = true;
       this.playerDeath();
       return;
     }

@@ -228,6 +228,7 @@
             if (window.ResourceSystem && window.CONFIG && CONFIG.resources && CONFIG.resources[recipe.outputId]) ResourceSystem.add(recipe.outputId, outN);
             else Warehouse.addItem(recipe.outputId, outN);
             if (recipe.outputId === 'pumpkin_lantern') GameState.farmBeauty += 5;
+            if (window.Telemetry) Telemetry.track('workshop_craft', { recipeId: job.recipeId, qty: job.qty });
             showToast('加工完成：' + recipe.outputName + ' ×' + (recipe.outputQty*job.qty), 'gold');
           }
           GameState.processingQueue.splice(i, 1);

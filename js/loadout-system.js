@@ -76,6 +76,7 @@ const LoadoutSystem = {
     if (GameState.gold < cost) { showToast('金币不足', 'warning'); return false; }
     GameState.gold -= cost;
     GameState.safeSlots++;
+    if (window.Telemetry) Telemetry.track('safe_upgrade', { slots: GameState.safeSlots });
     showToast(`安全箱升级！现在 ${GameState.safeSlots} 格`, 'gold');
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
     return true;
@@ -153,6 +154,7 @@ const LoadoutSystem = {
     GameState.gold -= cost.gold;
     const inst = { uid: this._nextUid(), weaponId, level: 0 };
     GameState.weaponInstances.push(inst);
+    if (window.Telemetry) Telemetry.track('weapon_craft', { weaponId });
     showToast(`🔨 打造完成：${wpn.name}！已入库`, 'gold');
     if (typeof AchievementSystem !== 'undefined') AchievementSystem.checkAll();
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
@@ -202,6 +204,7 @@ const LoadoutSystem = {
     }
     GameState.gold -= cost.gold;
     inst.level++;
+    if (window.Telemetry) Telemetry.track('weapon_upgrade', { weaponId: inst.weaponId, level: inst.level });
     const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
     if (!GameState.forgedWeapons.includes(inst.weaponId)) GameState.forgedWeapons.push(inst.weaponId);
     showToast(`🔨 ${wpn ? wpn.name : inst.weaponId} 升至 Lv.${inst.level}`, 'gold');

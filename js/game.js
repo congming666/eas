@@ -240,6 +240,7 @@ const Game = {
     if (typeof CropExpansion !== 'undefined') CropExpansion.CropBuffSystem.onExpeditionStart();
 
     this.expedition = new Expedition(GameState.selectedMap);
+    if (window.Telemetry) Telemetry.onExpeditionStart(this.expedition);
     PixiEffects.init();
     GameState.expedition = this.expedition;
     const consumedCards = GameState.selectedBoostCards
@@ -292,6 +293,7 @@ const Game = {
   },
 
   showResult(data) {
+    if (window.Telemetry) Telemetry.onExpeditionEnd(data, this.expedition);
     AudioManager.setScene('result');
     document.getElementById('lowHealthVignette').classList.remove('active');
     cancelAnimationFrame(this.animId);

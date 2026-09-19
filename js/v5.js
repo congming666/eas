@@ -494,6 +494,10 @@
       return arc ? arc.desc : '';
     },
     onLevelUp(lv) {
+      if (window.Telemetry) {
+        Telemetry.track('character_levelup', { level: lv });
+        if (GROWTH.slotLevels.includes(lv) || lv === 100) Telemetry.track('character_breakthrough', { level: lv });
+      }
       showToast(`境界提升！角色达到 Lv${lv}${GROWTH.slotLevels.includes(lv) ? '，技能卡槽 +1' : ''}`, 'gold');
     },
     // 修行台手动升级（消耗金币 + 泥土/清水/堆肥 + 修为）
@@ -516,6 +520,10 @@
     },
     onCropHarvested(cropId, qty, quality) {
       this.init();
+      if (window.Telemetry) {
+        Telemetry.track('crop_harvest', { cropId, qty: qty || 1, quality: quality || 'normal' });
+        if (window.CodexSystem && CodexSystem.mark) CodexSystem.mark('crop', cropId);
+      }
       GameState.harvestCount[cropId] = (GameState.harvestCount[cropId] || 0) + (qty || 1);
       const crop = (CONFIG.crops || []).find(c => c.id === cropId);
       if (crop && crop.cultivation) {
@@ -557,6 +565,7 @@
         if (GameState.equippedSkills.length >= slots) { showToast(`技能卡槽已满（${slots} 个）`, 'warning'); return; }
         GameState.equippedSkills.push(id);
       }
+      if (window.Telemetry) Telemetry.track('skill_equip', { skillId: id, equipped: GameState.equippedSkills.includes(id) });
       SaveSystem.save();
     },
     // 技能解锁判定
@@ -593,6 +602,7 @@
         if (!GameState.unlockedSkills.includes(s.id) && cond && this.unlockMet(cond)) {
           GameState.unlockedSkills.push(s.id);
           GameState.skillLevels[s.id] = 1;
+          if (window.Telemetry) Telemetry.track('skill_unlock', { skillId: s.id });
           showToast(`解锁新技能：${s.name}！可在修行台装备`, 'gold');
         }
       });
@@ -715,6 +725,7 @@
       if (rec.claimed[id]) { showToast('该档案已领取奖励', 'warning'); return; }
       if (!this.isMet(a)) { showToast('档案条件尚未达成', 'warning'); return; }
       rec.claimed[id] = true;
+      if (window.Telemetry) Telemetry.track('archive_claim', { archiveId: id });
       const r = a.reward || {};
       if (r.cult) CharacterSystem.addExp(r.cult, true);
       if (r.pardon) Warehouse.addItem('death_pardon', r.pardon);
@@ -735,6 +746,15 @@
   //  CodexSystem（全量图鉴，6 分页）
   // ============================================================
   const CodexSystem = window.CodexSystem = {
+    mark(kind, id) {
+      const gs = GameState;
+      gs.codexSeen = gs.codexSeen || {};
+      const bucket = gs.codexSeen[kind] || (gs.codexSeen[kind] = {});
+      if (!bucket[id]) {
+        bucket[id] = true;
+        if (window.Telemetry) Telemetry.track('codex_discover', { kind, id: String(id) });
+      }
+    },
     discovered(kind, id) {
       const gs = GameState;
       if (kind === 'crop') return (gs.unlockedCrops || []).includes(id) || (gs.harvestCount && gs.harvestCount[id]);
@@ -1134,7 +1154,10 @@
     }
     // Boss
     if (m.type === 'boss' && m.bossId) {
-      if (!rec.bosses[m.bossId]) { rec.bosses[m.bossId] = true; st.bossTypes = Object.keys(rec.bosses).length; }
+      if (!rec.bosses[m.bossId]) {
+        rec.bosses[m.bossId] = true; st.bossTypes = Object.keys(rec.bosses).length;
+        if (window.CodexSystem && CodexSystem.mark) CodexSystem.mark('boss', m.bossId);
+      }
       if ((CONFIG.bosses[m.bossId] || {}).tier === 3) st.t3BossKilled = (st.t3BossKilled || 0) + 1;
       const cfg = CONFIG.bosses[m.bossId];
       // v5.1 Boss 不再掉落打造材料（材料改由农作物产出），改为金币秘藏

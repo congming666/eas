@@ -9,7 +9,7 @@ Object.assign(Expedition.prototype, {
       // 地裂震荡：玩家脚下AOE + 冲击环
       this.spawnAoeEffect(this.player.x, this.player.y, phase2 ? 110 : 88, '#d59aff');
       this.spawnShockRing(this.player.x, this.player.y, '#d59aff', phase2 ? 110 : 88);
-      if (d < (phase2 ? 175 : 155)) this.damagePlayer(boss.damage * .72 * dmgMul);
+      if (d < (phase2 ? 175 : 155)) this.damagePlayer(boss.damage * .72 * dmgMul, boss);
     } else if (idx === 1) {
       // 狂暴冲锋：向玩家突进，路径拖尾 + 终点冲击
       const dashDist = phase2 ? 170 : 140;
@@ -19,7 +19,7 @@ Object.assign(Expedition.prototype, {
         this.spawnDirectionalSparks(boss.x - Math.cos(angle) * i * 14, boss.y - Math.sin(angle) * i * 14, angle + Math.PI, '#ff9a3c', 1, 1);
       }
       this.spawnShockRing(boss.x, boss.y, '#ff9a3c', 72);
-      if (d < 115) this.damagePlayer(boss.damage * .9 * dmgMul);
+      if (d < 115) this.damagePlayer(boss.damage * .9 * dmgMul, boss);
     } else if (idx === 2) {
       // 召唤兽群
       const count = phase2 ? 3 : 2;
@@ -75,6 +75,7 @@ Object.assign(Expedition.prototype, {
   spawnBeastWave() {
     this.beastWave.wave++;
     this.beastWave.active = true;
+    if (window.Telemetry) Telemetry.onBeastWave(this);
     this.beastWave.duration = 32 + this.map.tier * 3;
     if (typeof AudioManager !== 'undefined' && AudioManager.playWaveWarning) AudioManager.playWaveWarning();
     const count = Math.min(60, 16 + this.map.tier * 5 + this.beastWave.wave * 5);
@@ -585,6 +586,7 @@ Object.assign(Expedition.prototype, {
     }
     const item = CONFIG.consumables.find(c => c.id === id);
     this.consumableFlashes[id] = 0.3;
+    if (window.Telemetry) Telemetry.track('consumable_use', { id });
     AudioManager.playConsumable(id);
     if (id === 'herb_kit') {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + item.heal);
@@ -1160,6 +1162,7 @@ Object.assign(Expedition.prototype, {
   startExtract(type) {
     if (this.extracting) return;
     this.extracting = true;
+    if (window.Telemetry) Telemetry.onExtractBegin(type);
     this.extractType = type;
     this.extractProgress = 0;
     this.signalReinforced = false;
@@ -1224,6 +1227,15 @@ Object.assign(Expedition.prototype, {
   playerDeath() {
     this.gameOver = true;
     this.result = 'failed';
+    if (!this.deathCause) {
+      this.deathCause = {
+        reason: this._timeoutDeath ? 'timeout' : 'killed',
+        by: this.lastHitBy || 'unknown',
+        wave: this.beastWave ? this.beastWave.wave : 0,
+        elapsed: Math.round(this.elapsed || 0),
+      };
+    }
+    if (window.Telemetry) Telemetry.onPlayerDeath(this);
     AudioManager.playDeath();
     if (GameState.achievements) GameState.achievements.stats.consecutiveExtracts = 0;
     // v1.0 死亡永久损失带入武器
@@ -1457,7 +1469,7 @@ Object.assign(Expedition.prototype, {
     this.spawnShockRing(m.x, m.y, '#ff5533', R);
     this.spawnImpact(m.x, m.y, '#ffaa33', 1.6);
     const d = dist(m, this.player);
-    if (d < R) this.damagePlayer(m.damage || 20);
+    if (d < R) this.damagePlayer(m.damage || 20, m);
     this.monsters.forEach(o => { if (o !== m && o.hp > 0 && dist(o, m) < R) this.damageEnemy(o, (m.damage || 20) * 0.6, '#ff6644', false, { quiet: true }); });
     m.hp = 0;
   },
@@ -1560,9 +1572,19 @@ Object.assign(Expedition.prototype, {
     }
   },
 
-  damagePlayer(amount) {
+  damagePlayer(amount, source) {
     if (this.player.invuln > 0) return;
     if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.checkPerfectDodge()) return;
+    // 记录最后伤害来源（死亡原因埋点/平衡报表用）
+    if (source) {
+      this.lastHitBy = (typeof source === 'string') ? source : (source.boss ? 'boss' : source.elite ? 'elite:' + source.type : (source.type || source.name || source.id || 'unknown'));
+    } else {
+      const px = this.player.x, py = this.player.y;
+      const near = this.monsters.find(m => m.hp > 0 && (m.x - px) ** 2 + (m.y - py) ** 2 < 70 * 70)
+        || (this.raiders || []).find(m => m.hp > 0 && (m.x - px) ** 2 + (m.y - py) ** 2 < 70 * 70);
+      if (near) this.lastHitBy = near.boss ? 'boss' : (near.elite ? 'elite:' + near.type : near.type);
+      else if (this.boss && this.boss.hp > 0 && (this.boss.x - px) ** 2 + (this.boss.y - py) ** 2 < 110 * 110) this.lastHitBy = 'boss';
+    }
     const defendingTower = this.towers.find(t => t.state === 'player' && dist(t, this.player) <= t.range);
     if (this.beastWave.active) {
       amount *= defendingTower ? 0.38 : 1.45;
@@ -1650,7 +1672,7 @@ Object.assign(Expedition.prototype, {
             if (m.windupTarget === 'plant' && m.windupPlant && m.windupPlant.hp > 0) {
               this.damagePlant(m.windupPlant, m.damage);
             } else {
-              this.damagePlayer(m.damage);
+              this.damagePlayer(m.damage, m);
               if (typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
             }
           }
@@ -1970,7 +1992,7 @@ Object.assign(Expedition.prototype, {
       } else if (t.state === 'enemy') {
         // 攻击玩家
         if (dist(t, this.player) < t.range) {
-          this.damagePlayer(t.damage);
+          this.damagePlayer(t.damage, t.monsterType ? t : { monsterType: 'tower', name: '防御塔' });
           t.attackCd = 1.0;
         }
       }
@@ -2078,7 +2100,7 @@ Object.assign(Expedition.prototype, {
           const ddx = this.player.x - p.x, ddy = this.player.y - p.y;
           const rr = this.player.collisionRadius + p.radius;
           if (ddx * ddx + ddy * ddy <= rr * rr) {
-            this.damagePlayer(p.damage);
+            this.damagePlayer(p.damage, p.monsterType ? p : { monsterType: 'projectile', name: '敌方弹道' });
             dead = true;
           }
         }
