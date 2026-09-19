@@ -1,0 +1,53 @@
+name: nightly-balance
+
+on:
+  schedule:
+    # 每晚 22:17 UTC（北京时间次日 06:17）跑 504 局
+    - cron: '17 22 * * *'
+  workflow_dispatch:
+    inputs:
+      economy:
+        description: '同时跑经济闭环模拟（档数，0 表示跳过）'
+        type: number
+        default: 30
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装依赖与 Chromium
+        run: |
+          npm install
+          npx playwright install chromium --with-deps
+
+      - name: 语法检查
+        run: npm run check
+
+      - name: Nightly 平衡跑批（504 局）
+        run: npm run balance:nightly
+
+      - name: 经济闭环模拟（30 档连跑）
+        if: github.event_name == 'workflow_dispatch' && inputs.economy > 0
+        run: node tools/balance-bot.js --economy=${{ inputs.economy }} --label=economy-ci
+
+      - name: 上传平衡产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-report
+          path: |
+            tools/balance-report.json
+            docs/balance-report.md
+            tools/balance-economy.json
+            docs/balance-economy.md
+            tools/balance-history/
+          if-no-files-found: warn
+          retention-days: 30

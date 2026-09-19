@@ -1,6 +1,6 @@
 # 农场卡牌：荒野远征
 
-> 当前版本 **v5.2「数据驱动」** — 22 事件对局埋点 + 暗色数据看板 + Playwright 无头 bot 自动跑 200 局出数值平衡报表；v5.0「荒野觉醒」：100 级修行台角色成长 × 16 技能 × 远征档案突破 × 14 种具体资源与工坊闭环 × 12 Boss/24 地图差异化 × 105 张统一写实图标
+> 当前版本 **v5.3「千局级平衡平台」** — 5 画像 1088 局无头跑批（每格 n≥25）、Wilson 95% 置信区间 + 两比例 z 检验标"噪声"、单杠杆注入式 A/B、新号 30 档经济闭环双情景模拟、GitHub Actions nightly 500 局；v5.2：22 事件对局埋点 + 暗色数据看板；v5.0「荒野觉醒」：100 级修行台角色成长 × 16 技能 × 远征档案突破 × 14 种具体资源与工坊闭环 × 12 Boss/24 地图差异化 × 105 张统一写实图标
 
 融合 QQ 农场经营 + 卡牌收集 + 搜打撤远征的 2D 网页游戏。
 
@@ -23,7 +23,7 @@
 
 - 纯前端 Canvas2D + 原生 JavaScript，无框架依赖
 - localStorage 存档（schema 版本 + 自动迁移）
-- **数据驱动平衡**：`js/telemetry.js` 22 事件本地埋点 + 游戏内数据看板（JSON 导出）；`tools/balance-bot.js` 用 Playwright 无头驱动真实游戏代码自动跑 200 局（双画像队列、虚拟时钟快进、跳过渲染），产出 `docs/balance-report.md` 平衡报表
+- **数据驱动平衡**：`js/telemetry.js` 22 事件本地埋点 + 游戏内数据看板（JSON 导出）；`tools/balance-bot.js` 用 Playwright 无头驱动真实游戏代码自动跑 **1088 局**（5 画像：满级配装/新手/寻 Boss/有限补给/贪财，每画像×Tier×难度 n≥25，虚拟时钟快进、跳过渲染），所有撤离率带 Wilson 95% 置信区间、相邻难度用两比例 z 检验标"噪声"，支持注入式单杠杆 A/B；产出 `docs/balance-report.md`（12 节平衡报表）与 `docs/balance-economy.md`（30 档经济闭环模拟），逐局 JSON 归档 `tools/balance-history/` 并自动做版本对比
 - 武器/怪物/Boss/技能/作物/道具/资源/建筑素材：AI 生成概念图并统一云端抠图为 512px 透明 PNG（`assets/icons/**/*_t.png`，累计 105 张），双击 file:// 打开也不会出现黑/白底方块；技能释放特效由 Canvas 程序化实时绘制
 - 天气雨声/狼嚎等环境音由 Web Audio 程序合成，无外部音频文件
 
@@ -40,7 +40,9 @@ npx serve .
 ```bash
 npm run check     # 对全部 JS 跑 node --check 语法关卡
 npm test          # Playwright 端到端冒烟（首次需 npx playwright install chromium）
-npm run balance   # 无头 bot 自动跑 200 局真实远征，产出平衡报表（docs/balance-report.md）
+npm run balance   # 无头 bot 全量跑批（full=1088 局 / nightly=504 局），产出 docs/balance-report.md
+npm run balance:nightly  # CI 夜间档：504 局（5 画像压缩队列）
+npm run balance:economy  # 经济闭环专项：新号连跑 30 档，验证武器 +10 所需成功撤离局数
 npm run build     # 把运行时文件汇集到 dist/，并校验所有本地资源引用
 npm run version:sync -- 4.3.0   # 升版：config.js 为唯一数据源，联动 title/meta/缓存戳/package.json
 ```
@@ -75,10 +77,14 @@ assets/
   weapons/                                             5 把武器精灵图
 docs/art/                                             武器等运行时美术图（发布时随 dist 拷贝）
 css/style.css          全部样式（原内联在 index.html）
-tools/                 syntax-check / build-dist / bump-version 工程脚本
-  balance-bot.js       无头平衡 bot（Playwright 驱动真实游戏跑 200 局）
+tools/                 syntax-check / build-dist / bump-version / export-game-data 工程脚本
+  balance-bot.js       无头平衡 bot（Playwright 驱动真实游戏；5 画像、CI/杠杆/经济专项）
   balance-report.json  bot 逐局原始数据
-docs/balance-report.md 200 局平衡报表（撤离率/死因/自动 checks/调参建议）
+  balance-economy.json 经济闭环专项逐档数据
+  balance-history/     历次跑批 JSON 归档（版本对比数据源）
+.github/workflows/     balance.yml：nightly 500 局 + 经济专项，定时/手动触发
+docs/balance-report.md 1088 局平衡报表（CI/z 检验/12 Boss TTK/杠杆 A·B/观察项）
+docs/balance-economy.md 30 档经济闭环模拟报告（纯远征反证 + 农场双线）
 index.html             入口（仅结构与脚本引用）
 smoke_test.js          Playwright 端到端冒烟测试，截图输出到 test-results/
 ```

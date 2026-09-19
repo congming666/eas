@@ -13,3 +13,9 @@ output/
 Thumbs.db
 *.log
 .gh-cli/
+# 平衡跑批：只归档正式 full/lever 跑批，冒烟/调试/日志不入库
+tools/balance-history/*.log
+tools/balance-history/balance-smoke*.json
+tools/balance-history/balance-dbg*.json
+tools/balance-history/balance-lever-smoke*.json
+tools/balance-history/balance-lever-nm-2*.json
