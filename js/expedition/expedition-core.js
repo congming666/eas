@@ -24,6 +24,7 @@ class Expedition {
       invuln: 0,
       stealth: 0,
       slow: 0,
+      root: 0,
       vx: 0, vy: 0,
       visualZ: 0,
       visualVz: 0

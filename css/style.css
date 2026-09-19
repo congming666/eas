@@ -153,11 +153,29 @@
   }
   .farm-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     gap: 6px;
-    max-width: 500px;
+    max-width: 660px;
     margin: 0 auto;
   }
+  /* v5.1 作物产出详情卡 */
+  .crop-detail-panel {
+    background: rgba(0,0,0,0.4);
+    border-radius: 12px;
+    padding: 12px 16px;
+    max-width: 660px;
+    margin: 0 auto;
+    min-height: 40px;
+    border: 1px solid rgba(143, 207, 154, 0.25);
+  }
+  .crop-detail-panel:empty { display: none; }
+  .crop-detail-title { color: #ffd700; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+  .crop-detail-row { display: flex; font-size: 12px; line-height: 1.7; color: #cfd8cf; }
+  .crop-detail-row .cdl-label { color: #8fa88f; min-width: 64px; flex: 0 0 64px; }
+  .crop-detail-row .cdl-value.mat { color: #9fd8ff; }
+  .loadout-slot { position: relative; cursor: pointer; }
+  .loadout-slot.muted { opacity: 0.55; }
+  .loadout-slot.muted:hover { filter: brightness(1.1); }
   .crop-selector {
     display: flex;
     flex-wrap: wrap;

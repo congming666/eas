@@ -275,6 +275,29 @@ const Warehouse = {
       });
       html += `</div></div>`;
     }
+    // v5.1 打造材料 / 庄园资源区（材料字典不占仓库容量，由作物产出、远征获取）
+    const matBag = (GameState.warehouse.materials) || {};
+    const matGroups = [
+      { title: '⛏️ 打造材料（农作物产出，不占容量）', ids: ['wood', 'stone', 'fiber', 'iron', 'refined_iron', 'crystal', 'venom', 'carapace', 'soul_ash', 'bossFang'] },
+      { title: '🟫 庄园资源', ids: ['soil', 'water', 'compost', 'herb'] },
+    ];
+    matGroups.forEach(grp => {
+      const rows = grp.ids.filter(id => (matBag[id] || 0) > 0);
+      if (!rows.length) return;
+      hasItems = true;
+      html += `<div class="warehouse-category"><div class="category-title">${grp.title}</div><div class="warehouse-grid">`;
+      rows.forEach(id => {
+        const def = (CONFIG.resources && CONFIG.resources[id]) || (CONFIG.materials && CONFIG.materials[id]) || { icon: '📦', name: id, to: '' };
+        html += `
+          <div class="warehouse-item">
+            <div class="item-icon">${(typeof CropArt!=="undefined")?CropArt.dom(id,def.icon,36):def.icon}</div>
+            <div class="item-name">${def.name}</div>
+            <div class="item-count">×${matBag[id]}</div>
+            <div class="item-not-sellable">${def.to ? def.to : '打造材料·不可出售'}</div>
+          </div>`;
+      });
+      html += `</div></div>`;
+    });
     Object.keys(categories).forEach(cat => {
       const items = categories[cat];
       if (items.length === 0) return;

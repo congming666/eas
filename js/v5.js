@@ -15,22 +15,48 @@
    * 一、具体资源体系（取代抽象“材料”）
    * -------------------------------------------------------- */
   const RESOURCES = {
-    wood:      { name: '木材',   icon: '🪵', kind: 'farm',  from: '树精/木箱/密林', to: '建筑、火把、工具' },
-    soil:      { name: '泥土',   icon: '🟫', kind: 'farm',  from: '农场采集/采石场', to: '升级、种植、堆肥' },
-    water:     { name: '清水',   icon: '💧', kind: 'farm',  from: '河湾/水洼采集',   to: '升级、烹饪、温室' },
-    compost:   { name: '堆肥',   icon: '🍂', kind: 'farm',  from: '工坊：作物残料×2', to: '升级、高级种植' },
-    stone:     { name: '石料',   icon: '🪨', kind: 'farm',  from: '采石场/石像鬼',   to: '捕兽夹、建筑' },
-    fiber:     { name: '植物纤维', icon: '🌾', kind: 'farm', from: '作物副产/藤蔓',   to: '急救包、绳索' },
-    iron:      { name: '铁矿',   icon: '⛓️', kind: 'ore',   from: '魔像/采石场/宝箱', to: '提炼精铁锭' },
-    refined_iron: { name: '精铁锭', icon: '🔩', kind: 'ore', from: '工坊：铁矿×3',    to: '武器锻造、护盾器' },
-    crystal:   { name: '晶核',   icon: '💎', kind: 'mob',   from: '精英/Boss/影魔',  to: '高级锻造、技能' },
-    venom:     { name: '毒腺',   icon: '🧪', kind: 'mob',   from: '蜘蛛/沼泽巫妪',   to: '毒雾弹' },
-    carapace:  { name: '甲壳',   icon: '🐚', kind: 'mob',   from: '蝗虫/石像鬼/魔像', to: '护盾发生器' },
-    soul_ash:  { name: '魂烬',   icon: '🌫️', kind: 'mob',  from: '影魔/磨坊怨灵/虚空守卫', to: '高级技能、修为丹' },
-    bossFang:  { name: '巨兽獠牙', icon: '🦷', kind: 'mob', from: '各 Boss',         to: '武器顶级锻造' },
-    herb:      { name: '药草',   icon: '🌿', kind: 'raw',   from: '野外采摘/作物',   to: '急救包、药剂' },
+    wood:      { name: '木材',   icon: '🪵', kind: 'farm',  from: '作物：豌豆射手50%、九叶灵芝80%×2', to: '武器打造、建筑、火把' },
+    soil:      { name: '泥土',   icon: '🟫', kind: 'farm',  from: '远征：树精掉落、宝箱', to: '修行升级、种植、堆肥' },
+    water:     { name: '清水',   icon: '💧', kind: 'farm',  from: '远征：河湾/水洼采集',   to: '升级、烹饪、温室' },
+    compost:   { name: '堆肥',   icon: '🍂', kind: 'farm',  from: '作物：胡萝卜30%；工坊残料×2', to: '升级、高级种植' },
+    stone:     { name: '石料',   icon: '🪨', kind: 'farm',  from: '作物：仙人掌50%',   to: '建筑、捕兽夹' },
+    fiber:     { name: '植物纤维', icon: '🌾', kind: 'farm', from: '作物：向日葵/白菜/小麦/蒜/薄荷/水稻/番茄/迷迭香', to: '农田扩建、急救包、绳索' },
+    iron:      { name: '铁矿',   icon: '⛓️', kind: 'ore',   from: '作物：仙人掌32%、雷鸣藤55%×2', to: '武器打造升级、提炼精铁锭' },
+    refined_iron: { name: '精铁锭', icon: '🔩', kind: 'ore', from: '作物：雷鸣藤6%；工坊：铁矿×3', to: '高级武器锻造' },
+    crystal:   { name: '晶核',   icon: '💎', kind: 'mob',   from: '作物：西瓜/冰心莲/雷鸣藤/幽魂兰', to: '武器打造升级、高级技能' },
+    venom:     { name: '毒腺',   icon: '🧪', kind: 'mob',   from: '作物：辣椒30%、幽冥毒伞70%', to: '毒雾弹' },
+    carapace:  { name: '甲壳',   icon: '🐚', kind: 'mob',   from: '作物：仙人掌40%', to: '护盾类工坊制品' },
+    soul_ash:  { name: '魂烬',   icon: '🌫️', kind: 'mob',  from: '作物：幽魂兰45%、幽冥毒伞50%', to: '高级锻造、修为丹' },
+    bossFang:  { name: '巨兽獠牙', icon: '🦷', kind: 'mob', from: '作物：九叶灵芝25%、幽冥毒伞12%', to: '武器 7 级以上升级' },
+    herb:      { name: '药草',   icon: '🌿', kind: 'raw',   from: '远征野外采摘、宝箱',   to: '急救包、药剂' },
   };
   CONFIG.resources = RESOURCES;
+
+  /* ----------------------------------------------------------
+   * 一·补、农作物 -> 打造材料映射（v5.1：武器打造材料只能由农作物产出）
+   * 每条 [材料id, 单株概率, 命中数量]；高品质收获有数量加成
+   * -------------------------------------------------------- */
+  const CROP_MATERIALS = {
+    pea_shooter:    [['wood', 0.5, 1]],
+    sunflower:      [['fiber', 0.4, 1]],
+    watermelon:     [['crystal', 0.35, 1]],
+    cabbage:        [['fiber', 0.5, 1]],
+    wheat:          [['fiber', 0.7, 1]],
+    carrot:         [['compost', 0.3, 1]],
+    chili:          [['venom', 0.3, 1]],
+    garlic:         [['fiber', 0.45, 1]],
+    mint:           [['fiber', 0.4, 1]],
+    cactus:         [['stone', 0.5, 1], ['carapace', 0.4, 1], ['iron', 0.32, 1]],
+    rice:           [['fiber', 0.8, 1]],
+    ginseng:        [['wood', 0.8, 2], ['bossFang', 0.25, 1]],
+    tomato:         [['fiber', 0.35, 1]],
+    rosemary:       [['fiber', 0.45, 1]],
+    frost_flower:   [['crystal', 0.65, 1]],
+    lightning_vine: [['iron', 0.55, 2], ['crystal', 0.2, 1], ['refined_iron', 0.06, 1]],
+    shadow_flower:  [['crystal', 0.5, 1], ['soul_ash', 0.45, 1]],
+    deathcap:       [['venom', 0.7, 1], ['soul_ash', 0.5, 1], ['bossFang', 0.12, 1]],
+  };
+  CONFIG.cropMaterials = CROP_MATERIALS;
 
   /* ----------------------------------------------------------
    * 二、16 技能（旧 4 个排最前，保证旧索引兼容）
@@ -275,18 +301,18 @@
    * 七、12 Boss + 新精英怪 + 24 地图怪物池
    * -------------------------------------------------------- */
   const BOSSES = {
-    t1_boar_king:   { id: 't1_boar_king', name: '狂暴野猪王', tier: 1, hp: 820, dmg: 20, speed: 96, radius: 46, emoji: '🐗', color: '#c98a4b', skill: '冲锋 + 三重震荡波', loot: ['bossFang', 'iron', 'stone'] },
-    t1_withered:    { id: 't1_withered', name: '枯木精', tier: 1, hp: 900, dmg: 18, speed: 70, radius: 48, emoji: '🌳', color: '#6f8f4e', skill: '树根缠绕 + 回血光环', loot: ['bossFang', 'wood', 'fiber'] },
-    t1_quarry:      { id: 't1_quarry', name: '采石巨魔', tier: 1, hp: 980, dmg: 24, speed: 64, radius: 50, emoji: '🗿', color: '#9b8b78', skill: '投石 + 岩石护甲', loot: ['bossFang', 'stone', 'iron'] },
-    t2_gargoyle_lord: { id: 't2_gargoyle_lord', name: '石像鬼王', tier: 2, hp: 1180, dmg: 25, speed: 104, radius: 46, emoji: '🦇', color: '#7d8a99', flying: true, skill: '石化凝视 + 俯冲陨石', loot: ['bossFang', 'carapace', 'stone'] },
-    t2_ruin_golem:  { id: 't2_ruin_golem', name: '废墟魔像', tier: 2, hp: 1320, dmg: 27, speed: 60, radius: 52, emoji: '🗿', color: '#8d8578', skill: '分裂 + 反伤护盾', loot: ['bossFang', 'refined_iron', 'crystal'] },
-    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 1500, dmg: 28, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼 + 诅咒减速', loot: ['bossFang', 'venom', 'soul_ash'] },
-    t3_brood_mother:{ id: 't3_brood_mother', name: '虫母', tier: 3, hp: 1640, dmg: 24, speed: 72, radius: 52, emoji: '🕷️', color: '#a06bb0', summoner: true, skill: '产卵虫潮 + 吐丝网', loot: ['bossFang', 'carapace', 'venom'] },
-    t3_scorch_demon:{ id: 't3_scorch_demon', name: '焦林炎魔', tier: 3, hp: 1720, dmg: 32, speed: 88, radius: 48, emoji: '🔥', color: '#ff6a3c', skill: '烈焰风暴 + 落雷', loot: ['bossFang', 'crystal', 'soul_ash'] },
-    t4_abyss_lord:  { id: 't4_abyss_lord', name: '深渊领主', tier: 4, hp: 2100, dmg: 34, speed: 80, radius: 56, emoji: '👹', color: '#8a3bd8', skill: '深渊领域 + 多阶段召唤', loot: ['bossFang', 'soul_ash', 'crystal'] },
-    t4_time_warden: { id: 't4_time_warden', name: '时空守望', tier: 4, hp: 1980, dmg: 33, speed: 92, radius: 48, emoji: '⏳', color: '#5ad1c8', skill: '时间凝滞 + 传送', loot: ['bossFang', 'soul_ash', 'refined_iron'] },
-    t4_moon_priestess: { id: 't4_moon_priestess', name: '月之祭司', tier: 4, hp: 1900, dmg: 31, speed: 86, radius: 46, emoji: '🌙', color: '#9bb8ff', healer: true, skill: '月光治愈 + 夜魇幻术', loot: ['bossFang', 'soul_ash', 'crystal'] },
-    t4_arena_champion: { id: 't4_arena_champion', name: '竞技场冠军', tier: 4, hp: 2240, dmg: 38, speed: 112, radius: 48, emoji: '⚔️', color: '#d8b25a', charger: true, skill: '连招决斗 + 狂暴二阶段', loot: ['bossFang', 'refined_iron', 'crystal'] },
+    t1_boar_king:   { id: 't1_boar_king', name: '狂暴野猪王', tier: 1, hp: 820, dmg: 20, speed: 96, radius: 46, emoji: '🐗', color: '#c98a4b', skill: '震荡波 + 锁定冲锋（半血狂暴）', loot: ['bossFang', 'iron', 'stone'] },
+    t1_withered:    { id: 't1_withered', name: '枯木精', tier: 1, hp: 900, dmg: 18, speed: 70, radius: 48, emoji: '🌳', color: '#6f8f4e', skill: '树根缠绕定身 + 回血光环', loot: ['bossFang', 'wood', 'fiber'] },
+    t1_quarry:      { id: 't1_quarry', name: '采石巨魔', tier: 1, hp: 980, dmg: 24, speed: 64, radius: 50, emoji: '🗿', color: '#9b8b78', skill: '范围投石 + 岩石护甲减伤', loot: ['bossFang', 'stone', 'iron'] },
+    t2_gargoyle_lord: { id: 't2_gargoyle_lord', name: '石像鬼王', tier: 2, hp: 1180, dmg: 25, speed: 104, radius: 46, emoji: '🦇', color: '#7d8a99', flying: true, skill: '石化凝视 + 俯冲 + 弹幕散射', loot: ['bossFang', 'carapace', 'stone'] },
+    t2_ruin_golem:  { id: 't2_ruin_golem', name: '废墟魔像', tier: 2, hp: 1320, dmg: 27, speed: 60, radius: 52, emoji: '🗿', color: '#8d8578', skill: '血量分裂 + 反伤岩石护盾 + 碎石弹', loot: ['bossFang', 'refined_iron', 'crystal'] },
+    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 1500, dmg: 28, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼陷阱 + 召唤雾天 + 诅咒毒弹（远程风筝）', loot: ['bossFang', 'venom', 'soul_ash'] },
+    t3_brood_mother:{ id: 't3_brood_mother', name: '虫母', tier: 3, hp: 1640, dmg: 24, speed: 72, radius: 52, emoji: '🕷️', color: '#a06bb0', summoner: true, skill: '产卵虫潮 + 蛛网陷阱', loot: ['bossFang', 'carapace', 'venom'] },
+    t3_scorch_demon:{ id: 't3_scorch_demon', name: '焦林炎魔', tier: 3, hp: 1720, dmg: 32, speed: 88, radius: 48, emoji: '🔥', color: '#ff6a3c', skill: '火雨陷阱 + 召唤雷暴 + 火焰连射', loot: ['bossFang', 'crystal', 'soul_ash'] },
+    t4_abyss_lord:  { id: 't4_abyss_lord', name: '深渊领主', tier: 4, hp: 2100, dmg: 34, speed: 80, radius: 56, emoji: '👹', color: '#8a3bd8', skill: '复活尸体 + 深渊领域（雾天召唤）', loot: ['bossFang', 'soul_ash', 'crystal'] },
+    t4_time_warden: { id: 't4_time_warden', name: '时空守望', tier: 4, hp: 1980, dmg: 33, speed: 92, radius: 48, emoji: '⏳', color: '#5ad1c8', skill: '传送凝滞 + 环形弹幕齐射', loot: ['bossFang', 'soul_ash', 'refined_iron'] },
+    t4_moon_priestess: { id: 't4_moon_priestess', name: '月之祭司', tier: 4, hp: 1900, dmg: 31, speed: 86, radius: 46, emoji: '🌙', color: '#9bb8ff', healer: true, skill: '月光治疗 + 夜魇雾天召唤 + 月光弹', loot: ['bossFang', 'soul_ash', 'crystal'] },
+    t4_arena_champion: { id: 't4_arena_champion', name: '竞技场冠军', tier: 4, hp: 2240, dmg: 38, speed: 112, radius: 48, emoji: '⚔️', color: '#d8b25a', charger: true, skill: '突刺/横扫/跳劈三段连招 + 半血狂暴', loot: ['bossFang', 'refined_iron', 'crystal'] },
   };
   CONFIG.bosses = BOSSES;
 
@@ -389,10 +415,14 @@
       // 装备技能数不得超过卡槽
       const slots = this.slotCount();
       gs.equippedSkills = gs.equippedSkills.filter(id => gs.unlockedSkills.includes(id)).slice(0, slots);
-      while (gs.equippedSkills.length < Math.min(slots, gs.unlockedSkills.length)) {
-        const next = gs.unlockedSkills.find(id => !gs.equippedSkills.includes(id));
-        if (!next) break;
-        gs.equippedSkills.push(next);
+      // v5.1 仅首次初始化自动补满技能槽；之后尊重玩家主动卸下的空槽（修复“技能卸不掉”）
+      if (!gs._slotsInitialized) {
+        gs._slotsInitialized = true;
+        while (gs.equippedSkills.length < Math.min(slots, gs.unlockedSkills.length)) {
+          const next = gs.unlockedSkills.find(id => !gs.equippedSkills.includes(id));
+          if (!next) break;
+          gs.equippedSkills.push(next);
+        }
       }
     },
     slotCount(level) {
@@ -496,7 +526,24 @@
       ResourceSystem.add('soil', hq);
       if (Math.random() < Math.min(1, 0.6 * hq)) ResourceSystem.add('water', 1);
       if (Math.random() < Math.min(1, 0.25 * hq)) ResourceSystem.add('compost', 1);
+      // v5.1 打造材料按作物映射产出（武器材料的唯一来源）
+      const yields = CROP_MATERIALS[cropId];
+      const gained = [];
+      if (yields) {
+        const qMult = quality === 'legendary' ? 1.5 : quality === 'rare' ? 1.2 : 1;
+        for (let k = 0; k < hq; k++) {
+          yields.forEach(([mid, prob, baseQty]) => {
+            if (Math.random() < prob) {
+              const n = Math.max(1, Math.round(baseQty * qMult));
+              ResourceSystem.add(mid, n);
+              const ex = gained.find(g => g.id === mid);
+              if (ex) ex.n += n; else gained.push({ id: mid, n });
+            }
+          });
+        }
+      }
       this.checkUnlocks();
+      return gained.map(g => `${(RESOURCES[g.id] || {}).icon || ''}${(RESOURCES[g.id] || {}).name || g.id}×${g.n}`);
     },
     getEquipped() { this.init(); return GameState.equippedSkills.slice(); },
     skillLevelOf(id) { return GameState.skillLevels[id] || 1; },
@@ -1071,28 +1118,28 @@
   /* ----------------------------------------------------------
    *  怪物死亡 / 撤离 / 阵亡 钩子
    * -------------------------------------------------------- */
+  // v5.1 武器打造材料改由农作物产出，远征只保留庄园资源（泥土/堆肥）
   const TYPE_RES = {
-    spider: [['venom', 0.18]], bat: [['carapace', 0.14]], locust: [['carapace', 0.16]],
-    gargoyle: [['carapace', 0.2], ['stone', 0.2]], stone_golem: [['stone', 0.4], ['refined_iron', 0.2]],
-    shadow_demon: [['soul_ash', 0.2]], mill_wraith: [['soul_ash', 0.3]], shadow_assassin: [['soul_ash', 0.35]],
-    treant: [['wood', 0.3], ['fiber', 0.25], ['soil', 0.4]], withered_treant: [['wood', 0.4], ['fiber', 0.3], ['soil', 0.5]],
-    quarry_troll: [['stone', 0.45], ['iron', 0.2]], void_warden: [['soul_ash', 0.4], ['refined_iron', 0.25]],
-    brood_queen: [['venom', 0.3], ['carapace', 0.3]], swamp_hag_elite: [['venom', 0.4]],
+    treant: [['soil', 0.4]], withered_treant: [['soil', 0.5]],
     wolf: [['compost', 0.12]], boar: [['compost', 0.12]],
   };
   V5.onMonsterKilled = function (exp, m) {
     CharacterSystem.init();
     const rec = GameState.archive, st = rec.stats;
+    // v5.1 记录尸体（供深渊领主复活），最多保留 8 具、60 秒内
+    if (m.type !== 'boss') {
+      exp._corpses = exp._corpses || [];
+      exp._corpses.push({ x: m.x, y: m.y, type: m.type, t: performance.now() });
+      if (exp._corpses.length > 8) exp._corpses.shift();
+    }
     // Boss
     if (m.type === 'boss' && m.bossId) {
       if (!rec.bosses[m.bossId]) { rec.bosses[m.bossId] = true; st.bossTypes = Object.keys(rec.bosses).length; }
       if ((CONFIG.bosses[m.bossId] || {}).tier === 3) st.t3BossKilled = (st.t3BossKilled || 0) + 1;
       const cfg = CONFIG.bosses[m.bossId];
-      (cfg.loot || []).forEach((rid, i) => {
-        if (i === 0) return; // bossFang 已有独立掉落
-        exp.spawnGroundLoot({ type: 'material', name: RESOURCES[rid] ? RESOURCES[rid].name : rid, icon: RESOURCES[rid] ? RESOURCES[rid].icon : '◆', matId: rid, amount: randInt(1, 2) }, m.x + rand(-20, 20), m.y + rand(-20, 20));
-      });
-      if (Math.random() < 0.35) exp.spawnGroundLoot({ type: 'consumable', name: '免死令', id: 'death_pardon', icon: '📜' }, m.x, m.y - 10);
+      // v5.1 Boss 不再掉落打造材料（材料改由农作物产出），改为金币秘藏
+      exp.spawnGroundLoot({ type: 'gold', name: '首领秘藏', amount: randInt(40, 90) * (cfg.tier || 1), icon: '💰' }, m.x, m.y - 12);
+      if (Math.random() < 0.35) exp.spawnGroundLoot({ type: 'consumable', name: '免死令', id: 'death_pardon', icon: '📜' }, m.x, m.y - 26);
     } else if (m.elite) {
       rec.elites[m.type] = (rec.elites[m.type] || 0) + 1;
     }
@@ -1152,76 +1199,539 @@
     if (!pool.length) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   };
-  V5.tickBoss = function (exp, dt) {
-    const b = exp.boss;
-    if (!b || b.hp <= 0) return;
-    const p = exp.player;
-    if (!p) return;
-    if (!b.v5ai) b.v5ai = { t: 6 };
-    b.v5ai.t -= dt;
-    if (b.v5ai.t > 0) return;
-    const MS = CONFIG.expedition.mapSize;
-    const cl = v => Math.max(60, Math.min(MS - 60, v));
-    const spawnAdd = (type, hpScale) => {
-      const data = CONFIG.monsters[type]; if (!data) return;
-      const a = Math.random() * Math.PI * 2;
-      const sx = cl(b.x + Math.cos(a) * 90), sy = cl(b.y + Math.sin(a) * 90);
-      exp.spawnAoeEffect(sx, sy, 38, '#9affd5');
-      const hp = Math.round(data.hp * (exp.balance ? exp.balance.enemyHp : 1) * hpScale);
-      exp.monsters.push({
-        type, ...data, x: sx, y: sy, hp, maxHp: hp, v5add: true,
-        damage: Math.max(2, Math.round(data.damage * (exp.balance ? exp.balance.enemyDamage : 1) * 0.7)),
-        speed: data.speed * (exp.balance ? exp.balance.enemySpeed : 1),
-        attackCd: 0, stunned: 0, facing: a, animTime: 0, hitFlash: 0,
-        elite: false, abilityCd: rand(1, 3), packOffset: 0, beastWave: false, state: 'idle', stateTimer: 0,
-      });
-    };
-    const fireVolley = (color, n, spread, speed, dmgMul) => {
-      const base = Math.atan2(p.y - b.y, p.x - b.x);
-      for (let i = 0; i < n; i++) {
-        const a = base + (i - (n - 1) / 2) * spread;
-        const pr = exp.allocProjectile();
-        Object.assign(pr, { x: b.x, y: b.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, damage: b.damage * dmgMul, life: 2.4, radius: 10, fromPlayer: false, color, pierce: 0 });
-        pr.hit = pr.hit || []; pr.hit.length = 0;
-        exp.projectiles.push(pr);
+  /* ============================================================
+   * v5.1 Boss 差异化战斗：12 只 Boss 各有独立技能状态机
+   * 状态：idle（通用AI近战/风筝）→ windup_*（前摇预警）→ cast/charge → stagger → idle
+   * ============================================================ */
+  const BOSS_TRAPS = {
+    root:   { type: 'root',      name: '缠绕树根', icon: '🌿', color: '#6f8f4e', radius: 42, damage: 8,  cooldown: 2.2, slow: 1.4, root: 1.4, life: 12 },
+    poison: { type: 'poison',    name: '剧毒沼泽', icon: '☠️', color: '#8bd34a', radius: 54, damage: 10, cooldown: 1.6, slow: 0.5, life: 14 },
+    web:    { type: 'bear',      name: '蛛网',     icon: '🕸️', color: '#e8e2f5', radius: 48, damage: 0,  cooldown: 3,   slow: 3,   life: 10 },
+    fire:   { type: 'lightning', name: '火雨',     icon: '🔥', color: '#ff7a2e', radius: 50, damage: 26, cooldown: 5,  slow: 0.3, life: 6 },
+  };
+
+  const bFace = (exp, b) => { b.facing = Math.atan2(exp.player.y - b.y, exp.player.x - b.x); };
+  const bRage = b => b.hp / b.maxHp < 0.5;
+  function bToIdle(exp, b, min, max) { b.castState = 'idle'; b.ai.cd = rand(min, max); }
+  function bBegin(b, state, dur) { b.castState = state; b.castTimer = dur; }
+  function bToast(exp, b, msg) { showToast(`「${b.name}」${msg}`, 'warning'); }
+  function bSetWeather(exp, state, dur) {
+    if (!exp.fxWeather) return;
+    exp.fxWeather.state = state;
+    exp.fxWeather.timer = dur;
+    const name = { rain: '下起了雨', storm: '雷暴来袭', fog: '雾气弥漫', clear: '天气放晴' }[state];
+    if (name) showToast(name, 'warning');
+  }
+  // 延迟范围打击（预警圈 → 爆炸）
+  function bHazard(exp, h) {
+    exp.bossHazards = exp.bossHazards || [];
+    const full = Object.assign({ x: exp.player.x, y: exp.player.y, r: 70, delay: 1.0, dmg: 20, color: '#ff6a3c', icon: '💥', slow: 0, root: 0 }, h);
+    full.t = full.delay;
+    exp.bossHazards.push(full);
+  }
+  V5.updateBossHazards = function (exp, dt) {
+    if (!exp.bossHazards) return;
+    for (let i = exp.bossHazards.length - 1; i >= 0; i--) {
+      const h = exp.bossHazards[i];
+      h.t -= dt;
+      if (h.t <= 0) {
+        exp.spawnAoeEffect(h.x, h.y, h.r, h.color);
+        exp.spawnShockRing(h.x, h.y, h.color, h.r);
+        if (dist(exp.player, { x: h.x, y: h.y }) < h.r + (exp.player.collisionRadius || 11)) {
+          if (exp.player.invuln <= 0) {
+            exp.damagePlayer(h.dmg);
+            if (h.slow) exp.player.slow = Math.max(exp.player.slow, h.slow);
+            if (h.root) exp.player.root = Math.max(exp.player.root || 0, h.root);
+          }
+        }
+        exp.bossHazards.splice(i, 1);
       }
-    };
-    if (b.bossId === 't4_moon_priestess') {
-      b.v5ai.t = 9;
-      exp.spawnAoeEffect(b.x, b.y, 260, '#7dff9a');
-      enemies(exp).forEach(m => { if (m !== b && m.hp > 0 && dist(m, b) < 260) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.12); });
-      showToast('月之祭司施放治疗光环！', 'warning');
-    } else if (b.bossId === 't3_brood_mother') {
-      b.v5ai.t = 13;
-      const adds = exp.monsters.filter(m => m.v5add).length;
-      if (adds < 6) { spawnAdd('spider', 0.55); spawnAdd('spider', 0.55); showToast('虫母产卵，蛛群涌出！', 'warning'); }
-    } else if (b.bossId === 't4_time_warden') {
-      b.v5ai.t = 11;
-      const a0 = Math.atan2(p.y - b.y, p.x - b.x) + rand(-0.4, 0.4);
-      const nx = cl(p.x - Math.cos(a0) * 180), ny = cl(p.y - Math.sin(a0) * 180);
-      exp.spawnAoeEffect(b.x, b.y, 90, '#8ab6ff');
-      b.x = nx; b.y = ny;
-      exp.spawnAoeEffect(nx, ny, 120, '#8ab6ff');
-      if (typeof exp.spawnShockRing === 'function') exp.spawnShockRing(nx, ny, '#8ab6ff', 120);
-      if (dist({ x: nx, y: ny }, p) < 210) p.slow = Math.max(p.slow || 0, 2.2);
-      showToast('时空守望：时间凝滞！', 'warning');
-    } else if (b.bossId === 't3_scorch_demon') {
-      b.v5ai.t = 8;
-      fireVolley('#ff7a2e', 3, 0.22, 310, 0.4);
-      showToast('焦林炎魔：火焰连射！', 'warning');
-    } else if (b.bossId === 't4_abyss_lord') {
-      b.v5ai.t = 14;
-      const adds = exp.monsters.filter(m => m.v5add).length;
-      if (adds < 6) { spawnAdd('bat', 0.6); spawnAdd('shadow_demon', 0.5); spawnAdd('bat', 0.6); showToast('深渊领主撕开虚空！', 'warning'); }
-    } else if (b.bossId === 't2_gargoyle_lord') {
-      b.v5ai.t = 7;
-      fireVolley('#9ad8ff', 5, 0.16, 340, 0.32);
-    } else if (b.bossId === 't2_ruin_golem') {
-      b.v5ai.t = 9;
-      fireVolley('#c9a86a', 3, 0.3, 260, 0.5);
-    } else {
-      b.v5ai.t = 10;
     }
+  };
+  // Boss 投放限时陷阱
+  function bTrap(exp, key, x, y, delay) {
+    const tpl = BOSS_TRAPS[key];
+    const size = CONFIG.expedition.mapSize;
+    x = clamp(x, 40, size - 40); y = clamp(y, 40, size - 40);
+    exp.traps.push(Object.assign({}, tpl, { x, y, phase: rand(0, 6), triggerCd: delay == null ? 0.9 : delay }));
+    exp.spawnAoeEffect(x, y, tpl.radius, tpl.color);
+  }
+  // Boss 召唤小怪
+  function bAdd(exp, type, x, y, hpScale, color, opts) {
+    const data = CONFIG.monsters[type];
+    if (!data) return;
+    const size = CONFIG.expedition.mapSize;
+    x = clamp(x, 50, size - 50); y = clamp(y, 50, size - 50);
+    exp.monsters.push({
+      type, ...data, x, y,
+      hp: Math.round(data.hp * exp.balance.enemyHp * hpScale), maxHp: Math.round(data.hp * exp.balance.enemyHp * hpScale),
+      damage: Math.max(2, Math.round(data.damage * exp.balance.enemyDamage * 0.8)),
+      speed: data.speed * exp.balance.enemySpeed,
+      attackCd: rand(0.5, 2), stunned: 0, facing: 0, animTime: 0, hitFlash: 0,
+      elite: false, abilityCd: rand(1, 3), packOffset: 0, state: 'idle', stateTimer: 0,
+      v5add: true, risen: !!(opts && opts.risen),
+    });
+    exp.spawnAoeEffect(x, y, 40, color || '#c08aff');
+    exp.spawnRadialBurst(x, y, color || '#c08aff', 12);
+  }
+  const bAddCount = exp => exp.monsters.filter(m => m.v5add).length;
+  // v5.1 Boss 发射敌方弹幕（allocProjectile 只做对象池取用，必须 assign 后 push 才会真正生成）
+  function bShot(exp, b, a, speed, dmgMul, color, opt) {
+    const p = exp.allocProjectile();
+    Object.assign(p, {
+      x: b.x, y: b.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      damage: b.damage * dmgMul,
+      life: (opt && opt.life) || 4.5, radius: (opt && opt.radius) || 7,
+      fromPlayer: false, pierce: 1, color,
+    }, opt || {});
+    p.hit = p.hit || []; p.hit.length = 0;
+    exp.projectiles.push(p);
+    return p;
+  }
+  function bRing(exp, b, color, n, speed, dmgMul) {
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + rand(-0.05, 0.05);
+      bShot(exp, b, a, speed, dmgMul, color, { life: 4.5, radius: 7 });
+    }
+  }
+  // 冲锋推进（windup_charge → charge → stagger），返回 true 表示仍在冲锋流程
+  function bChargeFlow(exp, b, dt, opt) {
+    b.castTimer -= dt;
+    if (b.castState === 'windup_charge') {
+      bFace(exp, b);
+      if (Math.floor(b.castTimer * 6) !== b.ai._tick) { b.ai._tick = Math.floor(b.castTimer * 6); exp.spawnAoeEffect(b.x + Math.cos(b.facing) * 46, b.y + Math.sin(b.facing) * 46, 34, opt.color); }
+      if (b.castTimer <= 0) { bBegin(b, 'charge', opt.dur); b.ai.hit = false; b.ai.chargeCx = Math.cos(b.facing); b.ai.chargeCy = Math.sin(b.facing); exp.spawnShockRing(b.x, b.y, opt.color, 56); }
+    } else if (b.castState === 'charge') {
+      const sp = opt.speed;
+      const ox = b.x, oy = b.y;
+      exp.moveEntityWithCollisions(b, b.ai.chargeCx * sp * dt, b.ai.chargeCy * sp * dt);
+      const moved = Math.hypot(b.x - ox, b.y - oy);
+      b.facing = Math.atan2(b.ai.chargeCy, b.ai.chargeCx);
+      if (moved < sp * dt * 0.35) { exp.spawnImpact(b.x, b.y, opt.color, 1.3); bBegin(b, 'stagger', opt.stagger || 0.9); }
+      else if (!b.ai.hit && dist(exp.player, b) < b.radius + (exp.player.collisionRadius || 11) + 8) {
+        b.ai.hit = true;
+        exp.damagePlayer(b.damage * opt.dmgMul);
+        exp.player.hitStun = Math.max(exp.player.hitStun || 0, 0.3);
+        exp.player.slow = Math.max(exp.player.slow, 0.8);
+        exp.spawnImpact(exp.player.x, exp.player.y, opt.color, 1.3);
+      }
+      if (b.castTimer <= 0) bBegin(b, 'stagger', opt.stagger || 0.9);
+    } else if (b.castState === 'stagger') {
+      if (b.castTimer <= 0) { if (!opt.keepStagger) bToIdle(exp, b, opt.cdMin, opt.cdMax); }
+    }
+    return b.castState !== 'idle';
+  }
+
+  // ---------- T1-1 狂暴野猪王：震荡波 + 锁定冲锋 ----------
+  function h_boar(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_shock', 0.65); exp.spawnAoeEffect(exp.player.x, exp.player.y, rg ? 108 : 90, '#d59aff'); }
+        else { bBegin(b, 'windup_charge', rg ? 0.55 : 0.7); bToast(exp, b, '蓄力冲锋！'); }
+      }
+      return;
+    }
+    if (b.castState === 'h_shock') {
+      b.castTimer -= dt;
+      if (b.castTimer <= 0) {
+        bHazard(exp, { x: exp.player.x, y: exp.player.y, r: rg ? 110 : 92, delay: 0.06, dmg: b.damage * 0.75, color: '#d59aff', icon: '💜' });
+        bBegin(b, 'cast', 0.3);
+      }
+    } else if (b.castState === 'cast') { b.castTimer -= dt; if (b.castTimer <= 0) bToIdle(exp, b, rg ? 3 : 4, rg ? 4.5 : 6); }
+    else bChargeFlow(exp, b, dt, { color: '#ff7a4a', speed: rg ? 560 : 480, dur: rg ? 0.7 : 0.6, dmgMul: rg ? 1.2 : 1.05, stagger: 1.0, cdMin: rg ? 3 : 4, cdMax: rg ? 4.5 : 6 });
+  }
+
+  // ---------- T1-2 枯木精：树根缠绕（定身陷阱）+ 回血光环 ----------
+  function h_withered(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_root', 0.8); exp.spawnAoeEffect(exp.player.x, exp.player.y, 44, '#6f8f4e'); bToast(exp, b, '树根缠绕！'); }
+        else { bBegin(b, 'h_heal', 2.0); bToast(exp, b, '汲取大地生机'); }
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_root') {
+      if (b.castTimer <= 0) { bTrap(exp, 'root', exp.player.x, exp.player.y, 0.8); bToIdle(exp, b, 4.5, 6.5); }
+    } else if (b.castState === 'h_heal') {
+      if (Math.floor(b.castTimer * 2) !== b.ai._tick) {
+        b.ai._tick = Math.floor(b.castTimer * 2);
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.025);
+        exp.monsters.forEach(m => { if (m.hp > 0 && m !== b && dist(m, b) < 200) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.05); });
+        exp.spawnRadialBurst(b.x, b.y, '#8fd36a', 10);
+      }
+      if (b.castTimer <= 0) bToIdle(exp, b, rg ? 4 : 5.5, rg ? 6 : 8);
+    }
+  }
+
+  // ---------- T1-3 采石巨魔：抛物线投石 + 岩石护甲 ----------
+  function h_quarry(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) {
+          bBegin(b, 'h_boulder', rg ? 0.6 : 0.75);
+          bHazard(exp, { x: exp.player.x, y: exp.player.y, r: 74, delay: rg ? 0.9 : 1.1, dmg: b.damage * 1.2, color: '#b8a888', icon: '🪨', slow: 0.6 });
+          bToast(exp, b, '投石！');
+        } else { bBegin(b, 'h_armor', 0.8); bToast(exp, b, '岩石护甲'); }
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_boulder') { if (b.castTimer <= 0) { exp.spawnImpact(b.x, b.y, '#b8a888', 0.9); bToIdle(exp, b, 3.5, 5); } }
+    else if (b.castState === 'h_armor') {
+      if (b.castTimer <= 0) { b.armorUntil = performance.now() + 6000; b.armorReduce = 0.35; exp.spawnShockRing(b.x, b.y, '#9b8b78', 90); bToIdle(exp, b, 4, 6); }
+    }
+  }
+
+  // ---------- T2-1 石像鬼王：石化凝视 + 俯冲 + 散射（飞行、高速）----------
+  function h_gargoyle(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 3;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_gaze', 0.55); bToast(exp, b, '石化凝视！'); }
+        else if (b.ai.skill === 1) { bBegin(b, 'windup_charge', 0.45); }
+        else { bBegin(b, 'h_volley', 0.5); }
+      }
+      return;
+    }
+    if (b.castState === 'h_gaze') {
+      b.castTimer -= dt;
+      exp.spawnAoeEffect(b.x + Math.cos(b.facing) * 50, b.y + Math.sin(b.facing) * 50, 30, '#b9c6d9');
+      if (b.castTimer <= 0) {
+        const d = dist(exp.player, b);
+        const a = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+        let da = a - b.facing; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+        if (d < 240 && Math.abs(da) < 0.6) {
+          exp.player.slow = Math.max(exp.player.slow, 2);
+          exp.player.root = Math.max(exp.player.root || 0, 0.9);
+          exp.spawnAoeEffect(exp.player.x, exp.player.y, 50, '#b9c6d9');
+          showToast('被石化了！', 'warning');
+        }
+        bToIdle(exp, b, rg ? 2.8 : 3.5, rg ? 4 : 5);
+      }
+    } else if (b.castState === 'h_volley') {
+      b.castTimer -= dt;
+      if (b.castTimer <= 0) {
+        const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+        for (let i = 0; i < 5; i++) {
+          const a = base + (i - 2) * 0.22;
+          bShot(exp, b, a, 360, 0.6, '#b9c6d9', { life: 4, radius: 7 });
+        }
+        exp.spawnRadialBurst(b.x, b.y, '#b9c6d9', 10);
+        bToIdle(exp, b, rg ? 2.8 : 3.5, rg ? 4 : 5);
+      }
+    } else bChargeFlow(exp, b, dt, { color: '#9fb2c9', speed: 560, dur: 0.42, dmgMul: 0.95, stagger: 0.55, cdMin: rg ? 2.8 : 3.5, cdMax: rg ? 4 : 5 });
+  }
+
+  // ---------- T2-2 废墟魔像：血量分裂 + 反伤岩石护盾 + 碎石弹 ----------
+  function h_golem(exp, b, dt) {
+    const rg = bRage(b);
+    if (!b.ai.flags.split1 && b.hp / b.maxHp < 0.7) {
+      b.ai.flags.split1 = true;
+      for (let i = 0; i < 2; i++) bAdd(exp, 'stone_golem', b.x + rand(-60, 60), b.y + rand(-60, 60), 0.42, '#a89888');
+      bToast(exp, b, '崩裂分裂！');
+      exp.spawnImpact(b.x, b.y, '#a89888', 1.6);
+    }
+    if (!b.ai.flags.split2 && b.hp / b.maxHp < 0.35) {
+      b.ai.flags.split2 = true;
+      for (let i = 0; i < 2; i++) bAdd(exp, 'stone_golem', b.x + rand(-60, 60), b.y + rand(-60, 60), 0.5, '#a89888');
+      bToast(exp, b, '再次崩裂！');
+      exp.spawnImpact(b.x, b.y, '#a89888', 1.8);
+    }
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_armor', 0.8); bToast(exp, b, '反伤岩石护盾'); }
+        else bBegin(b, 'h_volley', 0.5);
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_armor' && b.castTimer <= 0) {
+      b.armorUntil = performance.now() + 7000; b.armorReduce = 0.4;
+      exp.spawnShockRing(b.x, b.y, '#8d8578', 100);
+      bToIdle(exp, b, 4, 6);
+    } else if (b.castState === 'h_volley' && b.castTimer <= 0) {
+      const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+      for (let i = 0; i < 3; i++) { const a = base + (i - 1) * 0.3; bShot(exp, b, a, 320, 0.7, '#a89888', { life: 4.5, radius: 8 }); }
+      bToIdle(exp, b, 3.5, 5);
+    }
+  }
+
+  // ---------- T3-1 沼泽巫妪：毒沼陷阱 + 改雾天 + 诅咒毒弹（纯远程风筝）----------
+  function h_hag(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_bog', 0.9); bToast(exp, b, '毒沼蔓延！'); }
+        else bBegin(b, 'h_volley', 0.6);
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_bog' && b.castTimer <= 0) {
+      for (let i = 0; i < 2; i++) bTrap(exp, 'poison', exp.player.x + rand(-110, 110), exp.player.y + rand(-110, 110), 1.0);
+      bSetWeather(exp, 'fog', 18);
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 6 : 8);
+    } else if (b.castState === 'h_volley' && b.castTimer <= 0) {
+      const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+      for (let i = 0; i < 3; i++) { const a = base + (i - 1) * 0.25; bShot(exp, b, a, 340, 0.7, '#8bd34a', { life: 4.5, radius: 7, burn: { dps: 4, dur: 2 } }); }
+      exp.spawnRadialBurst(b.x, b.y, '#8bd34a', 10);
+      bToIdle(exp, b, rg ? 3.5 : 4.5, rg ? 5.5 : 7);
+    }
+  }
+
+  // ---------- T3-2 虫母：产卵虫潮 + 吐丝网（陷阱）----------
+  function h_brood(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_spawn', 0.9); bToast(exp, b, '产卵！虫潮来袭'); }
+        else { bBegin(b, 'h_web', 0.8); exp.spawnAoeEffect(exp.player.x, exp.player.y, 48, '#e8e2f5'); bToast(exp, b, '吐丝网！'); }
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_spawn' && b.castTimer <= 0) {
+      const n = rg ? 4 : 3;
+      for (let i = 0; i < n && bAddCount(exp) < 10; i++) bAdd(exp, 'spider', b.x + rand(-80, 80), b.y + rand(-80, 80), 0.7, '#c08aff');
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 6.5 : 8);
+    } else if (b.castState === 'h_web' && b.castTimer <= 0) {
+      bTrap(exp, 'web', exp.player.x, exp.player.y, 0.8);
+      bToIdle(exp, b, rg ? 3.5 : 4.5, rg ? 5.5 : 7);
+    }
+  }
+
+  // ---------- T3-3 焦林炎魔：火雨 + 改雷暴天 + 火焰连射 ----------
+  function h_scorch(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_firestorm', 1.0); bToast(exp, b, '烈焰风暴！'); }
+        else bBegin(b, 'h_volley', 0.7);
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_firestorm' && b.castTimer <= 0) {
+      bSetWeather(exp, 'storm', 20);
+      for (let i = 0; i < 5; i++) bTrap(exp, 'fire', exp.player.x + rand(-150, 150), exp.player.y + rand(-150, 150), rand(0.9, 1.7));
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 7 : 9);
+    } else if (b.castState === 'h_volley' && b.castTimer <= 0) {
+      const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+      for (let k = 0; k < 3; k++) setTimeout(() => {
+        if (b.hp <= 0 || !exp.running) return;
+        for (let i = 0; i < 3; i++) { const a = base + (i - 1) * 0.18 + rand(-0.05, 0.05); bShot(exp, b, a, 380, 0.55, '#ff6a3c', { life: 4, radius: 7, burn: { dps: 6, dur: 2.5 } }); }
+        exp.spawnRadialBurst(b.x, b.y, '#ff6a3c', 8);
+      }, k * 180);
+      bToIdle(exp, b, rg ? 3.5 : 4.5, rg ? 5.5 : 7);
+    }
+  }
+
+  // ---------- T4-1 深渊领主：复活尸体 + 深渊领域（雾+召唤）----------
+  function bRevive(exp, b) {
+    exp._corpses = exp._corpses || [];
+    const now = performance.now();
+    exp._corpses = exp._corpses.filter(c => now - c.t < 60000);
+    let n = 0;
+    while (n < 2 && exp._corpses.length && bAddCount(exp) < 9) {
+      const c = exp._corpses.pop();
+      bAdd(exp, c.type, c.x, c.y, 0.75, '#b06bff', { risen: true });
+      n++;
+    }
+    for (; n < 2 && bAddCount(exp) < 9; n++) bAdd(exp, Math.random() < 0.5 ? 'shadow_demon' : 'bat', b.x + rand(-80, 80), b.y + rand(-80, 80), 0.8, '#b06bff');
+  }
+  function h_abyss(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_revive', 1.0); bToast(exp, b, '苏醒吧，我的仆从！'); }
+        else { bBegin(b, 'h_domain', 1.0); bToast(exp, b, '深渊领域展开！'); }
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_revive' && b.castTimer <= 0) { bRevive(exp, b); exp.spawnImpact(b.x, b.y, '#8a3bd8', 1.6); bToIdle(exp, b, rg ? 4 : 5.5, rg ? 7 : 9); }
+    else if (b.castState === 'h_domain' && b.castTimer <= 0) {
+      bSetWeather(exp, 'fog', 22);
+      const types = ['bat', 'shadow_demon', 'spider'];
+      for (let i = 0; i < 3 && bAddCount(exp) < 9; i++) bAdd(exp, types[i], b.x + rand(-100, 100), b.y + rand(-100, 100), 0.85, '#8a3bd8');
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 7 : 9);
+    }
+  }
+
+  // ---------- T4-2 时空守望：传送凝滞 + 环形弹幕齐射 ----------
+  function h_warden(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 2;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_tp', 0.6); bToast(exp, b, '时间凝滞！'); }
+        else bBegin(b, 'h_volley', 0.6);
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_tp' && b.castTimer <= 0) {
+      const a = rand(0, Math.PI * 2);
+      const size = CONFIG.expedition.mapSize;
+      b.x = clamp(exp.player.x + Math.cos(a) * 95, 50, size - 50);
+      b.y = clamp(exp.player.y + Math.sin(a) * 95, 50, size - 50);
+      exp.spawnRadialBurst(b.x, b.y, '#7fd8ff', 26);
+      exp.spawnImpact(b.x, b.y, '#7fd8ff', 1.4);
+      exp.player.slow = Math.max(exp.player.slow, 2.2);
+      bRing(exp, b, '#7fd8ff', rg ? 14 : 12, 260, 0.55);
+      bToIdle(exp, b, rg ? 3.5 : 4.5, rg ? 5.5 : 7);
+    } else if (b.castState === 'h_volley' && b.castTimer <= 0) {
+      const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+      for (let i = 0; i < 5; i++) { const aa = base + (i - 2) * 0.2; bShot(exp, b, aa, 340, 0.7, '#9fe8ff', { life: 4.5, radius: 7 }); }
+      bToIdle(exp, b, rg ? 3 : 4, rg ? 5 : 6);
+    }
+  }
+
+  // ---------- T4-3 月之祭司：月光治疗 + 夜魇（雾+召唤怨灵）+ 月光弹 ----------
+  function h_priestess(exp, b, dt) {
+    const rg = bRage(b);
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) {
+        b.ai.skill = ((b.ai.skill || 0) + 1) % 3;
+        bFace(exp, b);
+        if (b.ai.skill === 0) { bBegin(b, 'h_heal', 1.2); bToast(exp, b, '月光治愈'); }
+        else if (b.ai.skill === 1) { bBegin(b, 'h_night', 0.9); bToast(exp, b, '夜魇降临！'); }
+        else bBegin(b, 'h_volley', 0.6);
+      }
+      return;
+    }
+    b.castTimer -= dt;
+    if (b.castState === 'h_heal' && b.castTimer <= 0) {
+      exp.monsters.forEach(m => { if (m.hp > 0 && dist(m, b) < 260) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.12); });
+      b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.04);
+      exp.spawnRadialBurst(b.x, b.y, '#d9e6ff', 24);
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 7 : 9);
+    } else if (b.castState === 'h_night' && b.castTimer <= 0) {
+      bSetWeather(exp, 'fog', 16);
+      for (let i = 0; i < 2 && bAddCount(exp) < 8; i++) bAdd(exp, 'bat', b.x + rand(-80, 80), b.y + rand(-80, 80), 0.9, '#d9e6ff');
+      bToIdle(exp, b, rg ? 4 : 5.5, rg ? 7 : 9);
+    } else if (b.castState === 'h_volley' && b.castTimer <= 0) {
+      const base = Math.atan2(exp.player.y - b.y, exp.player.x - b.x);
+      for (let i = 0; i < 4; i++) { const aa = base + (i - 1.5) * 0.2; bShot(exp, b, aa, 330, 0.65, '#d9e6ff', { life: 4.5, radius: 7 }); }
+      bToIdle(exp, b, rg ? 3.5 : 4.5, rg ? 6 : 8);
+    }
+  }
+
+  // ---------- T4-4 竞技场冠军：三段连招 + 50%血狂暴二阶段（纯近战）----------
+  function h_champion(exp, b, dt) {
+    if (!b.ai.flags.rage && b.hp / b.maxHp < 0.5) {
+      b.ai.flags.rage = true;
+      b.speed *= 1.25; b.damage *= 1.2;
+      b.ai.cd = 2.5;
+      exp.screenShake = Math.max(exp.screenShake || 0, 0.8);
+      exp.spawnImpact(b.x, b.y, '#ff4a4a', 2);
+      bToast(exp, b, '狂暴决斗姿态！');
+    }
+    const rg = b.ai.flags.rage;
+    if (b.castState === 'idle') {
+      b.ai.cd -= dt;
+      if (b.ai.cd <= 0) { bFace(exp, b); b.ai.combo = 1; bBegin(b, 'windup_charge', 0.4); bToast(exp, b, '决斗连招！'); }
+      return;
+    }
+    // 第1段：突刺
+    if (b.ai.combo === 1) {
+      if (b.castState === 'windup_charge' || b.castState === 'charge' || b.castState === 'stagger') {
+        bChargeFlow(exp, b, dt, { color: '#ffb04a', speed: 520, dur: 0.3, dmgMul: 0.9, stagger: 0.02, keepStagger: true, cdMin: 1, cdMax: 1 });
+        if (b.castState === 'stagger' && b.castTimer <= 0) { b.ai.combo = 2; bBegin(b, 'h_sweep', 0.45); exp.spawnAoeEffect(b.x, b.y, 108, '#ffd96a'); }
+        return;
+      }
+    }
+    // 第2段：横扫
+    if (b.ai.combo === 2) {
+      b.castTimer -= dt;
+      if (b.castTimer <= 0) {
+        bHazard(exp, { x: b.x, y: b.y, r: 112, delay: 0.06, dmg: b.damage * 1.1, color: '#ffd96a', icon: '🌀' });
+        exp.spawnShockRing(b.x, b.y, '#ffd96a', 112);
+        b.ai.combo = 3;
+        bBegin(b, 'h_slam', 0.6);
+        exp.spawnAoeEffect(exp.player.x, exp.player.y, 100, '#ff5a4a');
+      }
+      return;
+    }
+    // 第3段：跳劈
+    if (b.ai.combo === 3) {
+      b.castTimer -= dt;
+      if (b.castTimer <= 0) {
+        const size = CONFIG.expedition.mapSize;
+        bHazard(exp, { x: exp.player.x, y: exp.player.y, r: 100, delay: 0.4, dmg: b.damage * 1.4, color: '#ff5a4a', icon: '💥', slow: 1.2 });
+        b.x = clamp(exp.player.x + rand(-40, 40), 50, size - 50);
+        b.y = clamp(exp.player.y + rand(-40, 40), 50, size - 50);
+        exp.spawnImpact(b.x, b.y, '#ff5a4a', 2);
+        exp.screenShake = Math.max(exp.screenShake || 0, 0.6);
+        bBegin(b, 'stagger', 1.0);
+        b.ai.combo = 0;
+        return;
+      }
+    }
+    if (b.castState === 'stagger' && b.castTimer <= 0) bToIdle(exp, b, rg ? 3.2 : 5, rg ? 4.5 : 7);
+  }
+
+  const BOSS_HANDLERS = {
+    t1_boar_king: h_boar, t1_withered: h_withered, t1_quarry: h_quarry,
+    t2_gargoyle_lord: h_gargoyle, t2_ruin_golem: h_golem,
+    t3_swamp_hag: h_hag, t3_brood_mother: h_brood, t3_scorch_demon: h_scorch,
+    t4_abyss_lord: h_abyss, t4_time_warden: h_warden, t4_moon_priestess: h_priestess,
+    t4_arena_champion: h_champion,
+  };
+
+  V5.tickBoss = function (exp, dt) {
+    if (!exp.bossHazards) exp.bossHazards = [];
+    V5.updateBossHazards(exp, dt);
+    if (!exp.boss || exp.boss.hp <= 0) return;
+    const b = exp.boss;
+    if (!b.ai) b.ai = { cd: rand(2.5, 4), skill: 0, combo: 0, flags: {} };
+    b.ai.flags = b.ai.flags || {};
+    if (b.ai.skill == null) b.ai.skill = 0;
+    // 岩石护盾反伤光环
+    if (b.armorUntil && b.armorUntil > performance.now()) {
+      b.ai.armorTick = (b.ai.armorTick || 0) - dt;
+      if (b.ai.armorTick <= 0 && dist(exp.player, b) < 95) {
+        b.ai.armorTick = 0.5;
+        exp.damagePlayer(b.damage * 0.1);
+        exp.spawnRadialBurst(b.x, b.y, '#9b8b78', 5);
+      }
+    }
+    const handler = BOSS_HANDLERS[b.bossId];
+    if (handler) handler(exp, b, dt);
   };
 
   V5.makeBoss = function (exp) {

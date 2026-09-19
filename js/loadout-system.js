@@ -95,30 +95,62 @@ const LoadoutSystem = {
     return (GameState.weaponInstances || []).filter(w => w.weaponId === weaponId).length;
   },
 
-  craftWeapon(weaponId) {
+  // v5.1 每单位材料折算修为（用修为抵扣材料，金币仍需支付）
+  CULT_PER_MAT: { wood: 40, stone: 30, fiber: 20, iron: 60, refined_iron: 240, crystal: 200, venom: 80, carapace: 80, soul_ash: 150, bossFang: 800 },
+  // v5.1 打造费用（唯一数据源，game.js 铁匠铺 UI 与测试/数据表均引用此处）
+  CRAFT_COSTS: {
+    harvest_sickle: { gold: 100, materials: { wood: 3, iron: 2 } },
+    pea_repeater: { gold: 150, materials: { wood: 5, iron: 3 } },
+    vine_staff: { gold: 200, materials: { wood: 8, crystal: 2 } },
+    throwing_knife: { gold: 500, materials: { iron: 10, crystal: 3 } },
+    flame_bow: { gold: 1000, materials: { wood: 15, iron: 8, crystal: 5 } }
+  },
+  // v5.1 武器 1→10 级升级费用（索引 = 当前等级）
+  UPGRADE_COSTS: [
+    { gold: 200, materials: { iron: 3 } },
+    { gold: 400, materials: { iron: 5 } },
+    { gold: 700, materials: { iron: 8, crystal: 1 } },
+    { gold: 1000, materials: { iron: 12, crystal: 2 } },
+    { gold: 1500, materials: { iron: 20, crystal: 4 } },
+    { gold: 2200, materials: { iron: 30, crystal: 6 } },
+    { gold: 3000, materials: { iron: 40, crystal: 8, bossFang: 1 } },
+    { gold: 4000, materials: { iron: 50, crystal: 12, bossFang: 1 } },
+    { gold: 5500, materials: { iron: 70, crystal: 18, bossFang: 2 } },
+    { gold: 8000, materials: { iron: 100, crystal: 25, bossFang: 3 } }
+  ],
+  matName(mat) {
+    const r = (typeof CONFIG !== 'undefined' && CONFIG.resources && CONFIG.resources[mat]) || (typeof CONFIG !== 'undefined' && CONFIG.materials && CONFIG.materials[mat]);
+    return r ? r.name : mat;
+  },
+  getCultivationCost(cost) {
+    let total = 0;
+    Object.entries(cost.materials || {}).forEach(([mat, n]) => { total += (this.CULT_PER_MAT[mat] || 100) * n; });
+    return Math.round(total);
+  },
+
+  craftWeapon(weaponId, mode) {
     const wpn = CONFIG.weapons.find(w => w.id === weaponId);
     if (!wpn) return;
     if (wpn.blueprint && !(GameState.blueprints && GameState.blueprints.includes(weaponId))) {
       showToast('未解锁蓝图！', 'warning'); return;
     }
-    const costs = {
-      harvest_sickle: { gold: 100, materials: { wood: 3, iron: 2 } },
-      pea_repeater: { gold: 150, materials: { wood: 5, iron: 3 } },
-      vine_staff: { gold: 200, materials: { wood: 8, crystal: 2 } },
-      throwing_knife: { gold: 500, materials: { iron: 10, crystal: 3 } },
-      flame_bow: { gold: 1000, materials: { wood: 15, iron: 8, crystal: 5 } }
-    };
-    const cost = costs[weaponId];
+    const cost = this.CRAFT_COSTS[weaponId];
     if (!cost) { showToast('无法打造', 'warning'); return; }
     if (GameState.gold < cost.gold) { showToast('金币不足', 'warning'); return; }
-    for (const [mat, need] of Object.entries(cost.materials)) {
-      const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
-      if (have < need) { showToast(`材料不足：需要 ${mat}×${need}`, 'warning'); return; }
+    if (mode === 'cult') {
+      const cultNeed = this.getCultivationCost(cost);
+      if ((GameState.cultivation || 0) < cultNeed) { showToast(`修为不足（需要 ${cultNeed} 修为抵扣全部材料）`, 'warning'); return; }
+      GameState.cultivation -= cultNeed;
+    } else {
+      for (const [mat, need] of Object.entries(cost.materials)) {
+        const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
+        if (have < need) { showToast(`材料不足：需要 ${this.matName(mat)}×${need}（也可用修为抵扣）`, 'warning'); return; }
+      }
+      for (const [mat, need] of Object.entries(cost.materials)) {
+        GameState.warehouse.materials[mat] -= need;
+      }
     }
     GameState.gold -= cost.gold;
-    for (const [mat, need] of Object.entries(cost.materials)) {
-      GameState.warehouse.materials[mat] -= need;
-    }
     const inst = { uid: this._nextUid(), weaponId, level: 0 };
     GameState.weaponInstances.push(inst);
     showToast(`🔨 打造完成：${wpn.name}！已入库`, 'gold');
@@ -145,35 +177,30 @@ const LoadoutSystem = {
   getUpgradeCost(uid) {
     const inst = this.getWeaponInstance(uid);
     if (!inst || inst.level >= 10) return null; // v1.1 每把武器可升10级
-    const costs = [
-      { gold: 200, materials: { iron: 3 } },
-      { gold: 400, materials: { iron: 5 } },
-      { gold: 700, materials: { iron: 8, crystal: 1 } },
-      { gold: 1000, materials: { iron: 12, crystal: 2 } },
-      { gold: 1500, materials: { iron: 20, crystal: 4 } },
-      { gold: 2200, materials: { iron: 30, crystal: 6 } },
-      { gold: 3000, materials: { iron: 40, crystal: 8, bossFang: 1 } },
-      { gold: 4000, materials: { iron: 50, crystal: 12, bossFang: 1 } },
-      { gold: 5500, materials: { iron: 70, crystal: 18, bossFang: 2 } },
-      { gold: 8000, materials: { iron: 100, crystal: 25, bossFang: 3 } }
-    ];
-    return costs[inst.level];
+    return this.UPGRADE_COSTS[inst.level];
   },
 
-  upgradeWeapon(uid) {
+  upgradeWeapon(uid, mode) {
     const inst = this.getWeaponInstance(uid);
     if (!inst) { showToast('武器不存在', 'warning'); return; }
     const cost = this.getUpgradeCost(uid);
     if (!cost) { showToast('已满级(10级)', 'warning'); return; }
     if (GameState.gold < cost.gold) { showToast('金币不足', 'warning'); return; }
-    for (const [mat, need] of Object.entries(cost.materials)) {
-      const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
-      if (have < need) { showToast(`材料不足：需要 ${mat}×${need}`, 'warning'); return; }
+    if (mode === 'cult') {
+      const cultNeed = this.getCultivationCost(cost);
+      if ((GameState.cultivation || 0) < cultNeed) { showToast(`修为不足（需要 ${cultNeed} 修为抵扣全部材料）`, 'warning'); return; }
+      GameState.cultivation -= cultNeed;
+      showToast(`消耗 ${cultNeed} 修为抵扣材料`, '');
+    } else {
+      for (const [mat, need] of Object.entries(cost.materials)) {
+        const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
+        if (have < need) { showToast(`材料不足：需要 ${this.matName(mat)}×${need}（也可用修为抵扣）`, 'warning'); return; }
+      }
+      for (const [mat, need] of Object.entries(cost.materials)) {
+        GameState.warehouse.materials[mat] -= need;
+      }
     }
     GameState.gold -= cost.gold;
-    for (const [mat, need] of Object.entries(cost.materials)) {
-      GameState.warehouse.materials[mat] -= need;
-    }
     inst.level++;
     const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
     if (!GameState.forgedWeapons.includes(inst.weaponId)) GameState.forgedWeapons.push(inst.weaponId);

@@ -59,12 +59,17 @@ Object.assign(Expedition.prototype, {
       const bossScale2 = this.getDepthScale(monster.y) * (1 + Math.sin(monster.animTime * 2.2) * .018);
       const drawW = 200 * bossScale2;
       const drawH = drawW * bossImg.naturalHeight / bossImg.naturalWidth;
-      if (monster.castState === 'windup') {
-        const w = Math.sin(monster.castTimer * 26);
+      const _channeling = monster.castState && (monster.castState.indexOf('windup') === 0 || monster.castState.indexOf('h_') === 0);
+      if (_channeling) {
+        const w = Math.sin((monster.castTimer || 0) * 26);
         ctx.translate(w * 2.4, -5 + w * 2);
-        ctx.shadowColor = '#ff9a4a';
-        ctx.shadowBlur = 16 + (Math.sin(monster.castTimer * 30) + 1) * 10;
+        ctx.shadowColor = monster.castState === 'windup_charge' ? '#ff5a3c' : '#c07aff';
+        ctx.shadowBlur = 16 + (Math.sin((monster.castTimer || 0) * 30) + 1) * 10;
         ctx.globalAlpha = .95;
+      } else if (monster.castState === 'charge') {
+        ctx.shadowColor = '#ff7a4a'; ctx.shadowBlur = 22; ctx.globalAlpha = .95;
+      } else if (monster.castState === 'stagger') {
+        ctx.globalAlpha = .78;
       }
       ctx.translate(0, Math.sin(monster.animTime * 2.2) * 1.5);
       if (monster.hitFlash > 0) { ctx.shadowColor = '#fff4cf'; ctx.shadowBlur = 24; ctx.globalAlpha = .92; }
@@ -102,13 +107,17 @@ Object.assign(Expedition.prototype, {
         const k = Math.sin((monster.attackAnim / 0.34) * Math.PI);
         ctx.translate(Math.cos(monster.facing || 0) * 7 * k, 0);
         ctx.rotate(k * 0.14);
-      } else if (monster.castState === 'windup') {
-        const w = Math.sin(monster.castTimer * 26);
+      } else if (monster.castState && (monster.castState.indexOf('windup') === 0 || monster.castState.indexOf('h_') === 0)) {
+        const w = Math.sin((monster.castTimer || 0) * 26);
         ctx.translate(w * 2.4, -5 + w * 2);
         ctx.rotate(w * 0.05);
-        ctx.shadowColor = '#ff9a4a';
-        ctx.shadowBlur = 16 + (Math.sin(monster.castTimer * 30) + 1) * 10;
+        ctx.shadowColor = monster.castState === 'windup_charge' ? '#ff5a3c' : '#c07aff';
+        ctx.shadowBlur = 16 + (Math.sin((monster.castTimer || 0) * 30) + 1) * 10;
         ctx.globalAlpha = .93;
+      } else if (monster.castState === 'charge') {
+        ctx.shadowColor = '#ff7a4a'; ctx.shadowBlur = 22; ctx.globalAlpha = .95;
+      } else if (monster.castState === 'stagger') {
+        ctx.globalAlpha = .78;
       } else if (monster.castState === 'cast') {
         ctx.translate(Math.cos(monster.facing || 0) * 6, 0);
       }
@@ -638,6 +647,7 @@ Object.assign(Expedition.prototype, {
     this.renderGroundLayer(ctx, cam);    // 天气雾遮罩/野生植物/分层地形/脚印/地图边界
     this.renderPauseOverlay(ctx);
     this.renderTraps(ctx, cam);
+    this.renderBossHazards(ctx, cam);
     this.renderGroundLoot(ctx, cam);
     this.renderNutrientCrystals(ctx, cam);
     this.renderLowHealthPulse(ctx);
@@ -735,6 +745,31 @@ Object.assign(Expedition.prototype, {
       ctx.globalAlpha = 1;
     });
   },
+  // v5.1 Boss 延迟范围打击预警圈（收缩动画 + 图标，引爆前闪烁）
+  renderBossHazards(ctx, cam) {
+    if (!this.bossHazards || !this.bossHazards.length) return;
+    this.bossHazards.forEach(h => {
+      const sx = h.x - cam.x, sy = h.y - cam.y;
+      if (sx < -120 || sy < -120 || sx > this.canvas.width + 120 || sy > this.canvas.height + 120) return;
+      const frac = Math.max(0, Math.min(1, h.t / h.delay));
+      const r = h.r * (0.35 + 0.65 * frac);
+      const blink = h.t < 0.45 ? (Math.floor(h.t * 12) % 2 === 0 ? 1 : 0.45) : 0.85;
+      ctx.save();
+      ctx.globalAlpha = blink;
+      ctx.fillStyle = h.color + '22';
+      ctx.strokeStyle = h.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = blink;
+      ctx.strokeStyle = h.color + '88';
+      ctx.beginPath(); ctx.arc(sx, sy, h.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '22px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(h.icon, sx, sy);
+      ctx.restore();
+    });
+  },
+
   renderGroundLoot(ctx, cam) {
     // 地面战利品：进入固定近战攻击范围后自动拾取。
     const nowSeconds = performance.now() / 1000;
@@ -1452,27 +1487,7 @@ Object.assign(Expedition.prototype, {
         this.spawnAoeEffect(monster.x, monster.y, 42, '#e9a15e');
       } else if (monster.type === 'boss') {
         monster.phase = monster.hp / monster.maxHp < .5 ? 2 : 1;
-        if (monster.castState === 'idle') {
-          monster.castState = 'windup';
-          monster.castTimer = 0.55;
-          monster.castIndex = (monster.castIndex || 0) % 4;
-          monster.abilityCd = (monster.phase === 2 ? 2.6 : 4.0) + 0.8;
-          this.spawnBossTelegraph(monster);
-        } else if (monster.castState === 'windup') {
-          monster.castTimer -= dt;
-          if (monster.castTimer <= 0) {
-            monster.castState = 'cast';
-            monster.castTimer = 0.3;
-            const dd = dist(monster, this.player);
-            const aa = Math.atan2(this.player.y - monster.y, this.player.x - monster.x);
-            this.castBossAbility(monster, dd, aa);
-            this.spawnShockRing(monster.x, monster.y, '#ffd9a0', 96);
-            this.spawnImpact(monster.x, monster.y, '#fff2c0', 1.5);
-          }
-        } else if (monster.castState === 'cast') {
-          monster.castTimer -= dt;
-          if (monster.castTimer <= 0) monster.castState = 'idle';
-        }
+        // v5.1 Boss 技能由 V5.tickBoss 差异化状态机驱动（12 只 Boss 独立技能组）
       }
     });
   },

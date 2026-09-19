@@ -533,6 +533,9 @@ Object.assign(Expedition.prototype, {
     this.skillCooldowns[idx] = skill.cooldown;
     this.skillFlashes[idx] = 0.28;
     AudioManager.playSkill(skill.id);
+    // v5.1 立即刷新技能栏（HUD 有 0.25s 节流，先归零强制重绘），冷却环/能量实时显示
+    this.hudTimer = 0;
+    this.updateHUD();
 
     const px = this.player.x, py = this.player.y;
     // 鼠标方向
@@ -1133,9 +1136,9 @@ Object.assign(Expedition.prototype, {
     if (plant) {
       loot.push({ type: 'plant_seed', name: plant.name + '防线种子', amount: 1, icon: plant.icon, plantId: plant.id });
     }
-    // 材料
+    // 泥土（庄园资源）
     if (Math.random() < 0.4) {
-      loot.push({ type: 'material', name: '建材', amount: randInt(1, 3), icon: '📦' });
+      loot.push({ type: 'material', name: '泥土', amount: randInt(1, 3), icon: '🟫', matId: 'soil' });
     }
     // 消耗品
     if (Math.random() < 0.3) {
@@ -1238,6 +1241,15 @@ Object.assign(Expedition.prototype, {
       }
     });
     this.cleanup();
+    // v5.1 携带消耗品结算：未使用的归还仓库（含远征中拾取的同类消耗品），并清空本次携带配置
+    if (GameState.loadout) {
+      CONFIG.consumables.forEach(c => {
+        const left = this.consumables ? (this.consumables[c.id] || 0) : 0;
+        if (left > 0) Warehouse.addItem(c.id, left);
+        GameState.loadout[c.id] = 0;
+        delete GameState.loadout[c.id];
+      });
+    }
     // 培育结算（基础+10 / 存活+40 / 被毁-30，首杀-15）
     this.applyPlantGrowthSettlement();
     // 计算结算
@@ -1463,6 +1475,7 @@ Object.assign(Expedition.prototype, {
   damageEnemy(target, amount, color = '#ffffff', heavy = false, hitInfo = null) {
     if (!target || target.hp <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
+    if (target.armorUntil && target.armorUntil > performance.now()) amount *= (1 - (target.armorReduce || 0.35)); // v5.1 Boss 岩石护甲
     const isBoss = target.type === 'boss';
     const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;
     if (fromPlayer && typeof CombatEnhancement !== 'undefined') {
@@ -1724,6 +1737,21 @@ Object.assign(Expedition.prototype, {
         } else {
           m.state = 'idle';
         }
+      } else if (canSee && m.type === 'boss' && m.castState && m.castState !== 'idle') {
+        // v5.1 Boss 施法/冲锋/连招期间由 V5 Boss 状态机接管，通用 AI 停手
+        m.state = 'idle';
+        return;
+      } else if (canSee && m.type === 'boss' && m.ranged) {
+        // v5.1 纯远程 Boss 保持距离（风筝）
+        const angle = Math.atan2(this.player.y - m.y, this.player.x - m.x);
+        m.facing = angle;
+        if (d < 250) {
+          m.state = 'move';
+          this.moveEntityWithCollisions(m, -Math.cos(angle) * m.speed * slowMul * dt, -Math.sin(angle) * m.speed * slowMul * dt);
+        } else if (d > 460) {
+          m.state = 'move';
+          this.moveEntityWithCollisions(m, Math.cos(angle) * m.speed * slowMul * dt, Math.sin(angle) * m.speed * slowMul * dt);
+        } else m.state = 'idle';
       } else if (canSee) {
         // 追击
         const angle = Math.atan2(this.player.y - m.y, this.player.x - m.x);
@@ -1781,8 +1809,8 @@ Object.assign(Expedition.prototype, {
           this.spawnGroundLoot({ type: 'gold', name: '首领赏金', amount: 150 * this.map.tier, icon: '💰' }, m.x - 18, m.y);
           showToast(`首领「${m.name}」已击败，撤离奖励提升`, 'success');
           if (typeof AchievementSystem !== 'undefined') AchievementSystem.trackEvent('boss', 't'+this.map.tier);
-          // v1.0 Boss 掉蓝图/高级材料
-          this.spawnGroundLoot({ type: 'material', name: 'Boss獠牙', amount: 1, icon: '🦷', matId: 'bossFang' }, m.x, m.y+15);
+          // v5.1 Boss 不再掉落打造材料（材料改由农作物产出），改为稳定补给
+          this.spawnGroundLoot({ type: 'consumable', name: '草药包扎包', amount: randInt(1, 2), icon: '💊', id: 'herb_kit' }, m.x, m.y+15);
           this.boss = null;
         }
         // v2.0 法杖Lv7 击杀小爆炸
@@ -1810,13 +1838,11 @@ Object.assign(Expedition.prototype, {
         if (Math.random() < 0.5) {
           this.spawnGroundLoot({ type: 'gold', name: '金币', amount: (m.gold || 5) + randInt(0, 5), icon: '💰' }, m.x, m.y);
         }
+        // v5.1 打造材料只能从农作物获得，怪物只掉消耗品与金币
         const dropTable = [
-          { type: 'consumable', name: '草药包', id: 'herb_kit', icon: '💊', weight: 0.15 },
-          { type: 'consumable', name: '信号弹', id: 'signal_flare', icon: '🔥', weight: 0.08 },
-          { type: 'consumable', name: '荆棘狂潮', id: 'thorn_storm', icon: '🌵', weight: 0.06 },
-          { type: 'material', name: '硬木', matId: 'wood', icon: '🪵', amount: randInt(1,2), weight: 0.25 },
-          { type: 'material', name: '铁块', matId: 'iron', icon: '⛓️', amount: randInt(1,3), weight: 0.2 },
-          { type: 'material', name: '灵晶', matId: 'crystal', icon: '💎', amount: 1, weight: 0.08 }
+          { type: 'consumable', name: '草药包', id: 'herb_kit', icon: '💊', weight: 0.22 },
+          { type: 'consumable', name: '信号弹', id: 'signal_flare', icon: '🔥', weight: 0.1 },
+          { type: 'consumable', name: '荆棘狂潮', id: 'thorn_storm', icon: '🌵', weight: 0.08 }
         ];
         for (const d of dropTable) {
           if (Math.random() < d.weight) {
@@ -1825,7 +1851,7 @@ Object.assign(Expedition.prototype, {
         }
         if (m.elite) {
           if (Math.random() < 0.5) this.spawnGroundLoot({ type: 'gold', name: '精英赏金', amount: randInt(30,80), icon: '💰' }, m.x, m.y-10);
-          if (Math.random() < 0.3) this.spawnGroundLoot({ type: 'material', name: '灵晶', amount: randInt(1,2), icon: '💎', matId: 'crystal' }, m.x+10, m.y+10);
+          if (Math.random() < 0.5) this.spawnGroundLoot({ type: 'gold', name: '精英赏金', amount: randInt(20,50), icon: '💰' }, m.x+10, m.y+10);
         }
         // v1.0 精英/Boss 掉临时武器
         if (m.elite && Math.random() < 0.5 && typeof LoadoutSystem !== 'undefined') {

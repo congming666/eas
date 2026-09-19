@@ -1025,6 +1025,8 @@ Object.assign(Expedition.prototype, {
     if (this.keys['d']) dx += 1;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len > 0) { dx /= len; dy /= len; }
+    // v5.1 被树根/蛛网定身时无法移动
+    if (this.player.root > 0) { dx = 0; dy = 0; }
 
     let speed = CONFIG.player.speed;
     if (this.keys['shift'] && this.player.energy > 1) {
@@ -1161,7 +1163,7 @@ Object.assign(Expedition.prototype, {
           pr.looted = true;
           // 50% 给材料，50% 给临时武器
           if (Math.random() < 0.5) {
-            this.spawnGroundLoot({ type: 'material', id: 'iron', matId: 'iron', name: '铁块', amount: randInt(2,5), icon: '⛓️' }, pr.x, pr.y);
+            this.spawnGroundLoot({ type: 'gold', name: '矿脉赏金', amount: randInt(15,40), icon: '💰' }, pr.x, pr.y);
           } else {
             this.spawnGroundLoot({ type: 'gold', name: '金币', amount: randInt(20,50), icon: '💰' }, pr.x, pr.y);
           }
@@ -1181,18 +1183,23 @@ Object.assign(Expedition.prototype, {
     }
   },
   updateTraps(dt) {
-    // 环境陷阱
-    this.traps.forEach(trap => {
+    // 环境陷阱（v5.1：支持定身 root、Boss 投放陷阱限时存在）
+    for (let ti = this.traps.length - 1; ti >= 0; ti--) {
+      const trap = this.traps[ti];
       trap.triggerCd = Math.max(0, trap.triggerCd - dt);
       trap.phase += dt;
+      if (trap.life != null) { trap.life -= dt; if (trap.life <= 0) { this.traps.splice(ti, 1); continue; } }
       if (trap.triggerCd <= 0 && dist(this.player, trap) < trap.radius) {
         trap.triggerCd = trap.cooldown;
-        if (this.player.invuln <= 0) this.player.slow = Math.max(this.player.slow, trap.slow);
-        this.damagePlayer(trap.damage + Math.max(0, this.map.tier - 1) * 2);
+        if (this.player.invuln <= 0) {
+          this.player.slow = Math.max(this.player.slow, trap.slow);
+          if (trap.root) this.player.root = Math.max(this.player.root || 0, trap.root);
+        }
+        if (trap.damage > 0) this.damagePlayer(trap.damage + Math.max(0, this.map.tier - 1) * 2);
         this.spawnAoeEffect(trap.x, trap.y, trap.radius, trap.color);
         showToast(`触发陷阱：${trap.name}！`, 'warning');
       }
-    });
+    }
   },
   updateCamera() {
     const size = CONFIG.expedition.mapSize;

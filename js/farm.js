@@ -1,10 +1,13 @@
 const Farm = {
+  PLOT_COUNT: 48,
   init() {
-    if (GameState.farmPlots.length === 36) return;
-    GameState.farmPlots = [];
-    for (let i = 0; i < 36; i++) {
+    // v5.1 农田扩至 48 格（旧档 36 格自动补齐，不重置已有作物）
+    const FARM_PLOT_COUNT = this.PLOT_COUNT;
+    while (GameState.farmPlots.length < FARM_PLOT_COUNT) {
       GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null, moisture: 80, quality: 'common', harvestCount: 0, fertilized: false });
     }
+    if (GameState.farmPlots.length > FARM_PLOT_COUNT) GameState.farmPlots.length = FARM_PLOT_COUNT;
+    if (!GameState.unlockedPlots || GameState.unlockedPlots > FARM_PLOT_COUNT) GameState.unlockedPlots = Math.min(GameState.unlockedPlots || 8, FARM_PLOT_COUNT);
     if (!GameState.weather) { GameState.weather = 'sunny'; GameState.weatherTimer = 120; }
     if (!GameState.season) { GameState.season = 'spring'; GameState.seasonDay = 1; }
     if (!GameState.workshopLevel) GameState.workshopLevel = 1;
@@ -29,10 +32,11 @@ const Farm = {
 
   render() {
     const grid = document.getElementById('farmGrid');
+    if (!grid) return; // 农场屏不在 DOM 时（准备大厅/远征）定时渲染直接跳过
     grid.innerHTML = '';
     const now = Date.now();
     const title = document.querySelector('.farm-grid-title');
-    if (title) title.textContent = `农田 ${GameState.unlockedPlots}/36（点击状态图标照料作物，点击锁定格扩建）`;
+    if (title) title.textContent = `农田 ${GameState.unlockedPlots}/${this.PLOT_COUNT}（点击状态图标照料作物，点击锁定格扩建）`;
     GameState.farmPlots.forEach((plot, idx) => {
       const cell = document.createElement('div');
       cell.className = 'farm-cell';
@@ -40,7 +44,7 @@ const Farm = {
         const cost = this.getUnlockCost(idx);
         cell.classList.add('locked');
         if (idx === GameState.unlockedPlots) cell.classList.add('next-unlock');
-        cell.innerHTML = `<div class="plot-lock">🔒<div class="plot-cost">${idx === GameState.unlockedPlots ? `💰${cost.gold}${cost.materials ? ` · 📦${cost.materials}` : ''}` : '依次扩建'}</div></div>`;
+        cell.innerHTML = `<div class="plot-lock">🔒<div class="plot-cost">${idx === GameState.unlockedPlots ? `💰${cost.gold}${cost.fiber ? ` · 🌾纤维×${cost.fiber}` : ''}` : '依次扩建'}</div></div>`;
         cell.onclick = () => this.unlockPlot(idx);
         grid.appendChild(cell);
         return;
@@ -72,10 +76,13 @@ const Farm = {
     });
     document.getElementById('goldDisplay').textContent = GameState.gold;
     document.getElementById('seedDisplay').textContent = Warehouse.getCount('seeds');
-    document.getElementById('materialDisplay').textContent = Warehouse.getCount('materials');
+    let _matTotal = 0;
+    if (window.ResourceSystem && CONFIG.resources) { Object.keys(CONFIG.resources).forEach(id => { _matTotal += ResourceSystem.count(id); }); }
+    document.getElementById('materialDisplay').textContent = _matTotal;
     const catalystCount = document.getElementById('growthCatalystCount');
     if (catalystCount) catalystCount.textContent = Warehouse.getCount('growth_catalyst');
     this.renderCropSelector();
+    this.renderCropDetail();
     RewardSystem.render();
   },
 
@@ -92,7 +99,7 @@ const Farm = {
       html += `<div style="padding:8px;margin:4px 0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
         <span style="color:#${crop.rarity==='legendary'?'ffd700':crop.rarity==='rare'?'bb88ff':'#ddd'}">${crop.icon} ${crop.name}</span>
         <span style="display:flex;align-items:center;gap:8px;">
-          <span style="color:#888;font-size:11px;">${crop.growTime}秒 · 卖${crop.sellPrice}金</span>
+          <span style="color:#9fd8ff;font-size:11px;" title="${this.yieldDetail(crop).replace(/\n/g,'&#10;')}">${this.yieldSummary(crop)}</span>
           <button class="secondary-btn" style="font-size:11px;" onclick="Farm.plantFromPicker(${idx}, '${crop.id}')">种植</button>
         </span>
       </div>`;
@@ -104,6 +111,51 @@ const Farm = {
     overlay.innerHTML = html;
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     document.body.appendChild(overlay);
+  },
+
+  // ===== v5.1 作物产出说明（材料数据来自 CONFIG.cropMaterials，由 v5.js 注册）=====
+  materialYield(cropId) {
+    const list = (CONFIG.cropMaterials && CONFIG.cropMaterials[cropId]) || [];
+    return list.map(([mid, prob, qty]) => {
+      const r = (CONFIG.resources && CONFIG.resources[mid]) || (CONFIG.materials && CONFIG.materials[mid]) || { icon: '📦', name: mid };
+      const pTxt = prob >= 1 ? '必出' : `${Math.round(prob * 100)}%`;
+      return `${r.icon}${r.name} ${pTxt}×${qty}`;
+    });
+  },
+
+  yieldSummary(crop) {
+    const parts = [`💰${crop.sellPrice}`];
+    if (crop.cultivation) parts.push(`🧘${crop.cultivation}`);
+    const mats = this.materialYield(crop.id);
+    mats.slice(0, 2).forEach(m => { const a = m.split(' '); parts.push(a[0] + ' ' + a[1]); });
+    return `${crop.growTime}秒 · ` + parts.join(' · ');
+  },
+
+  yieldDetail(crop) {
+    const lines = [`${crop.growTime}秒成熟 · 售价 ${crop.sellPrice} 金币`];
+    if (crop.rewardLabel) lines.push(`产出：${crop.rewardLabel}`);
+    if (crop.cultivation) lines.push(`修为：${crop.cultivation} 点/株（高品质加成）`);
+    const mats = this.materialYield(crop.id);
+    if (mats.length) lines.push(`打造材料：${mats.join('、')}`);
+    if (crop.description) lines.push(crop.description);
+    if (crop.desc) lines.push(crop.desc);
+    return lines.join('\n');
+  },
+
+  renderCropDetail() {
+    const box = document.getElementById('cropDetailPanel');
+    if (!box) return;
+    const crop = CONFIG.crops.find(c => c.id === GameState.selectedCrop);
+    if (!crop) { box.innerHTML = ''; return; }
+    const mats = this.materialYield(crop.id);
+    const buffTxt = crop.description || crop.desc || '';
+    box.innerHTML = `
+      <div class="crop-detail-title">${crop.icon} ${crop.name} <span style="color:#888;font-size:12px;font-weight:normal;">${crop.growTime}秒成熟 · 种子价 ${crop.seedPrice || crop.price || '-'} · 售价 💰${crop.sellPrice}</span></div>
+      <div class="crop-detail-row"><span class="cdl-label">产出：</span><span class="cdl-value">${crop.rewardLabel || '金币（收获出售）'}</span></div>
+      ${crop.cultivation ? `<div class="crop-detail-row"><span class="cdl-label">修为：</span><span class="cdl-value">🧘 ${crop.cultivation} 点/株（高品质有加成）</span></div>` : ''}
+      ${mats.length ? `<div class="crop-detail-row"><span class="cdl-label">打造材料：</span><span class="cdl-value mat">${mats.join('　')}</span></div>` : '<div class="crop-detail-row"><span class="cdl-label">打造材料：</span><span class="cdl-value" style="color:#777;">无（该作物不出产武器材料）</span></div>'}
+      ${buffTxt ? `<div class="crop-detail-row"><span class="cdl-label">特性：</span><span class="cdl-value" style="color:#9fc78f;">${buffTxt}</span></div>` : ''}
+    `;
   },
 
   plantFromPicker(idx, cropId) {
@@ -121,12 +173,13 @@ const Farm = {
       .forEach(crop => {
         const button = document.createElement('button');
         button.className = `crop-choice ${crop.rarity || 'common'}` + (GameState.selectedCrop === crop.id ? ' selected' : '');
-        button.innerHTML = `<span>${crop.icon} ${crop.name}</span><small>${crop.rewardLabel || `${crop.growTime}秒 · ${crop.sellPrice}金币`}</small>`;
-        button.title = `${crop.growTime}秒成熟 · ${crop.rewardLabel || '金币与概率强化卡'}`;
+        button.innerHTML = `<span>${crop.icon} ${crop.name}</span><small>${this.yieldSummary(crop)}</small>`;
+        button.title = this.yieldDetail(crop);
         button.onclick = () => {
           GameState.selectedCrop = crop.id;
           SaveSystem.save();
           this.renderCropSelector();
+          this.renderCropDetail();
         };
         container.appendChild(button);
       });
@@ -177,19 +230,16 @@ const Farm = {
     if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.recordCollection(crop.id, plot.quality);
     // 作物存入仓库
     const added = Warehouse.addItem(crop.id, yieldQty);
-    if (window.CharacterSystem) CharacterSystem.onCropHarvested(crop.id, yieldQty, plot.quality);
+    let matGained = [];
+    if (window.CharacterSystem) matGained = CharacterSystem.onCropHarvested(crop.id, yieldQty, plot.quality) || [];
     let rewardText = `${crop.name} ×${added} 已入仓`;
+    if (matGained.length) rewardText += '，' + matGained.join('、') + ' 已入材料库';
     // 30% 概率额外获得种子，存入仓库
     if (Math.random() < 0.3) {
       Warehouse.addItem('seeds', 1);
       rewardText += '，种子 ×1 已入仓';
     }
-    // 稀有作物额外获得材料，存入仓库
-    if (crop.rare) {
-      const matCount = randInt(1, 3);
-      Warehouse.addItem('materials', matCount);
-      rewardText += `，材料 ×${matCount} 已入仓`;
-    }
+    // v5.1 打造材料统一由 CharacterSystem.onCropHarvested 按作物映射发放（CONFIG.cropMaterials）
     if (crop.rewardType === 'gold') {
       const bonusGold = randInt(25, 45);
       GameState.gold += bonusGold;
@@ -322,8 +372,9 @@ const Farm = {
   },
 
   getUnlockCost(idx) {
+    // v5.1 第 13 块地起额外需要植物纤维（收获农作物获得）
     const step = Math.max(0, idx - 8);
-    return { gold: 90 + step * 35, materials: step < 4 ? 0 : Math.floor((step - 4) / 5) + 1 };
+    return { gold: 90 + step * 35, fiber: step < 4 ? 0 : Math.floor((step - 4) / 5) + 1 };
   },
 
   unlockPlot(idx) {
@@ -332,15 +383,22 @@ const Farm = {
       return;
     }
     const cost = this.getUnlockCost(idx);
-    if (GameState.gold < cost.gold || GameState.materials < cost.materials) {
-      showToast(`扩建需要 ${cost.gold}金币${cost.materials ? ` 和 ${cost.materials}材料` : ''}`, 'warning');
+    if (GameState.gold < cost.gold) {
+      showToast(`扩建需要 ${cost.gold} 金币`, 'warning');
       return;
     }
+    if (cost.fiber > 0) {
+      const have = (window.ResourceSystem && ResourceSystem.count('fiber')) || 0;
+      if (have < cost.fiber) {
+        showToast(`扩建还需要 🌾植物纤维 ×${cost.fiber}（收获农作物获得）`, 'warning');
+        return;
+      }
+      ResourceSystem.pay({ fiber: cost.fiber });
+    }
     GameState.gold -= cost.gold;
-    GameState.materials -= cost.materials;
     GameState.unlockedPlots++;
     SaveSystem.save();
-    showToast(`新农田已解锁：${GameState.unlockedPlots}/36`, 'gold');
+    showToast(`新农田已解锁：${GameState.unlockedPlots}/${this.PLOT_COUNT}`, 'gold');
     this.render();
   },
 
@@ -421,7 +479,21 @@ const Farm = {
     if (!container) return;
     container.innerHTML = '';
     const boosts = CardSystem.getSelectedBoosts();
-    CONFIG.skills.forEach(baseSkill => {
+    // v5.1 只显示修行台已装备的技能
+    let equippedIds = [];
+    if (typeof CharacterSystem !== 'undefined') {
+      CharacterSystem.init();
+      equippedIds = CharacterSystem.getEquipped(); // v5.1 返回值即为技能 id 数组
+    } else {
+      equippedIds = CONFIG.skills.slice(0, 4).map(s => s.id);
+    }
+    if (!equippedIds.length) {
+      container.innerHTML = '<div style="grid-column:1/-1;color:#c9a06a;font-size:12px;text-align:center;padding:12px;">尚未在「修行台」装备技能，请先回农场装备</div>';
+      return;
+    }
+    equippedIds.forEach(sid => {
+      const baseSkill = CONFIG.skills.find(s => s.id === sid) || (typeof SKILLS !== 'undefined' ? SKILLS[sid] : null);
+      if (!baseSkill) return;
       const extra = boosts[baseSkill.id] || 0;
       const skill = getSkillStats(baseSkill, extra);
       const pct100 = v => Math.round(v * 100) + '%';
@@ -446,28 +518,38 @@ const Farm = {
   renderLoadout() {
     const container = document.getElementById('loadoutGrid');
     container.innerHTML = '';
-    CONFIG.consumables.forEach(item => {
+    // v5.1 准备大厅只列 3 个战术消耗品（Q/R/E 带快捷键）；食品/药品等在远征内拾取或自动生效
+    CONFIG.consumables.filter(item => item.key).forEach(item => {
       const equipped = GameState.loadout[item.id] || 0;
       const inWarehouse = Warehouse.getCount(item.id);
       const div = document.createElement('div');
-      div.className = 'loadout-slot' + (equipped > 0 ? ' filled' : '');
+      div.className = 'loadout-slot' + (equipped > 0 ? ' filled' : '') + (equipped <= 0 && inWarehouse <= 0 ? ' muted' : '');
       const ciArt = (typeof CropArt!=='undefined' && CropArt.ready(item.id)) ? CropArt.dom(item.id, item.icon, 34) : item.icon;
       div.innerHTML = `
         <div class="item-icon" style="display:flex;align-items:center;justify-content:center;">${ciArt}</div>
         <div>${item.name}</div>
         <div class="loadout-effect">${item.desc}</div>
-        <div class="loadout-value">仓库 ${inWarehouse} · 已携带 ${equipped}</div>
+        <div class="loadout-value">仓库 ${inWarehouse} · 已携带 ${equipped}/5</div>
+        <div class="loadout-hint" style="font-size:10px;color:${equipped>0?'#9fc78f':(inWarehouse>0?'#c9b98a':'#d98a6a')};">${equipped > 0 ? '点击再带1个 · 右键卸下1个' : (inWarehouse > 0 ? '点击从仓库取出携带' : '仓库中没有，无法携带')}</div>
       `;
       div.onclick = () => {
-        if (equipped > 0) {
-          GameState.loadout[item.id]--;
-          Warehouse.addItem(item.id, 1);
-          showToast(`卸下1个${item.name}，放回仓库`);
-        } else {
-          // 从仓库取（简化：可以免费配置，远征后消耗）
-          GameState.loadout[item.id] = Math.min(5, (GameState.loadout[item.id] || 0) + 1);
-          showToast(`装备1个${item.name}`, 'success');
-        }
+        const cur = GameState.loadout[item.id] || 0;
+        if (cur >= 5) { showToast('每种消耗品最多携带 5 个', 'warning'); return; }
+        if (Warehouse.getCount(item.id) <= 0) { showToast(`仓库中没有 ${item.name}，无法携带`, 'warning'); return; }
+        if (!Warehouse.removeItem(item.id, 1)) { showToast(`仓库中没有 ${item.name}，无法携带`, 'warning'); return; }
+        GameState.loadout[item.id] = cur + 1;
+        showToast(`携带 ${item.name} ×${cur + 1}（从仓库取出）`, 'success');
+        SaveSystem.save();
+        this.renderLoadout();
+      };
+      div.oncontextmenu = (e) => {
+        e.preventDefault();
+        const cur = GameState.loadout[item.id] || 0;
+        if (cur <= 0) return;
+        GameState.loadout[item.id] = cur - 1;
+        if (GameState.loadout[item.id] <= 0) delete GameState.loadout[item.id];
+        Warehouse.addItem(item.id, 1);
+        showToast(`卸下1个${item.name}，放回仓库`);
         SaveSystem.save();
         this.renderLoadout();
       };

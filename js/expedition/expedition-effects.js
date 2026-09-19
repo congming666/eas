@@ -198,6 +198,7 @@ Object.assign(Expedition.prototype, {
 
   updateVisualTimers(dt) {
     this.player.slow = Math.max(0, this.player.slow - dt);
+    if (this.player.root > 0) this.player.root = Math.max(0, this.player.root - dt);
     this.weaponPulse = Math.max(0, this.weaponPulse - dt);
     this.attackAnim = Math.max(0, this.attackAnim - dt);
     this.weaponRecoil = Math.max(0, this.weaponRecoil - dt * 9);

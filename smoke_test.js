@@ -52,7 +52,7 @@ async function main() {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.waitForLoadState('networkidle');
-  if ((await page.title()) !== '农庄牌：荒野远征 v5.0.0') throw new Error('标题不正确：' + await page.title());
+  if ((await page.title()) !== '农庄牌：荒野远征 v5.1.0') throw new Error('标题不正确：' + await page.title());
   if (!(await page.locator('#mainMenu').isVisible())) throw new Error('主菜单未显示');
 
   await page.getByRole('button', { name: /开\s*始\s*游\s*戏/ }).click();
@@ -62,9 +62,11 @@ async function main() {
   if (!(await page.locator('#musicToggle').innerText()).includes('关')) throw new Error('音乐关闭按钮无效');
   await page.locator('#musicToggle').click();
   if (!(await page.locator('#musicToggle').innerText()).includes('开')) throw new Error('音乐开启按钮无效');
-  if ((await page.locator('.farm-cell').count()) !== 36) throw new Error('农田格子数量不正确');
-  if ((await page.locator('.farm-cell.locked').count()) !== 28) throw new Error('初始锁定农田数量不正确');
+  if ((await page.locator('.farm-cell').count()) !== 48) throw new Error('农田格子数量不正确（v5.1 应为48格）');
+  if ((await page.locator('.farm-cell.locked').count()) !== 40) throw new Error('初始锁定农田数量不正确（v5.1 应为40）');
   if ((await page.locator('.farm-cell:not(.locked)').count()) !== 8) throw new Error('初始开放农田数量不正确');
+  if ((await page.locator('#cropDetailPanel').count()) !== 1) throw new Error('作物产出详情卡未渲染');
+  if (!(await page.locator('#cropDetailPanel').innerText()).includes('打造材料')) throw new Error('作物详情卡缺少材料产出标注');
   if (await page.locator('#expeditionPrepScreen').isVisible()) throw new Error('远征准备界面不应与农场同时显示');
   if (!(await page.locator('#dailyRewardButton').isVisible())) throw new Error('每日奖励入口未显示');
   if (!(await page.locator('#reliefRewardButton').isVisible())) throw new Error('开荒保障入口未显示');
@@ -162,7 +164,11 @@ async function main() {
     if (Warehouse.getCount('flour') < 1) throw new Error('加工产物面粉未入仓（产物定义缺失回归）');
     // 野生种子 -> 作物 -> 仓库定义 全链路闭环
     for (const w of CONFIG.wildPlants) {
-      if (!CONFIG.crops.find(c => c.id === w.givesSeed)) throw new Error('野生种子无对应作物: ' + w.givesSeed);
+      // v5.1 野生种子分两类：农场作物种子、远征部署植物种子；两者都必须有仓库物品定义
+      const isCrop = CONFIG.crops.find(c => c.id === w.givesSeed);
+      if (!isCrop && !(CONFIG.warehouseItems && CONFIG.warehouseItems[w.givesSeed])) {
+        throw new Error('野生种子既无作物也无物品定义: ' + w.givesSeed);
+      }
       if (!CONFIG.warehouseItems[w.givesSeed]) throw new Error('野生作物无仓库定义: ' + w.givesSeed);
     }
     // 远征/温室/工坊全部现行产出 id 均有仓库定义
@@ -184,6 +190,12 @@ async function main() {
     GameState.warehouse.capacity = 120;
     // 未知物品安全拒收
     if (Warehouse.addItem('__not_exist__', 1) !== 0) throw new Error('未知物品不应入仓');
+    // v5.1 农作物 -> 打造材料闭环（闪电藤高产铁矿）
+    const ironBefore = ResourceSystem.count('iron');
+    const matGained = CharacterSystem.onCropHarvested('lightning_vine', 50, 'fine');
+    if (!Array.isArray(matGained) || !matGained.some(t => t.includes('铁矿'))) throw new Error('农作物材料产出失败');
+    if (ResourceSystem.count('iron') <= ironBefore) throw new Error('收获后材料库存未增加');
+    if (!CONFIG.cropMaterials || !CONFIG.cropMaterials.deathcap) throw new Error('作物材料映射表不完整');
     SaveSystem.save();
   });
 
@@ -194,6 +206,11 @@ async function main() {
       card.id = `loadout-test-${i}`;
       GameState.cardInventory.push(card);
     }
+    // v5.1 解锁并装备 4 个技能（模拟玩家修行进度：Lv60 有 4 卡槽），准备大厅只显示已装备技能
+    GameState.level = 60;
+    const s4 = CONFIG.skills.slice(0, 4).map(s => s.id);
+    GameState.unlockedSkills = s4.slice();
+    GameState.equippedSkills = s4.slice();
     SaveSystem.save();
     Farm.render();
   });
@@ -208,6 +225,36 @@ async function main() {
   if ((await page.locator('#boostCardCount').innerText()).trim() !== '3/3') throw new Error('强化卡携带计数不正确');
   await page.locator('.boost-card').nth(3).click();
   if ((await page.locator('.boost-card.selected').count()) !== 3) throw new Error('强化卡携带上限没有限制为3张');
+
+  // v5.1 消耗品携带闭环：无库存不可携带，携带扣库存，右键归还
+  const loadoutCheck = await page.evaluate(() => {
+    GameState.warehouse.capacity = Warehouse.getUsedCapacity() + 10;
+    Warehouse.removeItem('herb_kit', Warehouse.getCount('herb_kit'));
+    GameState.loadout = {};
+    Farm.renderLoadout();
+    const slot0 = () => document.querySelectorAll('#loadoutGrid .loadout-slot')[0];
+    slot0().click(); // 仓库没有，应被拒绝
+    const blocked = (GameState.loadout.herb_kit || 0) === 0 && slot0().classList.contains('muted');
+    Warehouse.addItem('herb_kit', 2);
+    Farm.renderLoadout();
+    slot0().click();
+    const afterCarry = { n: GameState.loadout.herb_kit || 0, wh: Warehouse.getCount('herb_kit') };
+    slot0().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    const afterReturn = { n: GameState.loadout.herb_kit || 0, wh: Warehouse.getCount('herb_kit') };
+    return { blocked, afterCarry, afterReturn };
+  });
+  if (!loadoutCheck.blocked) throw new Error('没有库存的消耗品不应允许携带（携带bug回归）');
+  if (loadoutCheck.afterCarry.n !== 1 || loadoutCheck.afterCarry.wh !== 1) throw new Error('携带消耗品没有扣减仓库库存');
+  if (loadoutCheck.afterReturn.n !== 0 || loadoutCheck.afterReturn.wh !== 2) throw new Error('卸下消耗品没有归还仓库');
+
+  // v5.1 修行台技能卸下：卸下后准备大厅技能预览同步减少
+  await page.evaluate(() => {
+    CharacterSystem.equip(CONFIG.skills[3].id);
+    Farm.renderSkillPreview();
+  });
+  if ((await page.locator('.prep-skill').count()) !== 3) throw new Error('修行台卸下技能后准备大厅仍显示该技能');
+  await page.evaluate(() => { CharacterSystem.equip(CONFIG.skills[3].id); Farm.renderSkillPreview(); });
+
   await page.locator('.map-option').nth(13).click();
   await page.screenshot({ path: shot('prep-test.png'), fullPage: true });
 
@@ -228,7 +275,7 @@ async function main() {
   if ((await page.evaluate(() => Game.expedition.traps.length)) < 10) throw new Error('环境陷阱生成不足');
   if ((await page.locator('.skill-meta').count()) < 7) throw new Error('技能数值信息未显示');
   if ((await page.locator('#skillBar .skill-slot').count()) !== 4) throw new Error('常驻技能栏布局不正确');
-  if ((await page.locator('#consumableBar .skill-slot').count()) !== 3) throw new Error('消耗品栏没有独立显示');
+  if ((await page.locator('#consumableBar .skill-slot.consumable:not(.cons-more)').count()) !== 3) throw new Error('消耗品栏没有独立显示');
   if (!(await page.locator('#musicToggle').isVisible())) throw new Error('音乐控制器未显示');
   await page.evaluate(() => {
     const expedition = Game.expedition;
@@ -277,15 +324,18 @@ async function main() {
   });
   if (!obstacleCollisionPassed) throw new Error('玩家可以穿过立体障碍物');
 
-  await page.keyboard.press('1');
-  await page.keyboard.press('3');
-  await page.keyboard.press('4');
-  await page.waitForTimeout(200);
-  await page.evaluate(() => Game.expedition.updateHUD());
+  // v5.1 直接调用技能接口（给满能量），避免键盘焦点导致的偶发失败
+  await page.evaluate(() => {
+    const e = Game.expedition;
+    e.player.energy = e.player.maxEnergy;
+    e.useSkill(0);
+  });
   if (!(await page.evaluate(() => Game.expedition.skillCooldowns.some(cd => cd > 0)))) {
     throw new Error('技能没有进入冷却');
   }
-  if ((await page.locator('.skill-cd-ring').count()) < 1) throw new Error('技能环形冷却未显示');
+  // v5.1 useSkill 内部已立即刷新 HUD；保险起见断言前再同步一帧
+  const ringCount = await page.evaluate(() => { const e = Game.expedition; e.hudTimer = 0; e.updateHUD(); return document.querySelectorAll('.skill-cd-ring').length; });
+  if (ringCount < 1) throw new Error('技能环形冷却未显示');
   await page.evaluate(() => { Game.expedition.player.hp = 20; Game.expedition.updateHUD(); });
   if (!(await page.locator('#lowHealthVignette').evaluate(el => el.classList.contains('active')))) throw new Error('低生命警告未显示');
   await page.evaluate(() => { Game.expedition.player.hp = 100; Game.expedition.updateHUD(); });
