@@ -247,7 +247,9 @@ class Expedition {
       // v3.4 地图词条：视野修正
       if (this.map.visibilityBonus) this.visionRadius *= (1 + this.map.visibilityBonus);
       if (this.map.visionPenalty) this.visionRadius *= (1 - this.map.visionPenalty);
-      this.beastWave.nextIn = 20; // v4.1 首波固定 20 秒，之后固定 40 秒节奏
+      this.beastWave.nextIn = 20; // v4.1 首波固定 20 秒
+      // v5.4 修复：难度/Heat 在此时才真正应用，必须重算 balance 快照，否则怪血/伤害恒为普通难度
+      this.balance = this.getBalanceProfile();
     }
     this.generateTerrain();
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.init(this);
@@ -272,13 +274,13 @@ class Expedition {
     const _ds = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {hpMul:1, dmgMul:1, rewardMul:1, speedMulExtra:1};
     const _tierM = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.getTierMechanic(tier) : {eliteChanceBonus:0};
     return {
-      enemyHp: (1 + (tier - 1) * 0.32) * _ds.hpMul,
-      enemyDamage: (1 + (tier - 1) * 0.22) * _ds.dmgMul,
-      enemySpeed: (1 + (tier - 1) * 0.055) * (_ds.speedMulExtra || 1),
+      enemyHp: ([1.15, 1.5, 2.4, 3.8, 5.6][tier] || 5.6) * _ds.hpMul,
+      enemyDamage: ([1.1, 1.25, 1.95, 2.9, 4.0][tier] || 4.0) * _ds.dmgMul,
+      enemySpeed: (1 + (tier - 1) * 0.06) * (_ds.speedMulExtra || 1),
       reward: (1 + (tier - 1) * 0.48) * _ds.rewardMul * ((typeof DifficultySystem !== 'undefined') ? DifficultySystem.getHeatRewardMultiplier() : 1),
       eliteChance: (tier < 3 ? 0 : 0.08 + tier * 0.025) + (_tierM.eliteChanceBonus || 0) + (this.map.eliteBonus || 0),
-      bossHp: (520 + tier * 260) * _ds.hpMul,
-      bossDamage: (14 + tier * 5) * _ds.dmgMul,
+      bossHp: (520 + tier * 320) * _ds.hpMul,
+      bossDamage: (14 + tier * 7) * _ds.dmgMul,
     };
   }
 

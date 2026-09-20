@@ -35,18 +35,40 @@ async function main() {
       weapons: pick(CONFIG.weapons),
       bosses: pick(CONFIG.bosses),
       skills: pick(CONFIG.skills),
+      skillUnlock: pick(CONFIG.skillUnlock),
+      greenhousePlants: pick(CONFIG.greenhousePlants),
+      cultivationCrops: pick(CONFIG.cultivationCrops),
+      heatModifiers: (typeof DifficultySystem !== 'undefined' && DifficultySystem.getHeatModifier) ? ['ironwall','frenzy','darkness','barren','headless'].map(id => { try { return Object.assign({ id }, DifficultySystem.getHeatModifier(id)); } catch (e) { return null; } }).filter(Boolean) : null,
       consumables: pick(CONFIG.consumables),
       maps: pick(CONFIG.maps),
       monsters: pick(CONFIG.monsters),
       plants: pick(CONFIG.plants),
       craftCosts: pick(LoadoutSystem.CRAFT_COSTS),
+      recipes: (typeof FarmRecipes !== 'undefined') ? pick(FarmRecipes) : null,
       upgradeCosts: pick(LoadoutSystem.UPGRADE_COSTS),
-      cultPerMat: pick(LoadoutSystem.CULT_PER_MAT),
       warehouseItems: pick(CONFIG.warehouseItems),
       expedition: pick(CONFIG.expedition),
       player: pick(CONFIG.player),
       nutrients: pick(CONFIG.nutrients),
-      growth: (typeof CharacterSystem !== 'undefined') ? null : null,
+      difficulties: (typeof DifficultySystem !== 'undefined') ? ['casual','normal','hard','nightmare'].map(id => DifficultySystem.getDifficulty(id)) : null,
+      levelTable: (typeof CharacterSystem !== 'undefined') ? (function(){
+        const rows = [];
+        for (let lv = 1; lv <= 100; lv++) {
+          const d = CharacterSystem.derived(lv);
+          rows.push({
+            level: lv,
+            maxHp: d.hp, baseAtk: d.atk, defense: d.def,
+            maxEnergy: d.energyMax, energyRegen: d.energyRegen, hpRegen: d.ocRegen,
+            skillSlots: d.slots,
+            cultCost: lv < 100 ? CharacterSystem.expNeeded(lv) : null,
+            goldCost: lv < 100 ? CharacterSystem.goldNeeded(lv) : null,
+            soilCost: lv < 100 ? CharacterSystem.soilNeeded(lv) : null,
+            waterCost: lv < 100 ? CharacterSystem.waterNeeded(lv) : null,
+            compostCost: lv < 100 ? CharacterSystem.compostNeeded(lv) : null,
+          });
+        }
+        return rows;
+      })() : null,
     };
   });
 

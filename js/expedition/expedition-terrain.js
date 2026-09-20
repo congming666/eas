@@ -1046,7 +1046,13 @@ Object.assign(Expedition.prototype, {
     // v3.7 洼地减速
     const hz = this.getHeightAt(this.player.x, this.player.y);
     if (hz === 'low') terrainModifier *= 0.7;
-    speed *= terrainModifier;
+    // v5.4 贪婪成本：背包超重（>12 格）小幅降移速，最多 -12%
+    let carryModifier = 1;
+    if (typeof LoadoutSystem !== 'undefined' && this.bag && LoadoutSystem.usedSlots) {
+      const _used = LoadoutSystem.usedSlots(this.bag);
+      if (_used > 12) carryModifier = Math.max(0.82, 1 - 0.045 * (_used - 12));
+    }
+    speed *= terrainModifier * carryModifier;
     const previousX = this.player.x;
     const previousY = this.player.y;
     this.player.x += dx * speed * dt;

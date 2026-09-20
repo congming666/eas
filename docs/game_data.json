@@ -1,5 +1,5 @@
 {
-  "version": "5.1.0",
+  "version": "5.4.0",
   "crops": [
     {
       "id": "pea_shooter",
@@ -398,7 +398,7 @@
     "watermelon": [
       [
         "crystal",
-        0.35,
+        0.25,
         1
       ]
     ],
@@ -457,7 +457,7 @@
       ],
       [
         "iron",
-        0.32,
+        0.28,
         1
       ]
     ],
@@ -497,7 +497,7 @@
     "frost_flower": [
       [
         "crystal",
-        0.65,
+        0.45,
         1
       ]
     ],
@@ -505,7 +505,7 @@
       [
         "iron",
         0.55,
-        2
+        1
       ],
       [
         "crystal",
@@ -514,7 +514,7 @@
       ],
       [
         "refined_iron",
-        0.06,
+        0.12,
         1
       ]
     ],
@@ -595,15 +595,15 @@
       "name": "铁矿",
       "icon": "⛓️",
       "kind": "ore",
-      "from": "作物：仙人掌32%、雷鸣藤55%×2",
+      "from": "作物：仙人掌22%、雷鸣藤40%",
       "to": "武器打造升级、提炼精铁锭"
     },
     "refined_iron": {
       "name": "精铁锭",
       "icon": "🔩",
       "kind": "ore",
-      "from": "作物：雷鸣藤6%；工坊：铁矿×3",
-      "to": "高级武器锻造"
+      "from": "作物：雷鸣藤8%；工坊：铁矿×3",
+      "to": "高级武器锻造（Lv6+）"
     },
     "crystal": {
       "name": "晶核",
@@ -638,7 +638,7 @@
       "icon": "🦷",
       "kind": "mob",
       "from": "作物：九叶灵芝25%、幽冥毒伞12%",
-      "to": "武器 7 级以上升级"
+      "to": "武器 7 级以上升级（温室/稀有作物产出）"
     },
     "herb": {
       "name": "药草",
@@ -754,8 +754,8 @@
       "id": "t1_boar_king",
       "name": "狂暴野猪王",
       "tier": 1,
-      "hp": 820,
-      "dmg": 20,
+      "hp": 3800,
+      "dmg": 22,
       "speed": 96,
       "radius": 46,
       "emoji": "🐗",
@@ -771,8 +771,8 @@
       "id": "t1_withered",
       "name": "枯木精",
       "tier": 1,
-      "hp": 900,
-      "dmg": 18,
+      "hp": 4000,
+      "dmg": 20,
       "speed": 70,
       "radius": 48,
       "emoji": "🌳",
@@ -788,8 +788,8 @@
       "id": "t1_quarry",
       "name": "采石巨魔",
       "tier": 1,
-      "hp": 980,
-      "dmg": 24,
+      "hp": 3600,
+      "dmg": 26,
       "speed": 64,
       "radius": 50,
       "emoji": "🗿",
@@ -805,8 +805,8 @@
       "id": "t2_gargoyle_lord",
       "name": "石像鬼王",
       "tier": 2,
-      "hp": 1180,
-      "dmg": 25,
+      "hp": 8400,
+      "dmg": 28,
       "speed": 104,
       "radius": 46,
       "emoji": "🦇",
@@ -823,8 +823,8 @@
       "id": "t2_ruin_golem",
       "name": "废墟魔像",
       "tier": 2,
-      "hp": 1320,
-      "dmg": 27,
+      "hp": 8600,
+      "dmg": 30,
       "speed": 60,
       "radius": 52,
       "emoji": "🗿",
@@ -840,8 +840,8 @@
       "id": "t3_swamp_hag",
       "name": "沼泽巫妪",
       "tier": 3,
-      "hp": 1500,
-      "dmg": 28,
+      "hp": 9800,
+      "dmg": 32,
       "speed": 82,
       "radius": 46,
       "emoji": "🧙‍♀️",
@@ -858,8 +858,8 @@
       "id": "t3_brood_mother",
       "name": "虫母",
       "tier": 3,
-      "hp": 1640,
-      "dmg": 24,
+      "hp": 21000,
+      "dmg": 28,
       "speed": 72,
       "radius": 52,
       "emoji": "🕷️",
@@ -876,8 +876,8 @@
       "id": "t3_scorch_demon",
       "name": "焦林炎魔",
       "tier": 3,
-      "hp": 1720,
-      "dmg": 32,
+      "hp": 23000,
+      "dmg": 36,
       "speed": 88,
       "radius": 48,
       "emoji": "🔥",
@@ -893,8 +893,8 @@
       "id": "t4_abyss_lord",
       "name": "深渊领主",
       "tier": 4,
-      "hp": 2100,
-      "dmg": 34,
+      "hp": 170000,
+      "dmg": 40,
       "speed": 80,
       "radius": 56,
       "emoji": "👹",
@@ -910,8 +910,8 @@
       "id": "t4_time_warden",
       "name": "时空守望",
       "tier": 4,
-      "hp": 1980,
-      "dmg": 33,
+      "hp": 160000,
+      "dmg": 38,
       "speed": 92,
       "radius": 48,
       "emoji": "⏳",
@@ -927,8 +927,8 @@
       "id": "t4_moon_priestess",
       "name": "月之祭司",
       "tier": 4,
-      "hp": 1900,
-      "dmg": 31,
+      "hp": 155000,
+      "dmg": 36,
       "speed": 86,
       "radius": 46,
       "emoji": "🌙",
@@ -945,8 +945,8 @@
       "id": "t4_arena_champion",
       "name": "竞技场冠军",
       "tier": 4,
-      "hp": 2240,
-      "dmg": 38,
+      "hp": 180000,
+      "dmg": 44,
       "speed": 112,
       "radius": 48,
       "emoji": "⚔️",
@@ -1201,6 +1201,480 @@
       "dmg": 48,
       "duration": 3,
       "desc": "3 秒旋转斩，持续绞杀周围敌人。"
+    }
+  ],
+  "skillUnlock": {
+    "straw_smash": {
+      "type": "default"
+    },
+    "vine_bind": {
+      "type": "level",
+      "value": 10
+    },
+    "earth_dash": {
+      "type": "extractTier",
+      "value": 1
+    },
+    "smoke_screen": {
+      "type": "perfectDodge",
+      "value": 20
+    },
+    "chili_breath": {
+      "type": "harvest",
+      "crop": "chili",
+      "value": 50
+    },
+    "pea_storm": {
+      "type": "weaponLevel",
+      "weapon": "pea_repeater",
+      "value": 5
+    },
+    "frost_barrier": {
+      "type": "consecTier",
+      "tier": 1,
+      "value": 3
+    },
+    "thorn_burst": {
+      "type": "killElite",
+      "value": "boar_king"
+    },
+    "earth_slam": {
+      "type": "level",
+      "value": 25
+    },
+    "gale_slash": {
+      "type": "signalExtract",
+      "value": 3
+    },
+    "healing_rain": {
+      "type": "greenhouse",
+      "value": 4
+    },
+    "sun_drum": {
+      "type": "tech",
+      "value": 10
+    },
+    "poison_mist": {
+      "type": "killBoss",
+      "value": "t2_ruin_golem"
+    },
+    "iron_armor": {
+      "type": "level",
+      "value": 45
+    },
+    "thunder_chain": {
+      "type": "extractTier",
+      "value": 3
+    },
+    "death_scythe": {
+      "type": "archives",
+      "value": 12
+    }
+  },
+  "greenhousePlants": [
+    {
+      "id": "golden_wheat",
+      "name": "黄金小麦",
+      "icon": "🌟",
+      "growTime": 90,
+      "rarity": "rare",
+      "seedPrice": 50,
+      "desc": "闪耀着金光的小麦，成熟后有概率产出金币卡和催化剂",
+      "drops": [
+        {
+          "id": "gold_card",
+          "chance": 0.6,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.4,
+          "amount": 1
+        },
+        {
+          "id": "gold",
+          "chance": 0.8,
+          "amount": [
+            80,
+            150
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crystal_corn",
+      "name": "水晶玉米",
+      "icon": "💎",
+      "growTime": 150,
+      "rarity": "epic",
+      "seedPrice": 120,
+      "desc": "晶莹剔透的玉米，能产出作物转化卡和大量金币",
+      "drops": [
+        {
+          "id": "gold_card",
+          "chance": 0.5,
+          "amount": 1
+        },
+        {
+          "id": "transform_card",
+          "chance": 0.5,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.3,
+          "amount": 1
+        },
+        {
+          "id": "gold",
+          "chance": 0.9,
+          "amount": [
+            150,
+            300
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rainbow_pumpkin",
+      "name": "彩虹南瓜",
+      "icon": "🎃",
+      "growTime": 200,
+      "rarity": "epic",
+      "seedPrice": 200,
+      "desc": "七彩斑斓的南瓜，蕴含着转化的魔力",
+      "drops": [
+        {
+          "id": "big_gold_card",
+          "chance": 0.4,
+          "amount": 1
+        },
+        {
+          "id": "transform_card",
+          "chance": 0.6,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.5,
+          "amount": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "gold",
+          "chance": 1,
+          "amount": [
+            200,
+            400
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moonlight_rice",
+      "name": "月光稻",
+      "icon": "🌙",
+      "growTime": 280,
+      "rarity": "legendary",
+      "seedPrice": 400,
+      "desc": "只在月光下生长的神秘稻子，产出传说级奖励",
+      "drops": [
+        {
+          "id": "big_gold_card",
+          "chance": 0.6,
+          "amount": 1
+        },
+        {
+          "id": "transform_card",
+          "chance": 0.5,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.7,
+          "amount": [
+            1,
+            3
+          ]
+        },
+        {
+          "id": "rare_seed_pack",
+          "chance": 0.3,
+          "amount": 1
+        },
+        {
+          "id": "gold",
+          "chance": 1,
+          "amount": [
+            400,
+            800
+          ]
+        }
+      ]
+    },
+    {
+      "id": "void_mushroom",
+      "name": "虚空蘑菇",
+      "icon": "🍄",
+      "growTime": 180,
+      "rarity": "rare",
+      "seedPrice": 80,
+      "desc": "来自虚空的蘑菇，能产出经验加成和神秘道具",
+      "drops": [
+        {
+          "id": "gold_card",
+          "chance": 0.4,
+          "amount": 1
+        },
+        {
+          "id": "exp_boost_card",
+          "chance": 0.5,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.3,
+          "amount": 1
+        },
+        {
+          "id": "gold",
+          "chance": 0.7,
+          "amount": [
+            100,
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thunder_dragon_fruit",
+      "name": "雷龙果",
+      "icon": "⚡",
+      "growTime": 350,
+      "rarity": "legendary",
+      "seedPrice": 600,
+      "desc": "蕴含雷龙之力的果实，能强化武器和产出巨额奖励",
+      "drops": [
+        {
+          "id": "big_gold_card",
+          "chance": 0.7,
+          "amount": 1
+        },
+        {
+          "id": "transform_card",
+          "chance": 0.4,
+          "amount": 1
+        },
+        {
+          "id": "weapon_upgrade_stone",
+          "chance": 0.4,
+          "amount": 1
+        },
+        {
+          "id": "growth_catalyst",
+          "chance": 0.5,
+          "amount": [
+            2,
+            4
+          ]
+        },
+        {
+          "id": "gold",
+          "chance": 1,
+          "amount": [
+            600,
+            1200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ice_lotus",
+      "name": "冰心莲",
+      "icon": "🪷",
+      "rarity": "rare",
+      "seedPrice": 260,
+      "growTime": 600,
+      "drops": [
+        {
+          "id": "shield_elixir",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "desc": "炼制护盾药剂。"
+    },
+    {
+      "id": "flame_fruit",
+      "name": "赤炎果",
+      "icon": "🔥",
+      "rarity": "rare",
+      "seedPrice": 280,
+      "growTime": 640,
+      "drops": [
+        {
+          "id": "flame_elixir",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "desc": "火抗/火伤药剂。"
+    },
+    {
+      "id": "wraith_orchid",
+      "name": "幽魂兰",
+      "icon": "🪻",
+      "rarity": "epic",
+      "seedPrice": 420,
+      "growTime": 900,
+      "drops": [
+        {
+          "id": "wraith_draft",
+          "chance": 0.7,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "desc": "延长隐身时间的秘药。"
+    },
+    {
+      "id": "thunder_fruit",
+      "name": "雷霆果",
+      "icon": "⚡",
+      "rarity": "epic",
+      "seedPrice": 460,
+      "growTime": 960,
+      "drops": [
+        {
+          "id": "energy_cell",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "desc": "瞬间满能量的能量药。"
+    },
+    {
+      "id": "crystal_grape",
+      "name": "水晶葡萄",
+      "icon": "🍇",
+      "rarity": "rare",
+      "seedPrice": 300,
+      "growTime": 700,
+      "drops": [
+        {
+          "id": "grape_juice",
+          "chance": 0.85,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "desc": "能量回复增益饮品。"
+    },
+    {
+      "id": "wudao_fruit",
+      "name": "悟道果",
+      "icon": "🍑",
+      "rarity": "epic",
+      "seedPrice": 520,
+      "growTime": 720,
+      "drops": [
+        {
+          "id": "cult_pill_s",
+          "chance": 1,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "desc": "修为作物：收获修为丹(+75)。"
+    },
+    {
+      "id": "jiuye_lingzhi",
+      "name": "九叶灵芝",
+      "icon": "🍄",
+      "rarity": "legendary",
+      "seedPrice": 900,
+      "growTime": 14400,
+      "drops": [
+        {
+          "id": "cult_pill_m",
+          "chance": 1,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "desc": "修为作物：修为丹(+260)。"
+    },
+    {
+      "id": "jiuzhuan_ginseng",
+      "name": "九转人参",
+      "icon": "🥕",
+      "rarity": "legendary",
+      "seedPrice": 2000,
+      "growTime": 43200,
+      "drops": [
+        {
+          "id": "cult_pill_l",
+          "chance": 1,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "desc": "修为作物：巨额修为(+900)。"
+    }
+  ],
+  "cultivationCrops": [
+    {
+      "id": "ningqi_grass",
+      "name": "凝气草",
+      "icon": "🌱",
+      "growTime": 30,
+      "exp": 10,
+      "unlock": "初始解锁"
+    },
+    {
+      "id": "lingsui_wheat",
+      "name": "灵穗麦",
+      "icon": "🌾",
+      "growTime": 60,
+      "exp": 28,
+      "unlock": "角色 Lv15"
+    }
+  ],
+  "heatModifiers": [
+    {
+      "id": "ironwall",
+      "name": "铁壁",
+      "desc": "所有怪物+50%血量",
+      "rewardBonus": 0.2
+    },
+    {
+      "id": "frenzy",
+      "name": "狂乱",
+      "desc": "所有怪物行动速度+30%",
+      "rewardBonus": 0.25
+    },
+    {
+      "id": "darkness",
+      "name": "黑暗",
+      "desc": "视野永久-30%",
+      "rewardBonus": 0.15
+    },
+    {
+      "id": "barren",
+      "name": "贫瘠",
+      "desc": "补给掉落-50%",
+      "rewardBonus": 0.3
+    },
+    {
+      "id": "headless",
+      "name": "无头",
+      "desc": "禁用怒气超杀",
+      "rewardBonus": 0.5
     }
   ],
   "consumables": [
@@ -3267,92 +3741,326 @@
       }
     }
   },
+  "recipes": [
+    {
+      "id": "flour",
+      "name": "面粉",
+      "icon": "🌾",
+      "inputCrop": "wheat",
+      "inputQty": 3,
+      "outputId": "flour",
+      "outputName": "面粉",
+      "outputIcon": "🥛",
+      "outputQty": 1,
+      "time": 20,
+      "workshopLevel": 1,
+      "desc": "小麦→面粉，可做面包"
+    },
+    {
+      "id": "bread",
+      "name": "面包",
+      "icon": "🍞",
+      "inputCrop": "flour",
+      "inputQty": 2,
+      "outputId": "bread",
+      "outputName": "面包",
+      "outputIcon": "🍞",
+      "outputQty": 1,
+      "time": 30,
+      "workshopLevel": 2,
+      "desc": "面粉→面包，远征回血+80"
+    },
+    {
+      "id": "oil",
+      "name": "植物油",
+      "icon": "🌻",
+      "inputCrop": "sunflower",
+      "inputQty": 3,
+      "outputId": "oil",
+      "outputName": "植物油",
+      "outputIcon": "🫒",
+      "outputQty": 1,
+      "time": 25,
+      "workshopLevel": 1,
+      "desc": "向日葵→植物油"
+    },
+    {
+      "id": "torch",
+      "name": "火把",
+      "icon": "🔥",
+      "inputCrop": "oil",
+      "inputQty": 2,
+      "outputId": "torch",
+      "outputName": "火把",
+      "outputIcon": "🔥",
+      "outputQty": 1,
+      "time": 25,
+      "workshopLevel": 2,
+      "desc": "植物油→火把，远征迷雾视野+"
+    },
+    {
+      "id": "juice",
+      "name": "西瓜汁",
+      "icon": "🧃",
+      "inputCrop": "watermelon",
+      "inputQty": 2,
+      "outputId": "juice",
+      "outputName": "西瓜汁",
+      "outputIcon": "🧃",
+      "outputQty": 1,
+      "time": 15,
+      "workshopLevel": 1,
+      "desc": "西瓜→果汁，远征能量上限+"
+    },
+    {
+      "id": "feed",
+      "name": "饲料",
+      "icon": "🌽",
+      "inputCrop": "corn",
+      "inputQty": 3,
+      "outputId": "feed",
+      "outputName": "饲料",
+      "outputIcon": "🥣",
+      "outputQty": 1,
+      "time": 20,
+      "workshopLevel": 1,
+      "desc": "玉米→饲料，养鸡下蛋"
+    },
+    {
+      "id": "egg",
+      "name": "鸡蛋",
+      "icon": "🥚",
+      "inputCrop": "feed",
+      "inputQty": 2,
+      "outputId": "egg",
+      "outputName": "鸡蛋",
+      "outputIcon": "🥚",
+      "outputQty": 2,
+      "time": 40,
+      "workshopLevel": 2,
+      "desc": "饲料→鸡蛋，远征buff食物"
+    },
+    {
+      "id": "pumpkin_lantern",
+      "name": "南瓜灯",
+      "icon": "🎃",
+      "inputCrop": "pumpkin",
+      "inputQty": 1,
+      "outputId": "pumpkin_lantern",
+      "outputName": "南瓜灯",
+      "outputIcon": "🎃",
+      "outputQty": 1,
+      "time": 15,
+      "workshopLevel": 1,
+      "desc": "南瓜→南瓜灯装饰，美观+5"
+    },
+    {
+      "id": "insecticide",
+      "name": "驱虫剂",
+      "icon": "🧪",
+      "inputCrop": "cabbage",
+      "inputQty": 2,
+      "outputId": "insecticide",
+      "outputName": "驱虫剂",
+      "outputIcon": "🧪",
+      "outputQty": 1,
+      "time": 18,
+      "workshopLevel": 1,
+      "desc": "卷心菜→驱虫剂，治病虫害"
+    },
+    {
+      "id": "ketchup",
+      "name": "番茄酱",
+      "icon": "🥫",
+      "inputCrop": "tomato",
+      "inputQty": 2,
+      "outputId": "ketchup",
+      "outputName": "番茄酱",
+      "outputIcon": "🥫",
+      "outputQty": 1,
+      "time": 25,
+      "workshopLevel": 1,
+      "desc": "番茄→番茄酱，远征回血150"
+    },
+    {
+      "id": "mint_tea",
+      "name": "薄荷茶",
+      "icon": "🍵",
+      "inputCrop": "mint",
+      "inputQty": 2,
+      "outputId": "mint_tea",
+      "outputName": "薄荷茶",
+      "outputIcon": "🍵",
+      "outputQty": 1,
+      "time": 20,
+      "workshopLevel": 1,
+      "desc": "薄荷→薄荷茶，远征移速buff"
+    },
+    {
+      "id": "compost2",
+      "name": "堆肥",
+      "icon": "🍂",
+      "inputCrop": "wheat",
+      "inputQty": 2,
+      "outputId": "compost",
+      "outputName": "堆肥",
+      "outputIcon": "🍂",
+      "outputQty": 1,
+      "time": 15,
+      "workshopLevel": 1,
+      "desc": "残料→堆肥，角色升级材料"
+    },
+    {
+      "id": "refined_iron",
+      "name": "精铁锭",
+      "icon": "🔩",
+      "inputs": {
+        "iron": 3
+      },
+      "outputId": "refined_iron",
+      "outputName": "精铁锭",
+      "outputIcon": "🔩",
+      "outputQty": 1,
+      "time": 20,
+      "workshopLevel": 2,
+      "desc": "铁矿×3→精铁锭，高级锻造"
+    },
+    {
+      "id": "medkit",
+      "name": "急救包",
+      "icon": "🩹",
+      "inputs": {
+        "herb": 2,
+        "fiber": 1
+      },
+      "outputId": "medkit",
+      "outputName": "急救包",
+      "outputIcon": "🩹",
+      "outputQty": 1,
+      "time": 25,
+      "workshopLevel": 1,
+      "desc": "药草×2+纤维→急救包，回血200"
+    },
+    {
+      "id": "poison_bomb",
+      "name": "毒雾弹",
+      "icon": "☠️",
+      "inputs": {
+        "venom": 2,
+        "fiber": 1
+      },
+      "outputId": "poison_bomb",
+      "outputName": "毒雾弹",
+      "outputIcon": "☠️",
+      "outputQty": 1,
+      "time": 30,
+      "workshopLevel": 2,
+      "desc": "毒腺×2+纤维→毒雾弹"
+    },
+    {
+      "id": "ginseng_soup",
+      "name": "人参汤",
+      "icon": "🍲",
+      "inputs": {
+        "ginseng": 1,
+        "herb": 2
+      },
+      "outputId": "ginseng_soup",
+      "outputName": "人参汤",
+      "outputIcon": "🍲",
+      "outputQty": 1,
+      "time": 40,
+      "workshopLevel": 3,
+      "desc": "人参+药草→人参汤，满血红蓝药"
+    }
+  ],
   "upgradeCosts": [
     {
-      "gold": 200,
+      "gold": 150,
       "materials": {
-        "iron": 3
+        "iron": 2,
+        "fiber": 4
       }
     },
     {
-      "gold": 400,
+      "gold": 300,
       "materials": {
-        "iron": 5
+        "iron": 4,
+        "wood": 6
       }
     },
     {
-      "gold": 700,
+      "gold": 500,
+      "materials": {
+        "iron": 6,
+        "crystal": 1,
+        "stone": 6
+      }
+    },
+    {
+      "gold": 800,
       "materials": {
         "iron": 8,
-        "crystal": 1
+        "crystal": 2,
+        "venom": 2
       }
     },
     {
-      "gold": 1000,
+      "gold": 1200,
       "materials": {
         "iron": 12,
-        "crystal": 2
+        "crystal": 3,
+        "carapace": 4
       }
     },
     {
-      "gold": 1500,
+      "gold": 1700,
       "materials": {
-        "iron": 20,
-        "crystal": 4
+        "iron": 17,
+        "crystal": 5,
+        "venom": 4,
+        "refined_iron": 1
       }
     },
     {
-      "gold": 2200,
+      "gold": 2300,
       "materials": {
-        "iron": 30,
-        "crystal": 6
+        "iron": 26,
+        "crystal": 7,
+        "soul_ash": 2,
+        "bossFang": 1
       }
     },
     {
       "gold": 3000,
       "materials": {
-        "iron": 40,
-        "crystal": 8,
+        "iron": 30,
+        "crystal": 10,
+        "refined_iron": 2,
         "bossFang": 1
       }
     },
     {
       "gold": 4000,
       "materials": {
-        "iron": 50,
-        "crystal": 12,
-        "bossFang": 1
-      }
-    },
-    {
-      "gold": 5500,
-      "materials": {
-        "iron": 70,
-        "crystal": 18,
+        "iron": 40,
+        "crystal": 14,
+        "soul_ash": 5,
+        "refined_iron": 3,
         "bossFang": 2
       }
     },
     {
-      "gold": 8000,
+      "gold": 5200,
       "materials": {
-        "iron": 100,
-        "crystal": 25,
+        "iron": 48,
+        "crystal": 20,
+        "soul_ash": 8,
+        "refined_iron": 5,
         "bossFang": 3
       }
     }
   ],
-  "cultPerMat": {
-    "wood": 40,
-    "stone": 30,
-    "fiber": 20,
-    "iron": 60,
-    "refined_iron": 240,
-    "crystal": 200,
-    "venom": 80,
-    "carapace": 80,
-    "soul_ash": 150,
-    "bossFang": 800
-  },
   "warehouseItems": {
     "wheat": {
       "name": "小麦",
@@ -3850,6 +4558,1594 @@
     "normalKill": 2,
     "eliteKill": 8
   },
+  "difficulties": [
+    {
+      "id": "casual",
+      "name": "休闲",
+      "icon": "🌱",
+      "hpMul": 0.7,
+      "dmgMul": 0.7,
+      "maxAffixes": 1,
+      "minAffixes": 0,
+      "supplyMul": 1.3,
+      "torchMul": 0.5,
+      "rewardMul": 0.8,
+      "vision": 1.05,
+      "comboCap": 1,
+      "dodgeWindow": 200,
+      "dodgeCrit": true,
+      "ultBossDmg": 0.25,
+      "ultEliteDmg": 0.99,
+      "executeKill": true,
+      "envPlayerMul": 0.5
+    },
+    {
+      "id": "normal",
+      "name": "普通",
+      "icon": "⚔️",
+      "hpMul": 1,
+      "dmgMul": 1,
+      "maxAffixes": 2,
+      "minAffixes": 0,
+      "supplyMul": 1,
+      "torchMul": 1,
+      "rewardMul": 1,
+      "vision": 1,
+      "comboCap": 0.6,
+      "dodgeWindow": 180,
+      "dodgeCrit": true,
+      "ultBossDmg": 0.25,
+      "ultEliteDmg": 0.99,
+      "executeKill": true,
+      "envPlayerMul": 0.5
+    },
+    {
+      "id": "hard",
+      "name": "困难",
+      "icon": "🔥",
+      "hpMul": 1.55,
+      "dmgMul": 1.45,
+      "maxAffixes": 2,
+      "minAffixes": 1,
+      "supplyMul": 0.7,
+      "torchMul": 1.5,
+      "rewardMul": 1.5,
+      "vision": 0.92,
+      "comboCap": 0.4,
+      "dodgeWindow": 130,
+      "dodgeCrit": false,
+      "dodgeCritDmg": 1.5,
+      "ultBossDmg": 0.15,
+      "ultEliteDmg": 0.5,
+      "executeKill": false,
+      "executeDmg": 0.8,
+      "envPlayerMul": 1
+    },
+    {
+      "id": "nightmare",
+      "name": "噩梦",
+      "icon": "💀",
+      "hpMul": 2.3,
+      "dmgMul": 2.1,
+      "maxAffixes": 3,
+      "minAffixes": 2,
+      "supplyMul": 0.35,
+      "torchMul": 2,
+      "rewardMul": 2.5,
+      "vision": 0.82,
+      "comboCap": 0.3,
+      "dodgeWindow": 100,
+      "dodgeCrit": false,
+      "dodgeCritDmg": 1.5,
+      "ultBossDmg": 0.15,
+      "ultEliteDmg": 0.5,
+      "executeKill": false,
+      "executeDmg": 0.8,
+      "envPlayerMul": 1.5
+    }
+  ],
+  "levelTable": [
+    {
+      "level": 1,
+      "maxHp": 100,
+      "baseAtk": 12,
+      "defense": 0,
+      "maxEnergy": 100,
+      "energyRegen": 15,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 60,
+      "goldCost": 30,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 2,
+      "maxHp": 108,
+      "baseAtk": 12.8,
+      "defense": 0.6,
+      "maxEnergy": 102,
+      "energyRegen": 15,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 158,
+      "goldCost": 71,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 3,
+      "maxHp": 116,
+      "baseAtk": 13.6,
+      "defense": 1.2,
+      "maxEnergy": 102,
+      "energyRegen": 15,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 279,
+      "goldCost": 118,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 4,
+      "maxHp": 124,
+      "baseAtk": 14.4,
+      "defense": 1.8,
+      "maxEnergy": 104,
+      "energyRegen": 15,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 418,
+      "goldCost": 170,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 5,
+      "maxHp": 132,
+      "baseAtk": 15.2,
+      "defense": 2.4,
+      "maxEnergy": 104,
+      "energyRegen": 15.3,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 571,
+      "goldCost": 224,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 6,
+      "maxHp": 140,
+      "baseAtk": 16,
+      "defense": 3,
+      "maxEnergy": 106,
+      "energyRegen": 15.3,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 737,
+      "goldCost": 282,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 7,
+      "maxHp": 148,
+      "baseAtk": 16.8,
+      "defense": 3.6,
+      "maxEnergy": 106,
+      "energyRegen": 15.3,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 915,
+      "goldCost": 342,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 8,
+      "maxHp": 157,
+      "baseAtk": 17.7,
+      "defense": 4.2,
+      "maxEnergy": 108,
+      "energyRegen": 15.3,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 1103,
+      "goldCost": 404,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 9,
+      "maxHp": 165,
+      "baseAtk": 18.5,
+      "defense": 4.8,
+      "maxEnergy": 108,
+      "energyRegen": 15.3,
+      "hpRegen": 0,
+      "skillSlots": 1,
+      "cultCost": 1300,
+      "goldCost": 468,
+      "soilCost": 2,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 10,
+      "maxHp": 173,
+      "baseAtk": 19.3,
+      "defense": 5.5,
+      "maxEnergy": 110,
+      "energyRegen": 15.6,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 1507,
+      "goldCost": 533,
+      "soilCost": 3,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 11,
+      "maxHp": 181,
+      "baseAtk": 20.1,
+      "defense": 6.1,
+      "maxEnergy": 110,
+      "energyRegen": 15.6,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 1722,
+      "goldCost": 601,
+      "soilCost": 3,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 12,
+      "maxHp": 189,
+      "baseAtk": 20.9,
+      "defense": 6.7,
+      "maxEnergy": 112,
+      "energyRegen": 15.6,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 1945,
+      "goldCost": 670,
+      "soilCost": 3,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 13,
+      "maxHp": 197,
+      "baseAtk": 21.7,
+      "defense": 7.3,
+      "maxEnergy": 112,
+      "energyRegen": 15.6,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 2176,
+      "goldCost": 741,
+      "soilCost": 3,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 14,
+      "maxHp": 205,
+      "baseAtk": 22.5,
+      "defense": 7.9,
+      "maxEnergy": 114,
+      "energyRegen": 15.6,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 2414,
+      "goldCost": 812,
+      "soilCost": 3,
+      "waterCost": 1,
+      "compostCost": 0
+    },
+    {
+      "level": 15,
+      "maxHp": 213,
+      "baseAtk": 23.3,
+      "defense": 8.5,
+      "maxEnergy": 114,
+      "energyRegen": 15.9,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 2659,
+      "goldCost": 886,
+      "soilCost": 3,
+      "waterCost": 2,
+      "compostCost": 0
+    },
+    {
+      "level": 16,
+      "maxHp": 221,
+      "baseAtk": 24.1,
+      "defense": 9.1,
+      "maxEnergy": 116,
+      "energyRegen": 15.9,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 2910,
+      "goldCost": 960,
+      "soilCost": 3,
+      "waterCost": 2,
+      "compostCost": 0
+    },
+    {
+      "level": 17,
+      "maxHp": 229,
+      "baseAtk": 24.9,
+      "defense": 9.7,
+      "maxEnergy": 116,
+      "energyRegen": 15.9,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 3168,
+      "goldCost": 1036,
+      "soilCost": 3,
+      "waterCost": 2,
+      "compostCost": 0
+    },
+    {
+      "level": 18,
+      "maxHp": 237,
+      "baseAtk": 25.7,
+      "defense": 10.3,
+      "maxEnergy": 118,
+      "energyRegen": 15.9,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 3432,
+      "goldCost": 1112,
+      "soilCost": 3,
+      "waterCost": 2,
+      "compostCost": 0
+    },
+    {
+      "level": 19,
+      "maxHp": 245,
+      "baseAtk": 26.5,
+      "defense": 10.9,
+      "maxEnergy": 118,
+      "energyRegen": 15.9,
+      "hpRegen": 0.4,
+      "skillSlots": 1,
+      "cultCost": 3702,
+      "goldCost": 1190,
+      "soilCost": 3,
+      "waterCost": 2,
+      "compostCost": 0
+    },
+    {
+      "level": 20,
+      "maxHp": 254,
+      "baseAtk": 27.4,
+      "defense": 11.5,
+      "maxEnergy": 120,
+      "energyRegen": 16.2,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 3977,
+      "goldCost": 1269,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 21,
+      "maxHp": 262,
+      "baseAtk": 28.2,
+      "defense": 12.1,
+      "maxEnergy": 120,
+      "energyRegen": 16.2,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 4259,
+      "goldCost": 1349,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 22,
+      "maxHp": 270,
+      "baseAtk": 29,
+      "defense": 12.7,
+      "maxEnergy": 122,
+      "energyRegen": 16.2,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 4545,
+      "goldCost": 1429,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 23,
+      "maxHp": 278,
+      "baseAtk": 29.8,
+      "defense": 13.3,
+      "maxEnergy": 122,
+      "energyRegen": 16.2,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 4837,
+      "goldCost": 1511,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 24,
+      "maxHp": 286,
+      "baseAtk": 30.6,
+      "defense": 13.9,
+      "maxEnergy": 124,
+      "energyRegen": 16.2,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 5134,
+      "goldCost": 1594,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 25,
+      "maxHp": 294,
+      "baseAtk": 31.4,
+      "defense": 14.5,
+      "maxEnergy": 124,
+      "energyRegen": 16.5,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 5436,
+      "goldCost": 1677,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 26,
+      "maxHp": 302,
+      "baseAtk": 32.2,
+      "defense": 15.2,
+      "maxEnergy": 126,
+      "energyRegen": 16.5,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 5743,
+      "goldCost": 1761,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 27,
+      "maxHp": 310,
+      "baseAtk": 33,
+      "defense": 15.8,
+      "maxEnergy": 126,
+      "energyRegen": 16.5,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 6054,
+      "goldCost": 1846,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 28,
+      "maxHp": 318,
+      "baseAtk": 33.8,
+      "defense": 16.4,
+      "maxEnergy": 128,
+      "energyRegen": 16.5,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 6370,
+      "goldCost": 1932,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 29,
+      "maxHp": 326,
+      "baseAtk": 34.6,
+      "defense": 17,
+      "maxEnergy": 128,
+      "energyRegen": 16.5,
+      "hpRegen": 0.8,
+      "skillSlots": 2,
+      "cultCost": 6691,
+      "goldCost": 2019,
+      "soilCost": 4,
+      "waterCost": 2,
+      "compostCost": 1
+    },
+    {
+      "level": 30,
+      "maxHp": 334,
+      "baseAtk": 35.4,
+      "defense": 17.6,
+      "maxEnergy": 130,
+      "energyRegen": 16.8,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 7017,
+      "goldCost": 2106,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 31,
+      "maxHp": 342,
+      "baseAtk": 36.2,
+      "defense": 18.2,
+      "maxEnergy": 130,
+      "energyRegen": 16.8,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 7346,
+      "goldCost": 2194,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 32,
+      "maxHp": 351,
+      "baseAtk": 37.1,
+      "defense": 18.8,
+      "maxEnergy": 132,
+      "energyRegen": 16.8,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 7680,
+      "goldCost": 2283,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 33,
+      "maxHp": 359,
+      "baseAtk": 37.9,
+      "defense": 19.4,
+      "maxEnergy": 132,
+      "energyRegen": 16.8,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 8018,
+      "goldCost": 2373,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 34,
+      "maxHp": 367,
+      "baseAtk": 38.7,
+      "defense": 20,
+      "maxEnergy": 134,
+      "energyRegen": 16.8,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 8360,
+      "goldCost": 2463,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 35,
+      "maxHp": 375,
+      "baseAtk": 39.5,
+      "defense": 20.6,
+      "maxEnergy": 134,
+      "energyRegen": 17.1,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 8707,
+      "goldCost": 2554,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 36,
+      "maxHp": 383,
+      "baseAtk": 40.3,
+      "defense": 21.2,
+      "maxEnergy": 136,
+      "energyRegen": 17.1,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 9057,
+      "goldCost": 2645,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 37,
+      "maxHp": 391,
+      "baseAtk": 41.1,
+      "defense": 21.8,
+      "maxEnergy": 136,
+      "energyRegen": 17.1,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 9411,
+      "goldCost": 2738,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 38,
+      "maxHp": 399,
+      "baseAtk": 41.9,
+      "defense": 22.4,
+      "maxEnergy": 138,
+      "energyRegen": 17.1,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 9769,
+      "goldCost": 2830,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 39,
+      "maxHp": 407,
+      "baseAtk": 42.7,
+      "defense": 23,
+      "maxEnergy": 138,
+      "energyRegen": 17.1,
+      "hpRegen": 1.2000000000000002,
+      "skillSlots": 2,
+      "cultCost": 10131,
+      "goldCost": 2924,
+      "soilCost": 5,
+      "waterCost": 3,
+      "compostCost": 1
+    },
+    {
+      "level": 40,
+      "maxHp": 415,
+      "baseAtk": 43.5,
+      "defense": 23.6,
+      "maxEnergy": 140,
+      "energyRegen": 17.4,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 10496,
+      "goldCost": 3018,
+      "soilCost": 6,
+      "waterCost": 3,
+      "compostCost": 2
+    },
+    {
+      "level": 41,
+      "maxHp": 423,
+      "baseAtk": 44.3,
+      "defense": 24.2,
+      "maxEnergy": 140,
+      "energyRegen": 17.4,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 10865,
+      "goldCost": 3112,
+      "soilCost": 6,
+      "waterCost": 3,
+      "compostCost": 2
+    },
+    {
+      "level": 42,
+      "maxHp": 431,
+      "baseAtk": 45.1,
+      "defense": 24.8,
+      "maxEnergy": 142,
+      "energyRegen": 17.4,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 11238,
+      "goldCost": 3208,
+      "soilCost": 6,
+      "waterCost": 3,
+      "compostCost": 2
+    },
+    {
+      "level": 43,
+      "maxHp": 439,
+      "baseAtk": 45.9,
+      "defense": 25.5,
+      "maxEnergy": 142,
+      "energyRegen": 17.4,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 11615,
+      "goldCost": 3303,
+      "soilCost": 6,
+      "waterCost": 3,
+      "compostCost": 2
+    },
+    {
+      "level": 44,
+      "maxHp": 447,
+      "baseAtk": 46.7,
+      "defense": 26.1,
+      "maxEnergy": 144,
+      "energyRegen": 17.4,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 11995,
+      "goldCost": 3400,
+      "soilCost": 6,
+      "waterCost": 3,
+      "compostCost": 2
+    },
+    {
+      "level": 45,
+      "maxHp": 456,
+      "baseAtk": 47.6,
+      "defense": 26.7,
+      "maxEnergy": 144,
+      "energyRegen": 17.7,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 12378,
+      "goldCost": 3497,
+      "soilCost": 6,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 46,
+      "maxHp": 464,
+      "baseAtk": 48.4,
+      "defense": 27.3,
+      "maxEnergy": 146,
+      "energyRegen": 17.7,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 12765,
+      "goldCost": 3594,
+      "soilCost": 6,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 47,
+      "maxHp": 472,
+      "baseAtk": 49.2,
+      "defense": 27.9,
+      "maxEnergy": 146,
+      "energyRegen": 17.7,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 13155,
+      "goldCost": 3692,
+      "soilCost": 6,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 48,
+      "maxHp": 480,
+      "baseAtk": 50,
+      "defense": 28.5,
+      "maxEnergy": 148,
+      "energyRegen": 17.7,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 13548,
+      "goldCost": 3790,
+      "soilCost": 6,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 49,
+      "maxHp": 488,
+      "baseAtk": 50.8,
+      "defense": 29.1,
+      "maxEnergy": 148,
+      "energyRegen": 17.7,
+      "hpRegen": 1.6,
+      "skillSlots": 3,
+      "cultCost": 13945,
+      "goldCost": 3889,
+      "soilCost": 6,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 50,
+      "maxHp": 496,
+      "baseAtk": 51.6,
+      "defense": 29.7,
+      "maxEnergy": 150,
+      "energyRegen": 18,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 14345,
+      "goldCost": 3989,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 51,
+      "maxHp": 504,
+      "baseAtk": 52.4,
+      "defense": 30.3,
+      "maxEnergy": 150,
+      "energyRegen": 18,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 14749,
+      "goldCost": 4089,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 52,
+      "maxHp": 512,
+      "baseAtk": 53.2,
+      "defense": 30.9,
+      "maxEnergy": 152,
+      "energyRegen": 18,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 15155,
+      "goldCost": 4189,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 53,
+      "maxHp": 520,
+      "baseAtk": 54,
+      "defense": 31.5,
+      "maxEnergy": 152,
+      "energyRegen": 18,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 15565,
+      "goldCost": 4290,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 54,
+      "maxHp": 528,
+      "baseAtk": 54.8,
+      "defense": 32.1,
+      "maxEnergy": 154,
+      "energyRegen": 18,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 15977,
+      "goldCost": 4392,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 55,
+      "maxHp": 536,
+      "baseAtk": 55.6,
+      "defense": 32.7,
+      "maxEnergy": 154,
+      "energyRegen": 18.3,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 16393,
+      "goldCost": 4493,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 56,
+      "maxHp": 544,
+      "baseAtk": 56.4,
+      "defense": 33.3,
+      "maxEnergy": 156,
+      "energyRegen": 18.3,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 16812,
+      "goldCost": 4596,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 57,
+      "maxHp": 553,
+      "baseAtk": 57.3,
+      "defense": 33.9,
+      "maxEnergy": 156,
+      "energyRegen": 18.3,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 17234,
+      "goldCost": 4699,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 58,
+      "maxHp": 561,
+      "baseAtk": 58.1,
+      "defense": 34.5,
+      "maxEnergy": 158,
+      "energyRegen": 18.3,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 17658,
+      "goldCost": 4802,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 59,
+      "maxHp": 569,
+      "baseAtk": 58.9,
+      "defense": 35.2,
+      "maxEnergy": 158,
+      "energyRegen": 18.3,
+      "hpRegen": 2,
+      "skillSlots": 3,
+      "cultCost": 18086,
+      "goldCost": 4906,
+      "soilCost": 7,
+      "waterCost": 4,
+      "compostCost": 2
+    },
+    {
+      "level": 60,
+      "maxHp": 577,
+      "baseAtk": 59.7,
+      "defense": 35.8,
+      "maxEnergy": 160,
+      "energyRegen": 18.6,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 18517,
+      "goldCost": 5010,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 61,
+      "maxHp": 585,
+      "baseAtk": 60.5,
+      "defense": 36.4,
+      "maxEnergy": 160,
+      "energyRegen": 18.6,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 18950,
+      "goldCost": 5114,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 62,
+      "maxHp": 593,
+      "baseAtk": 61.3,
+      "defense": 37,
+      "maxEnergy": 162,
+      "energyRegen": 18.6,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 19387,
+      "goldCost": 5219,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 63,
+      "maxHp": 601,
+      "baseAtk": 62.1,
+      "defense": 37.6,
+      "maxEnergy": 162,
+      "energyRegen": 18.6,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 19826,
+      "goldCost": 5325,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 64,
+      "maxHp": 609,
+      "baseAtk": 62.9,
+      "defense": 38.2,
+      "maxEnergy": 164,
+      "energyRegen": 18.6,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 20268,
+      "goldCost": 5431,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 65,
+      "maxHp": 617,
+      "baseAtk": 63.7,
+      "defense": 38.8,
+      "maxEnergy": 164,
+      "energyRegen": 18.9,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 20712,
+      "goldCost": 5537,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 66,
+      "maxHp": 625,
+      "baseAtk": 64.5,
+      "defense": 39.4,
+      "maxEnergy": 166,
+      "energyRegen": 18.9,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 21160,
+      "goldCost": 5644,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 67,
+      "maxHp": 633,
+      "baseAtk": 65.3,
+      "defense": 40,
+      "maxEnergy": 166,
+      "energyRegen": 18.9,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 21610,
+      "goldCost": 5751,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 68,
+      "maxHp": 641,
+      "baseAtk": 66.1,
+      "defense": 40.6,
+      "maxEnergy": 168,
+      "energyRegen": 18.9,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 22063,
+      "goldCost": 5858,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 69,
+      "maxHp": 649,
+      "baseAtk": 66.9,
+      "defense": 41.2,
+      "maxEnergy": 168,
+      "energyRegen": 18.9,
+      "hpRegen": 2.4000000000000004,
+      "skillSlots": 4,
+      "cultCost": 22519,
+      "goldCost": 5966,
+      "soilCost": 8,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 70,
+      "maxHp": 658,
+      "baseAtk": 67.8,
+      "defense": 41.8,
+      "maxEnergy": 170,
+      "energyRegen": 19.2,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 22977,
+      "goldCost": 6074,
+      "soilCost": 9,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 71,
+      "maxHp": 666,
+      "baseAtk": 68.6,
+      "defense": 42.4,
+      "maxEnergy": 170,
+      "energyRegen": 19.2,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 23438,
+      "goldCost": 6183,
+      "soilCost": 9,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 72,
+      "maxHp": 674,
+      "baseAtk": 69.4,
+      "defense": 43,
+      "maxEnergy": 172,
+      "energyRegen": 19.2,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 23901,
+      "goldCost": 6292,
+      "soilCost": 9,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 73,
+      "maxHp": 682,
+      "baseAtk": 70.2,
+      "defense": 43.6,
+      "maxEnergy": 172,
+      "energyRegen": 19.2,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 24367,
+      "goldCost": 6401,
+      "soilCost": 9,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 74,
+      "maxHp": 690,
+      "baseAtk": 71,
+      "defense": 44.2,
+      "maxEnergy": 174,
+      "energyRegen": 19.2,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 24836,
+      "goldCost": 6511,
+      "soilCost": 9,
+      "waterCost": 5,
+      "compostCost": 3
+    },
+    {
+      "level": 75,
+      "maxHp": 698,
+      "baseAtk": 71.8,
+      "defense": 44.8,
+      "maxEnergy": 174,
+      "energyRegen": 19.5,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 25307,
+      "goldCost": 6621,
+      "soilCost": 9,
+      "waterCost": 6,
+      "compostCost": 3
+    },
+    {
+      "level": 76,
+      "maxHp": 706,
+      "baseAtk": 72.6,
+      "defense": 45.5,
+      "maxEnergy": 176,
+      "energyRegen": 19.5,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 25780,
+      "goldCost": 6732,
+      "soilCost": 9,
+      "waterCost": 6,
+      "compostCost": 3
+    },
+    {
+      "level": 77,
+      "maxHp": 714,
+      "baseAtk": 73.4,
+      "defense": 46.1,
+      "maxEnergy": 176,
+      "energyRegen": 19.5,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 26257,
+      "goldCost": 6843,
+      "soilCost": 9,
+      "waterCost": 6,
+      "compostCost": 3
+    },
+    {
+      "level": 78,
+      "maxHp": 722,
+      "baseAtk": 74.2,
+      "defense": 46.7,
+      "maxEnergy": 178,
+      "energyRegen": 19.5,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 26735,
+      "goldCost": 6954,
+      "soilCost": 9,
+      "waterCost": 6,
+      "compostCost": 3
+    },
+    {
+      "level": 79,
+      "maxHp": 730,
+      "baseAtk": 75,
+      "defense": 47.3,
+      "maxEnergy": 178,
+      "energyRegen": 19.5,
+      "hpRegen": 2.8000000000000003,
+      "skillSlots": 4,
+      "cultCost": 27216,
+      "goldCost": 7066,
+      "soilCost": 9,
+      "waterCost": 6,
+      "compostCost": 3
+    },
+    {
+      "level": 80,
+      "maxHp": 738,
+      "baseAtk": 75.8,
+      "defense": 47.9,
+      "maxEnergy": 180,
+      "energyRegen": 19.8,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 27700,
+      "goldCost": 7178,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 81,
+      "maxHp": 746,
+      "baseAtk": 76.6,
+      "defense": 48.5,
+      "maxEnergy": 180,
+      "energyRegen": 19.8,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 28186,
+      "goldCost": 7290,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 82,
+      "maxHp": 755,
+      "baseAtk": 77.5,
+      "defense": 49.1,
+      "maxEnergy": 182,
+      "energyRegen": 19.8,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 28674,
+      "goldCost": 7403,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 83,
+      "maxHp": 763,
+      "baseAtk": 78.3,
+      "defense": 49.7,
+      "maxEnergy": 182,
+      "energyRegen": 19.8,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 29165,
+      "goldCost": 7516,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 84,
+      "maxHp": 771,
+      "baseAtk": 79.1,
+      "defense": 50.3,
+      "maxEnergy": 184,
+      "energyRegen": 19.8,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 29658,
+      "goldCost": 7629,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 85,
+      "maxHp": 779,
+      "baseAtk": 79.9,
+      "defense": 50.9,
+      "maxEnergy": 184,
+      "energyRegen": 20.1,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 30154,
+      "goldCost": 7743,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 86,
+      "maxHp": 787,
+      "baseAtk": 80.7,
+      "defense": 51.5,
+      "maxEnergy": 186,
+      "energyRegen": 20.1,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 30651,
+      "goldCost": 7857,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 87,
+      "maxHp": 795,
+      "baseAtk": 81.5,
+      "defense": 52.1,
+      "maxEnergy": 186,
+      "energyRegen": 20.1,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 31151,
+      "goldCost": 7971,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 88,
+      "maxHp": 803,
+      "baseAtk": 82.3,
+      "defense": 52.7,
+      "maxEnergy": 188,
+      "energyRegen": 20.1,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 31654,
+      "goldCost": 8086,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 89,
+      "maxHp": 811,
+      "baseAtk": 83.1,
+      "defense": 53.3,
+      "maxEnergy": 188,
+      "energyRegen": 20.1,
+      "hpRegen": 3.2,
+      "skillSlots": 5,
+      "cultCost": 32159,
+      "goldCost": 8201,
+      "soilCost": 10,
+      "waterCost": 6,
+      "compostCost": 4
+    },
+    {
+      "level": 90,
+      "maxHp": 819,
+      "baseAtk": 83.9,
+      "defense": 53.9,
+      "maxEnergy": 190,
+      "energyRegen": 20.4,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 32666,
+      "goldCost": 8316,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 91,
+      "maxHp": 827,
+      "baseAtk": 84.7,
+      "defense": 54.5,
+      "maxEnergy": 190,
+      "energyRegen": 20.4,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 33175,
+      "goldCost": 8432,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 92,
+      "maxHp": 835,
+      "baseAtk": 85.5,
+      "defense": 55.2,
+      "maxEnergy": 192,
+      "energyRegen": 20.4,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 33686,
+      "goldCost": 8548,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 93,
+      "maxHp": 843,
+      "baseAtk": 86.3,
+      "defense": 55.8,
+      "maxEnergy": 192,
+      "energyRegen": 20.4,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 34200,
+      "goldCost": 8664,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 94,
+      "maxHp": 852,
+      "baseAtk": 87.2,
+      "defense": 56.4,
+      "maxEnergy": 194,
+      "energyRegen": 20.4,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 34716,
+      "goldCost": 8781,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 95,
+      "maxHp": 860,
+      "baseAtk": 88,
+      "defense": 57,
+      "maxEnergy": 194,
+      "energyRegen": 20.7,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 35234,
+      "goldCost": 8898,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 96,
+      "maxHp": 868,
+      "baseAtk": 88.8,
+      "defense": 57.6,
+      "maxEnergy": 196,
+      "energyRegen": 20.7,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 35755,
+      "goldCost": 9015,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 97,
+      "maxHp": 876,
+      "baseAtk": 89.6,
+      "defense": 58.2,
+      "maxEnergy": 196,
+      "energyRegen": 20.7,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 36277,
+      "goldCost": 9132,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 98,
+      "maxHp": 884,
+      "baseAtk": 90.4,
+      "defense": 58.8,
+      "maxEnergy": 198,
+      "energyRegen": 20.7,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 36802,
+      "goldCost": 9250,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 99,
+      "maxHp": 892,
+      "baseAtk": 91.2,
+      "defense": 59.4,
+      "maxEnergy": 198,
+      "energyRegen": 20.7,
+      "hpRegen": 3.6,
+      "skillSlots": 5,
+      "cultCost": 37328,
+      "goldCost": 9368,
+      "soilCost": 11,
+      "waterCost": 7,
+      "compostCost": 4
+    },
+    {
+      "level": 100,
+      "maxHp": 900,
+      "baseAtk": 92,
+      "defense": 60,
+      "maxEnergy": 200,
+      "energyRegen": 21,
+      "hpRegen": 4,
+      "skillSlots": 5,
+      "cultCost": null,
+      "goldCost": null,
+      "soilCost": null,
+      "waterCost": null,
+      "compostCost": null
+    }
+  ],
   "growth": {
     "slotLevels": null
   }

@@ -8,28 +8,28 @@
     casual: {
       id: 'casual', name: '休闲', icon: '🌱',
       hpMul: 0.7, dmgMul: 0.7,
-      maxAffixes: 1, supplyMul: 1.3, torchMul: 0.5, rewardMul: 0.8,
+      maxAffixes: 1, minAffixes: 0, supplyMul: 1.3, torchMul: 0.5, rewardMul: 0.8, vision: 1.05,
       comboCap: 1.0, dodgeWindow: 200, dodgeCrit: true,
       ultBossDmg: 0.25, ultEliteDmg: 0.99, executeKill: true, envPlayerMul: 0.5
     },
     normal: {
       id: 'normal', name: '普通', icon: '⚔️',
       hpMul: 1.0, dmgMul: 1.0,
-      maxAffixes: 2, supplyMul: 1.0, torchMul: 1.0, rewardMul: 1.0,
+      maxAffixes: 2, minAffixes: 0, supplyMul: 1.0, torchMul: 1.0, rewardMul: 1.0, vision: 1.0,
       comboCap: 0.6, dodgeWindow: 180, dodgeCrit: true,
       ultBossDmg: 0.25, ultEliteDmg: 0.99, executeKill: true, envPlayerMul: 0.5
     },
     hard: {
       id: 'hard', name: '困难', icon: '🔥',
-      hpMul: 1.4, dmgMul: 1.3,
-      maxAffixes: 2, supplyMul: 0.7, torchMul: 1.5, rewardMul: 1.5,
+      hpMul: 1.55, dmgMul: 1.45,
+      maxAffixes: 2, minAffixes: 1, supplyMul: 0.7, torchMul: 1.5, rewardMul: 1.5, vision: 0.92,
       comboCap: 0.4, dodgeWindow: 130, dodgeCrit: false, dodgeCritDmg: 1.5,
       ultBossDmg: 0.15, ultEliteDmg: 0.5, executeKill: false, executeDmg: 0.8, envPlayerMul: 1.0
     },
     nightmare: {
       id: 'nightmare', name: '噩梦', icon: '💀',
-      hpMul: 2.0, dmgMul: 1.8,
-      maxAffixes: 3, supplyMul: 0.4, torchMul: 2.0, rewardMul: 2.5,
+      hpMul: 2.3, dmgMul: 2.1,
+      maxAffixes: 3, minAffixes: 2, supplyMul: 0.35, torchMul: 2.0, rewardMul: 2.5, vision: 0.82,
       comboCap: 0.3, dodgeWindow: 100, dodgeCrit: false, dodgeCritDmg: 1.5,
       ultBossDmg: 0.15, ultEliteDmg: 0.5, executeKill: false, executeDmg: 0.8, envPlayerMul: 1.5
     }
@@ -95,7 +95,7 @@
   // ===== 四、Heat修改器 =====
   const HEAT_MODIFIERS = {
     ironwall: { id: 'ironwall', name: '铁壁', desc: '所有怪物+50%血量', rewardBonus: 0.2, apply: (s) => { s.hpMulExtra = (s.hpMulExtra || 1) * 1.5; } },
-    frenzy: { id: 'frenzy', name: '狂乱', desc: '所有怪物+30%攻速', rewardBonus: 0.25, apply: (s) => { s.speedMulExtra = (s.speedMulExtra || 1) * 1.3; } },
+    frenzy: { id: 'frenzy', name: '狂乱', desc: '所有怪物行动速度+30%', rewardBonus: 0.25, apply: (s) => { s.speedMulExtra = (s.speedMulExtra || 1) * 1.3; } },
     darkness: { id: 'darkness', name: '黑暗', desc: '视野永久-30%', rewardBonus: 0.15, apply: (s) => { s.visionMulExtra = (s.visionMulExtra || 1) * 0.7; } },
     barren: { id: 'barren', name: '贫瘠', desc: '补给掉落-50%', rewardBonus: 0.3, apply: (s) => { s.supplyMulExtra = (s.supplyMulExtra || 1) * 0.5; } },
     headless: { id: 'headless', name: '无头', desc: '禁用怒气超杀', rewardBonus: 0.5, apply: (s) => { s.ultDisabled = true; } }
@@ -131,7 +131,8 @@
     s.ultBossDmg = d.ultBossDmg; s.ultEliteDmg = d.ultEliteDmg;
     s.executeKill = d.executeKill; s.executeDmg = d.executeDmg || 1.0;
     s.envPlayerMul = d.envPlayerMul;
-    s.visionMul = m.visionMul;
+    s.visionMul = m.visionMul * (d.vision != null ? d.vision : 1);
+    s.minAffixes = d.minAffixes || 0;
     s.ultDisabled = false;
     s.speedMulExtra = 1.0; s.hpMulExtra = 1.0; s.visionMulExtra = 1.0; s.supplyMulExtra = 1.0;
     // Heat叠加
@@ -149,6 +150,15 @@
   }
 
   function get() { return _current; }
+  // v5.4 统一乘区读取入口（Boss/掉落/视野全部从这里取，避免漏接难度系数）
+  function getMultipliers() {
+    return {
+      hpMul: _current.hpMul, dmgMul: _current.dmgMul, supplyMul: _current.supplyMul,
+      rewardMul: _current.rewardMul, visionMul: getEffectiveVision(),
+      speedMulExtra: _current.speedMulExtra || 1, minAffixes: _current.minAffixes || 0,
+      maxAffixes: _current.maxAffixes, envPlayerMul: _current.envPlayerMul
+    };
+  }
   function getDifficulty(id) { return DIFFICULTIES[id] || DIFFICULTIES.normal; }
   function getTierMechanic(tier) { return TIER_MECHANICS[tier] || TIER_MECHANICS[1]; }
   function getHeatModifier(id) { return HEAT_MODIFIERS[id]; }
@@ -264,7 +274,7 @@
   // 暴露全局
   window.DifficultySystem = {
     DIFFICULTIES, TIER_MECHANICS, ADVANCED_AFFIXES, HEAT_MODIFIERS,
-    applyDifficulty, get, getDifficulty, getTierMechanic, getHeatModifier,
+    applyDifficulty, get, getMultipliers, getDifficulty, getTierMechanic, getHeatModifier,
     getAllDifficulties, getAllHeat, getAdvancedAffixes, getHeatRewardMultiplier,
     tick, getEffectiveVision, applyPoison, tickPoison,
     renderDifficultySelect, renderHeatSelect

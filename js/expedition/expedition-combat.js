@@ -78,7 +78,10 @@ Object.assign(Expedition.prototype, {
     if (window.Telemetry) Telemetry.onBeastWave(this);
     this.beastWave.duration = 32 + this.map.tier * 3;
     if (typeof AudioManager !== 'undefined' && AudioManager.playWaveWarning) AudioManager.playWaveWarning();
-    const count = Math.min(60, 16 + this.map.tier * 5 + this.beastWave.wave * 5);
+    // v5.4 指数兽潮：数量 1.18^(波次-1)，密度上限 26+Tier*8，后期压力指数抬升而非线性
+    const _wn = this.beastWave.wave;
+    const _cap = 32 + this.map.tier * 10;
+    const count = Math.min(_cap, Math.round((12 + this.map.tier * 4) * Math.pow(1.34, _wn - 1)));
     const types = ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
       const type = types[randInt(0, types.length - 1)];
@@ -99,7 +102,8 @@ Object.assign(Expedition.prototype, {
       });
     }
     this.beastWave.remaining = count;
-    this.beastWave.nextIn = this.beastWave.interval; // v4.1 下一波倒计时从本波刷出即开始（不清完也照刷）
+    // v5.4 波间隔随波次缩短：40s × 0.94^(波次-1)，下限 18s（本波刷出即开始下一波倒计时）
+    this.beastWave.nextIn = Math.max(12, Math.round(40 * Math.pow(0.88, _wn - 1)));
     this.screenShake = 1;
     showToast(`第 ${this.beastWave.wave} 波兽潮来袭！立即进入已占领防御塔射程`, 'warning');
   },
@@ -697,6 +701,12 @@ Object.assign(Expedition.prototype, {
       this.tempWeapons.push(item.weapon);
       this.spawnAoeEffect(x, y, 50, '#ffd700');
       showToast(`🔨 获得临时武器：${item.weapon.name}！按Q滚轮切换`, 'gold');
+    } else if (item.type === 'consumable' && item.id) {
+      // v5.4 修复：局内拾取的消耗品直接进快捷栏（与带入消耗品同口径），撤离时未用完的由 endExpedition 归还仓库
+      this.consumables = this.consumables || {};
+      this.consumables[item.id] = (this.consumables[item.id] || 0) + (item.amount || 1);
+      this.spawnAoeEffect(x, y, 34, '#f6c75b');
+      showToast('拾取 ' + (item.icon || '🎒') + ' ' + item.name + ' ×' + (item.amount || 1) + '（已加入快捷栏）', 'gold');
     } else {
       // v2.9 同类物品无限叠加（金币/材料等堆叠进已有格）
       // v3.7 金币无论从哪捡都合并到同一堆
@@ -1142,8 +1152,9 @@ Object.assign(Expedition.prototype, {
     if (Math.random() < 0.4) {
       loot.push({ type: 'material', name: '泥土', amount: randInt(1, 3), icon: '🟫', matId: 'soil' });
     }
-    // 消耗品
-    if (Math.random() < 0.3) {
+    // 消耗品（v5.4：草药包掉率接难度补给系数，frugal 画像 30-40% 撤离率反推）
+    const _chestSupply = (typeof DifficultySystem !== 'undefined' && DifficultySystem.get) ? (DifficultySystem.get().supplyMul || 1) : 1;
+    if (Math.random() < Math.min(0.95, 0.65 * _chestSupply)) {
       loot.push({ type: 'consumable', name: '草药包扎包', amount: 1, icon: '💊', id: 'herb_kit' });
     }
     if (chest.hasSignal) {
@@ -1489,6 +1500,7 @@ Object.assign(Expedition.prototype, {
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
     if (target.armorUntil && target.armorUntil > performance.now()) amount *= (1 - (target.armorReduce || 0.35)); // v5.1 Boss 岩石护甲
     const isBoss = target.type === 'boss';
+    if (isBoss && target.enrageStage > 0) amount *= (1 + 0.12 * target.enrageStage); // v5.4 r4 狂暴阶防御崩坏：每阶受伤+12%，长尾双向收束
     const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;
     if (fromPlayer && typeof CombatEnhancement !== 'undefined') {
       amount *= CombatEnhancement.getComboMul();
@@ -1861,8 +1873,9 @@ Object.assign(Expedition.prototype, {
           this.spawnGroundLoot({ type: 'gold', name: '金币', amount: (m.gold || 5) + randInt(0, 5), icon: '💰' }, m.x, m.y);
         }
         // v5.1 打造材料只能从农作物获得，怪物只掉消耗品与金币
+        const _mobSupply = (typeof DifficultySystem !== 'undefined' && DifficultySystem.get) ? (DifficultySystem.get().supplyMul || 1) : 1;
         const dropTable = [
-          { type: 'consumable', name: '草药包', id: 'herb_kit', icon: '💊', weight: 0.22 },
+          { type: 'consumable', name: '草药包', id: 'herb_kit', icon: '💊', weight: Math.min(0.9, 0.40 * _mobSupply) },
           { type: 'consumable', name: '信号弹', id: 'signal_flare', icon: '🔥', weight: 0.1 },
           { type: 'consumable', name: '荆棘狂潮', id: 'thorn_storm', icon: '🌵', weight: 0.08 }
         ];
@@ -2145,6 +2158,23 @@ Object.assign(Expedition.prototype, {
   updateExtraction(dt) {
     // 撤离读条
     if (this.extracting) {
+      // v5.4 撤离点清怪半径 40px：读条期间持续肃清圈内普通怪（Boss 不受影响）
+      this._extractClearT = (this._extractClearT || 0) - dt;
+      if (this._extractClearT <= 0) {
+        this._extractClearT = 0.5;
+        let _cx = this.player.x, _cy = this.player.y;
+        if (this.extractType === 'fixed') {
+          const _ep = this.extractPoints.find(ep => dist(this.player, ep) < ep.radius);
+          if (_ep) { _cx = _ep.x; _cy = _ep.y; }
+        }
+        this.monsters.forEach(m => {
+          if (m.hp > 0 && !m.boss && Math.hypot(m.x - _cx, m.y - _cy) < 40 + (m.radius || 14) * 0.5) {
+            if (this.damageEnemy) this.damageEnemy(m, 200, '#9fe6ff', true);
+            const _a = Math.atan2(m.y - _cy, m.x - _cx);
+            if (this.moveEntityWithCollisions) this.moveEntityWithCollisions(m, Math.cos(_a) * 30, Math.sin(_a) * 30);
+          }
+        });
+      }
       if (this.extractType === 'fixed') {
         const inPoint = this.extractPoints.some(ep => dist(this.player, ep) < ep.radius);
         if (!inPoint) { this.cancelExtract(); showToast('离开了撤离点，撤离取消', 'warning'); }

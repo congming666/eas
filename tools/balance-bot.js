@@ -313,6 +313,7 @@ function botSource(specsJson) {
     let signalUsed = 0, ultUsed = 0, execUsed = 0, branchCount = 0;
     let noHerbDeath = false, herbAttemptsMissed = 0;
     let bossEngaged = false, bossEngageAt = null, bossTtkSec = null, bossKilled = false, bossSeenHp = null;
+    let peakSlots = 0, bossEnrageStage = null;
     let ultRageBefore = 0;
 
     // 位移技不自动放：会把 bot 带出撤离圈（疾风斩真实 id 为 gale_slash）
@@ -382,12 +383,16 @@ function botSource(specsJson) {
       } else if (bossSeenHp != null && !bossKilled) {
         bossKilled = true;
         if (bossEngageAt != null) bossTtkSec = +(elapsed - bossEngageAt).toFixed(1);
+        if (exp.boss && exp.boss.enrageStage != null) bossEnrageStage = exp.boss.enrageStage;
       }
+      // 玩家死亡时若 Boss 仍在场，也记录其当前狂暴阶段
+      if (exp.boss && exp.boss.hp > 0 && exp.boss.enrageStage != null) bossEnrageStage = exp.boss.enrageStage;
 
       // 背包格数：与游戏一致（金币 100/格），优先走 LoadoutSystem.usedSlots
       let slots = 0;
       try { slots = LoadoutSystem.usedSlots(exp.bag); }
       catch (e) { (exp.bag || []).forEach(it => { slots += it.type === 'gold' ? Math.max(1, Math.ceil((it.amount || 0) / 100)) : (it.slots || 1); }); }
+      if (slots > peakSlots) peakSlots = slots;
 
       // ===== 撤离决策（画像差异）=====
       obj = exp.objective || {};
@@ -716,6 +721,7 @@ function botSource(specsJson) {
       chests: exp.chestOpened || 0,
       damageTaken: Math.round(exp.damageTaken || 0),
       highestWave: (exp.beastWave && exp.beastWave.wave) || 0,
+      peakSlots, bossEnrageStage,
       goldBag, goldSettled: exp.result === 'success' ? goldBag : Math.floor(goldBag * 0.2),
       deathReason: (exp.deathCause && exp.deathCause.reason) || null,
       deathBy: (exp.deathCause && exp.deathCause.by) || null,
@@ -745,7 +751,7 @@ function botSource(specsJson) {
         weaponId: spec.weaponId, weaponLevel: spec.weaponLevel, charLevel: spec.level, planSec: spec.planSec,
         result: 'error', success: false, error: String(e && e.message || e),
         durationSec: 0, kills: 0, eliteKills: 0, bossKills: 0, chests: 0, damageTaken: 0,
-        highestWave: 0, goldBag: 0, goldSettled: 0, deathReason: 'script_error', deathBy: null,
+        highestWave: 0, peakSlots: 0, bossEnrageStage: null, goldBag: 0, goldSettled: 0, deathReason: 'script_error', deathBy: null,
         perfectDodges: 0, maxCombo: 0, minHpPct: 100, extractType: null,
         signalUsed: 0, ultUsed: 0, execUsed: 0, branchCount: 0,
         bossEngaged: false, bossTtkSec: null, bossKilled: false, herbsLeft: 0, noHerbDeath: false,
@@ -761,7 +767,7 @@ function botSource(specsJson) {
 
 // 经济闭环专项（页面内）
 function economySource(nRuns, farmJson) {
-  return `(async function(N, FARM){
+  return `(async function(N, FARM, FARM_CYCLES){
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const TICK = 1000/60, MAXT = 560*1000;
   function setKeys(exp, dx, dy){const k=exp.keys;k['w']=dy<-0.35;k['s']=dy>0.35;k['a']=dx<-0.35;k['d']=dx>0.35;}
@@ -902,7 +908,7 @@ function economySource(nRuns, farmJson) {
   const CFG_A={uid:'eco',herbs:2,thorn:1,flares:0,skillsAll:false,charLv:10};
   resetAccount(CFG_A);
   const log = [];
-  let recraftCount = 0;
+  let recraftCount = 0, stuckA = null;
 
   for(let i=1;i<=N;i++){
     let inst=LoadoutSystem.getWeaponInstance('eco');
@@ -919,7 +925,9 @@ function economySource(nRuns, farmJson) {
     }
     const beforeLv=LoadoutSystem.getWeaponInstance('eco').level;
     const tier=tierForLevel(beforeLv);
-    const run=await runOnce(tier, CFG_A);
+    let run;
+    try { run=await runOnce(tier, CFG_A); }
+    catch(e){ stuckA='第'+i+'档中断：'+(e&&e.message?e.message:e); break; }
     const upr=tryUpgrades('eco');
     const after=LoadoutSystem.getWeaponInstance('eco');
     const mats=GS.warehouse.materials||{};
@@ -933,7 +941,7 @@ function economySource(nRuns, farmJson) {
     if(after && after.level>=10) break;
   }
   const finalA=LoadoutSystem.getWeaponInstance('eco');
-  const A={ runs:log, finalLevel:finalA?finalA.level:0, recraftCount,
+  const A={ runs:log, finalLevel:finalA?finalA.level:0, recraftCount, stuck:stuckA,
     successRuns:log.filter(l=>l.result==='success').length,
     gold:Math.floor(GS.gold), materials:GS.warehouse.materials||{} };
 
@@ -945,14 +953,19 @@ function economySource(nRuns, farmJson) {
   function farmCycle(lv){
     const stage=lv<=2?'early':(lv<=5?'mid':'late');
     const pkg=FARM[stage];
-    farmAcc.gold+=pkg.gold;
+    const reps=FARM_CYCLES?FARM_CYCLES[stage]:1;
+    for(let c=0;c<reps;c++){
+      farmAcc.gold+=pkg.gold;
+      for(const [m,v] of Object.entries(pkg.materials)){
+        farmAcc.mats[m]=(farmAcc.mats[m]||0)+v;
+      }
+      farmAcc.cycles++;
+    }
     const g=Math.floor(farmAcc.gold);
     if(g>farmAcc.goldGranted){ GS.gold+=g-farmAcc.goldGranted; farmAcc.goldGranted=g; }
-    for(const [m,v] of Object.entries(pkg.materials)){
-      farmAcc.mats[m]=(farmAcc.mats[m]||0)+v;
+    for(const m of Object.keys(farmAcc.mats)){
       GS.warehouse.materials[m]=Math.floor(farmAcc.mats[m]);
     }
-    farmAcc.cycles++;
   }
   for(let i=1;i<=N;i++){
     let inst=LoadoutSystem.getWeaponInstance('dual');
@@ -982,7 +995,7 @@ function economySource(nRuns, farmJson) {
     gold:Math.floor(GS.gold), materials:GS.warehouse.materials||{}, stuck:stuckB };
 
   return { A, B };
-})(${nRuns}, ${farmJson})`;
+})(${nRuns}, ${farmJson}, {"early":3,"mid":2,"late":2})`;
 }
 
 // ---------- 浏览器 ----------
@@ -1061,11 +1074,14 @@ function buildFarmPackages() {
   const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'docs', 'game_data.json'), 'utf8'));
   const crops = {}; (data.crops || []).forEach(c => crops[c.id] = c);
   const cm = data.cropMaterials || {};
+  // 混合种植（48 格）：专用材料作物 + 纤维/粮食作物，模拟真实玩家配比
   const mixes = {
-    early: { cactus: 28, watermelon: 12, pea_shooter: 8 },
-    mid: { lightning_vine: 24, frost_flower: 24 },
-    late: { ginseng: 12, lightning_vine: 18, frost_flower: 18 },
+    early: { cactus: 16, wheat: 8, pea_shooter: 8, watermelon: 8, rice: 8 },
+    mid:   { lightning_vine: 22, cactus: 8, frost_flower: 8, deathcap: 4, wheat: 6 },
+    late:  { lightning_vine: 24, frost_flower: 6, shadow_flower: 8, deathcap: 4, ginseng: 6 },
   };
+  // 每局远征之间结算的完整收获周期数（快生作物 30-60s，局间可多次收获；晚期慢生作物保守计 2 次）
+  const cyclesPerRun = { early: 3, mid: 2, late: 2 };
   const out = {};
   for (const [stage, mix] of Object.entries(mixes)) {
     const mats = {}; let gold = 0, grow = 0, plots = 0;
@@ -1122,6 +1138,8 @@ function buildReport(runs, opts) {
   const { label, lever, previous, pageErrors } = opts;
   const summary = summarize(runs);
   const byDiff = rateTable(runs, 'difficulty', DIFFS.map(d => d.id));
+  const coreRuns = runs.filter(r => r.profile === 'oncurve' || r.profile === 'baseline');
+  const byDiffCore = rateTable(coreRuns, 'difficulty', DIFFS.map(d => d.id));
   const byTier = rateTable(runs, 'tier', [1, 2, 3, 4]);
   const byProfile = rateTable(runs, 'profile', PROFILES.filter(pr => runs.some(r => r.profile === pr)));
 
@@ -1156,7 +1174,7 @@ function buildReport(runs, opts) {
     const ca = runs.filter(r => r.profile === 'baseline' && r.difficulty === 'casual' && r.result !== 'timeout' && r.result !== 'error');
     const no = runs.filter(r => r.profile === 'baseline' && r.difficulty === 'normal' && r.result !== 'timeout' && r.result !== 'error');
     const z = twoProp(ca.filter(r => r.success).length, ca.length, no.filter(r => r.success).length, no.length);
-    if (z.p != null) inversion = { z: +z.z.toFixed(2), p: +z.p.toFixed(3), delta: +(z.delta * 100).toFixed(1), confirmed: z.sig && z.delta < -0.08 };
+    if (z.p != null) inversion = { z: +z.z.toFixed(2), p: +z.p.toFixed(3), delta: +(z.delta * 100).toFixed(1), confirmed: z.sig && z.delta > 0.08 };
   }
 
   // Boss 统计（bosshunter）
@@ -1181,19 +1199,28 @@ function buildReport(runs, opts) {
   for (const r of bh) {
     if (r.result === 'error' || !r.bossId) continue;
     const k = r.bossId;
-    if (!bossById[k]) bossById[k] = { bossId: k, runs: 0, engaged: 0, killed: 0, ttk: [], maps: new Set() };
+    if (!bossById[k]) bossById[k] = { bossId: k, runs: 0, engaged: 0, killed: 0, ttk: [], enrage: [], maps: new Set() };
     const b = bossById[k];
     b.runs++;
     if (r.mapName) b.maps.add(r.mapName);
     if (r.bossEngaged) b.engaged++;
-    if (r.bossKilled) { b.killed++; if (r.bossTtkSec != null) b.ttk.push(r.bossTtkSec); }
+    if (r.bossKilled) { b.killed++; if (r.bossTtkSec != null) b.ttk.push(r.bossTtkSec); if (r.bossEnrageStage != null) b.enrage.push(r.bossEnrageStage); }
   }
   Object.values(bossById).forEach(b => {
     b.engageRate = wilson(b.engaged, b.runs);
     b.killRate = wilson(b.killed, b.runs);
     b.ttkAvg = b.ttk.length ? +mean(b.ttk).toFixed(1) : null;
+    b.enrageAvg = b.enrage.length ? +mean(b.enrage).toFixed(1) : null;
     b.maps = [...b.maps];
   });
+
+  // 超重峰值（v5.4 贪婪成本观测）
+  const greedyValid = runs.filter(r => r.profile === 'greedy' && r.result !== 'error' && r.peakSlots != null);
+  const overweight = greedyValid.length ? {
+    n: greedyValid.length,
+    peakAvg: +mean(greedyValid.map(r => r.peakSlots)).toFixed(1),
+    over12: greedyValid.filter(r => r.peakSlots > 12).length,
+  } : null;
 
   // 任务目标完成率（hunt/scavenge/tower）
   const objAgg = {};
@@ -1247,8 +1274,8 @@ function buildReport(runs, opts) {
       version: require('../package.json').version,
       previous: previous ? { label: previous.meta ? previous.meta.label : null, generatedAt: previous.meta ? previous.meta.generatedAt : null, byDiff: previous.byDiff, byTier: previous.byTier, summary: previous.summary } : null,
     },
-    summary, byDiff, byTier, byProfile, matrix, sigTests, inversion,
-    bossStats, bossById, objAgg, frugal, greedy, deathReasons, systems,
+    summary, byDiff, byDiffCore, byTier, byProfile, matrix, sigTests, inversion,
+    bossStats, bossById, overweight, objAgg, frugal, greedy, deathReasons, systems,
     pageErrors: pageErrors.slice(0, 20),
     runs,
   };
@@ -1288,6 +1315,11 @@ function buildMarkdown(rep) {
   L.push('');
   L.push(mdTable(['难度', '样本', '撤离', '撤离率 [95% CI]', '超时'],
     rep.byDiff.map(r => [diffName(r.key), r.n, r.k, ciStr(r.w), r.timeouts])));
+  L.push('');
+  L.push('> 注：全队列含只跑普通/噩梦的有限补给、贪财画像，构成不对称；难度单调性以核心两画像（满级配装+新手）为准：');
+  L.push('');
+  L.push(mdTable(['难度（核心两画像）', '样本', '撤离', '撤离率 [95% CI]', '超时'],
+    rep.byDiffCore.map(r => [diffName(r.key), r.n, r.k, ciStr(r.w), r.timeouts])));
 
   // 3 Tier
   L.push('## 3. Tier 梯度');
@@ -1329,8 +1361,10 @@ function buildMarkdown(rep) {
   // 6b 12 Boss 个体
   const bossRows = Object.values(rep.bossById).sort((a, b) => a.bossId.localeCompare(b.bossId)).map(b =>
     [b.bossId, b.maps[0] || '—', b.runs, `${pct(b.engageRate.rate)} [${pct(b.engageRate.lo)}-${pct(b.engageRate.hi)}]`,
-     `${pct(b.killRate.rate)} [${pct(b.killRate.lo)}-${pct(b.killRate.hi)}]`, b.ttkAvg != null ? b.ttkAvg : '—']);
-  L.push(mdTable(['Boss', '代表地图', '局数', '交战率 [95% CI]', '击杀率 [95% CI]', 'TTK 均值(s)'], bossRows));
+     `${pct(b.killRate.rate)} [${pct(b.killRate.lo)}-${pct(b.killRate.hi)}]`, b.ttkAvg != null ? b.ttkAvg : '—', b.enrageAvg != null ? b.enrageAvg : '—']);
+  L.push(mdTable(['Boss', '代表地图', '局数', '交战率 [95% CI]', '击杀率 [95% CI]', 'TTK 均值(s)', '击杀时狂暴阶'], bossRows));
+  if (rep.overweight) L.push(`**超重观测（贪财画像）**：峰值格数均值 ${rep.overweight.peakAvg}/16，超过 12 格触发降速的局占 ${(rep.overweight.over12 / rep.overweight.n * 100).toFixed(1)}% (n=${rep.overweight.n})`);
+  L.push('');
   const objRows = Object.values(rep.objAgg).map(o => [o.type, o.n, o.done, pct(o.rate.rate)]);
   if (objRows.length) {
     L.push('### 任务目标完成率（寻 Boss 画像单画像口径；其余画像不执行该目标）');
@@ -1406,13 +1440,13 @@ function buildEconomyMarkdown(e) {
   const L = [];
   L.push('# 经济闭环专项：武器 +10 所需撤离局数');
   L.push('');
-  L.push('设计目标（v5.1）：一把武器从 0 升到 +10 应在 **5–8 次成功撤离** 内达成；升级总消耗金币 26100、铁块 338、晶核 76、Boss 獠牙 7（数据来源 LoadoutSystem.UPGRADE_COSTS）。v5.1 起铁/晶/獠牙只由农场作物产出，本专项分别模拟「纯远征零农场」与「农场+远征双线」两条路径。');
+  L.push('设计目标：一把武器从 0 升到 +10 应在 **5–8 次成功撤离** 内达成；v5.4 升级总消耗金币 19150、铁矿 193、晶核 62、精铁锭 11、魂烬 15、巨兽獠牙 7、植物纤维 4、木材 6、石料 6、毒腺 6、甲壳 4（数据来源 LoadoutSystem.UPGRADE_COSTS，按局间 3/2/2 个农场收获周期建模）。铁/晶/精铁/魂烬/獠牙只由农场作物产出，本专项分别模拟「纯远征零农场」与「农场+远征双线」两条路径。');
   L.push('');
   L.push('## 账号 A：纯远征、零农场（反证口径）');
   L.push('');
   L.push('口径：新号 200 金、0 级镰刃、2 草药/1 荆棘/0 信号弹、仅初始技能、1 格安全箱、空仓库；普通难度；局间继承；死亡后 bot 免费补发一把 0 级镰刃（**比真实规则宽松**——真实重铸需 100 金+3 木+2 铁，纯远征无法获得铁，实际只会更差）。');
   L.push('');
-  L.push(`结果：连跑 ${A.runs.length} 档，成功撤离 **${A.successRuns}** 档，重铸 ${A.recraftCount} 次，最终武器 **Lv${A.finalLevel}**，剩余金币 ${A.gold}。`);
+  L.push(`结果：连跑 ${A.runs.length} 档，成功撤离 **${A.successRuns}** 档，重铸 ${A.recraftCount} 次，最终武器 **Lv${A.finalLevel}**，剩余金币 ${A.gold}${A.stuck?'；'+A.stuck:''}。`);
   L.push('');
   L.push('结论：纯远征路径下武器等级始终为 0（铁/晶/獠牙缺口无法弥合），且弱配装 T1 撤离率极低，形成"死亡→重铸→再死亡"负循环。');
   L.push('');
@@ -1444,7 +1478,7 @@ function buildEconomyMarkdown(e) {
     L.push(`| ${stageName[k]} | ${mix} | ${p.growSec}s | ${p.gold} | ${mats} |`);
   }
   L.push('');
-  L.push('> 注：材料为概率期望（如后期每周期期望獠牙 3 个，来自 12 株人参 25% 掉率）；人参/死亡帽为传说/史诗作物，默认温室与种子已解锁；未计作物品质加成与反复收获特性，口径偏保守。农场周期按"局间一次完整收获"折算，现实墙钟时间取决于生长秒数与温室等级。');
+  L.push('> 注：材料为概率期望；早期/中期/晚期每局远征之间分别结算 3/2/2 个完整收获周期（快生作物 30–60s，局间可多次收获；晚期含人参/死亡帽等慢生作物，保守计 2 次）。默认温室与种子已解锁，未计作物品质加成与反复收获特性，口径偏保守；现实墙钟时间取决于生长秒数与温室等级。');
   L.push('');
   L.push('账号 B 终局材料库存：' + JSON.stringify(B.materials));
   L.push('');
@@ -1491,6 +1525,10 @@ function findPrevious(label) {
   const t0 = Date.now();
   const batch = parseInt(arg('batch', '5'), 10);
   const { runs, pageErrors } = await runBatches(specs, batch);
+  try {
+    if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
+    fs.writeFileSync(path.join(HISTORY_DIR, `raw-${label}-${stamp()}.json`), JSON.stringify({ label, stamp: new Date().toISOString(), runs, pageErrors }, null, 2), 'utf8');
+  } catch (e) { console.error('raw dump failed', e); }
   const previous = findPrevious(label);
   const rep = buildReport(runs, { label, lever: leverDesc, previous, pageErrors });
 

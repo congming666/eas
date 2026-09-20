@@ -420,20 +420,28 @@ const Game = {
   },
 
   // v1.0 武器锻造台
+  // v1.0 武器锻造台（v5.4：仅作物材料，修为不可抵扣，逐项标注材料来源）
   openBlacksmith() {
     if (typeof LoadoutSystem === 'undefined') return;
-    // 只关动态创建的锻造台面板（不能删静态 modal-overlay 如卡牌工坊）
     document.querySelectorAll('.modal-overlay[data-dynamic="1"]').forEach(el => el.remove());
     const overlay = document.createElement('div');
     overlay.setAttribute('data-dynamic', '1');
     overlay.className = 'overlay modal-overlay';
     overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    let html = '<div style="width:620px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
+    const have = m => (GameState.warehouse.materials && GameState.warehouse.materials[m]) || 0;
+    // 逐项材料：名称 持有/需要 + 来源作物
+    const matLines = mats => Object.entries(mats).map(([m,n]) => {
+      const ok = have(m) >= n;
+      return '<div style="font-size:10px;line-height:1.5;color:' + (ok ? '#9fe6a0' : '#ff8a8a') + ';">'
+        + LoadoutSystem.matName(m) + ' ' + have(m) + '/' + n
+        + '<span style="color:#8a9470;"> · ' + LoadoutSystem.materialSourceText(m) + '</span></div>';
+    }).join('');
+    let html = '<div style="width:640px;max-height:82vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
     html += '<h3 style="color:#ffd700;margin:0 0 8px;">🔨 武器锻造台</h3>';
-    html += `<p style="color:#aaa;font-size:12px;margin-bottom:8px;">每把武器独立等级，死亡永久损失。升级单个实例，打造补充新武器。</p>
-    <p style="color:#9fd8ff;font-size:12px;margin:0 0 12px;">当前修为 🧘 ${Math.floor(GameState.cultivation||0)} · 材料可由农作物产出，也可用修为抵扣（金币仍需支付）</p>`;
+    html += '<p style="color:#aaa;font-size:12px;margin-bottom:6px;">每把武器独立等级，死亡永久损失。升级单个实例，打造补充新武器。</p>';
+    html += '<p style="color:#ffcf8a;font-size:12px;margin:0 0 12px;">锻造与升级只消耗农作物产出的材料（Lv6+ 需要精炼/稀有材料，Lv7-10 需要温室/稀有作物材料）；修为仅用于修行台角色升级。</p>';
 
-    // 现有武器实例列表
+    // 现有武器实例
     html += '<div style="margin-bottom:12px;"><div style="color:#8ecf9a;font-weight:bold;margin-bottom:6px;">仓库中的武器</div>';
     const insts = GameState.weaponInstances || [];
     if (insts.length === 0) html += '<div style="color:#f66;font-size:12px;">没有武器，打造一把吧！</div>';
@@ -442,26 +450,17 @@ const Game = {
       if (!wpn) return;
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
       const cost = LoadoutSystem.getUpgradeCost(inst.uid);
-      html += `<div style="padding:8px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div style="display:flex;align-items:center;gap:10px;"><img src="${wpn.img}" style="width:40px;height:40px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'">
-        <div><span style="color:#e6bd54;font-weight:bold;">${wpn.name}</span>
-        <span style="color:${inst.level>=10?'#ffd700':'#7fff7f'};"> Lv.${inst.level}</span>
-        <span style="color:#888;font-size:11px;"> 伤害${stats?stats.damage:wpn.damage}</span>
-        <span style="color:#555;font-size:10px;margin-left:8px;">${inst.uid}</span></div></div>`;
+      html += '<div style="padding:8px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+      html += '<div style="display:flex;align-items:center;gap:10px;"><img src="' + wpn.img + '" style="width:40px;height:40px;object-fit:contain;border-radius:4px;" onerror="this.style.display=\'none\'">';
+      html += '<div><span style="color:#e6bd54;font-weight:bold;">' + wpn.name + '</span>';
+      html += '<span style="color:' + (inst.level>=10?'#ffd700':'#7fff7f') + ';"> Lv.' + inst.level + '</span>';
+      html += '<span style="color:#888;font-size:11px;"> 伤害' + (stats?stats.damage:wpn.damage) + '</span></div></div>';
       if (cost) {
-        const matStr = Object.entries(cost.materials).map(([m,n]) => {
-          const have = (GameState.warehouse.materials && GameState.warehouse.materials[m]) || 0;
-          return `${LoadoutSystem.matName(m)} ${have}/${n}`;
-        }).join(' · ');
-        const cultCost = LoadoutSystem.getCultivationCost(cost);
-        const cultOk = (GameState.cultivation||0) >= cultCost;
-        html += `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
-          <div style="color:#bbb;font-size:10px;">${cost.gold}金 · ${matStr}</div>
-          <div style="display:flex;gap:4px;">
-            <button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.upgradeWeapon('${inst.uid}','materials');Game.openBlacksmith()">材料升级</button>
-            <button class="secondary-btn" style="font-size:11px;${cultOk?'':'opacity:0.5;'}" title="用 ${cultCost} 修为抵扣全部材料（金币仍需支付）" onclick="LoadoutSystem.upgradeWeapon('${inst.uid}','cult');Game.openBlacksmith()">修为升级 🧘${cultCost}</button>
-          </div>
-        </div>`;
+        html += '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;min-width:230px;">';
+        html += '<div style="color:#d8b46a;font-size:10px;">' + cost.gold + ' 金币</div>';
+        html += '<div style="text-align:right;">' + matLines(cost.materials) + '</div>';
+        html += '<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.upgradeWeapon(\'' + inst.uid + '\');Game.openBlacksmith()">材料升级</button>';
+        html += '</div>';
       } else {
         html += '<span style="color:#ffd700;font-size:11px;">已满级</span>';
       }
@@ -470,24 +469,21 @@ const Game = {
     html += '</div>';
 
     // 打造新武器
-    html += '<div style="margin-top:12px;"><div style="color:#e6a; font-weight:bold;margin-bottom:6px;">打造新武器</div>';
+    html += '<div style="margin-top:12px;"><div style="color:#e6a;font-weight:bold;margin-bottom:6px;">打造新武器</div>';
     CONFIG.weapons.forEach(w => {
       const owned = !w.blueprint || (GameState.blueprints && GameState.blueprints.includes(w.id));
       if (!owned) return;
       const count = LoadoutSystem.getWeaponCount(w.id);
-      const cc = LoadoutSystem.CRAFT_COSTS[w.id]; // v5.1 唯一数据源
-      const matStr = cc ? Object.entries(cc.materials).map(([m,n]) => `${LoadoutSystem.matName(m)}×${n}`).join(' · ') : '';
-      const cultCost = cc ? LoadoutSystem.getCultivationCost(cc) : 0;
-      html += `<div style="padding:6px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <span style="display:flex;align-items:center;gap:8px;"><img src="${w.img}" style="width:32px;height:32px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'"> ${w.name} <span style="color:#888;font-size:11px;">(现有×${count})</span></span>
-        <span style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;">
-          <span style="color:#bbb;font-size:10px;">${cc?cc.gold:''}金 · ${matStr}</span>
-          <span style="display:flex;gap:4px;">
-            <button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.craftWeapon('${w.id}','materials');Game.openBlacksmith()">材料打造</button>
-            <button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.craftWeapon('${w.id}','cult');Game.openBlacksmith()">修为🧘${cultCost}</button>
-          </span>
-        </span>
-      </div>`;
+      const cc = LoadoutSystem.CRAFT_COSTS[w.id];
+      html += '<div style="padding:6px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+      html += '<span style="display:flex;align-items:center;gap:8px;"><img src="' + w.img + '" style="width:32px;height:32px;object-fit:contain;border-radius:4px;" onerror="this.style.display=\'none\'"> ' + w.name + ' <span style="color:#888;font-size:11px;">(现有×' + count + ')</span></span>';
+      html += '<span style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;min-width:230px;">';
+      if (cc) {
+        html += '<span style="color:#d8b46a;font-size:10px;">' + cc.gold + ' 金币</span>';
+        html += '<span style="text-align:right;">' + matLines(cc.materials) + '</span>';
+      }
+      html += '<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.craftWeapon(\'' + w.id + '\');Game.openBlacksmith()">材料打造</button>';
+      html += '</span></div>';
     });
     html += '</div>';
 

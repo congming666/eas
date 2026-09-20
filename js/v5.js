@@ -21,13 +21,13 @@
     compost:   { name: '堆肥',   icon: '🍂', kind: 'farm',  from: '作物：胡萝卜30%；工坊残料×2', to: '升级、高级种植' },
     stone:     { name: '石料',   icon: '🪨', kind: 'farm',  from: '作物：仙人掌50%',   to: '建筑、捕兽夹' },
     fiber:     { name: '植物纤维', icon: '🌾', kind: 'farm', from: '作物：向日葵/白菜/小麦/蒜/薄荷/水稻/番茄/迷迭香', to: '农田扩建、急救包、绳索' },
-    iron:      { name: '铁矿',   icon: '⛓️', kind: 'ore',   from: '作物：仙人掌32%、雷鸣藤55%×2', to: '武器打造升级、提炼精铁锭' },
-    refined_iron: { name: '精铁锭', icon: '🔩', kind: 'ore', from: '作物：雷鸣藤6%；工坊：铁矿×3', to: '高级武器锻造' },
+    iron:      { name: '铁矿',   icon: '⛓️', kind: 'ore',   from: '作物：仙人掌22%、雷鸣藤40%', to: '武器打造升级、提炼精铁锭' },
+    refined_iron: { name: '精铁锭', icon: '🔩', kind: 'ore', from: '作物：雷鸣藤8%；工坊：铁矿×3', to: '高级武器锻造（Lv6+）' },
     crystal:   { name: '晶核',   icon: '💎', kind: 'mob',   from: '作物：西瓜/冰心莲/雷鸣藤/幽魂兰', to: '武器打造升级、高级技能' },
     venom:     { name: '毒腺',   icon: '🧪', kind: 'mob',   from: '作物：辣椒30%、幽冥毒伞70%', to: '毒雾弹' },
     carapace:  { name: '甲壳',   icon: '🐚', kind: 'mob',   from: '作物：仙人掌40%', to: '护盾类工坊制品' },
     soul_ash:  { name: '魂烬',   icon: '🌫️', kind: 'mob',  from: '作物：幽魂兰45%、幽冥毒伞50%', to: '高级锻造、修为丹' },
-    bossFang:  { name: '巨兽獠牙', icon: '🦷', kind: 'mob', from: '作物：九叶灵芝25%、幽冥毒伞12%', to: '武器 7 级以上升级' },
+    bossFang:  { name: '巨兽獠牙', icon: '🦷', kind: 'mob', from: '作物：九叶灵芝25%、幽冥毒伞12%', to: '武器 7 级以上升级（温室/稀有作物产出）' },
     herb:      { name: '药草',   icon: '🌿', kind: 'raw',   from: '远征野外采摘、宝箱',   to: '急救包、药剂' },
   };
   CONFIG.resources = RESOURCES;
@@ -39,20 +39,20 @@
   const CROP_MATERIALS = {
     pea_shooter:    [['wood', 0.5, 1]],
     sunflower:      [['fiber', 0.4, 1]],
-    watermelon:     [['crystal', 0.35, 1]],
+    watermelon:     [['crystal', 0.25, 1]],
     cabbage:        [['fiber', 0.5, 1]],
     wheat:          [['fiber', 0.7, 1]],
     carrot:         [['compost', 0.3, 1]],
     chili:          [['venom', 0.3, 1]],
     garlic:         [['fiber', 0.45, 1]],
     mint:           [['fiber', 0.4, 1]],
-    cactus:         [['stone', 0.5, 1], ['carapace', 0.4, 1], ['iron', 0.32, 1]],
+    cactus:         [['stone', 0.5, 1], ['carapace', 0.4, 1], ['iron', 0.28, 1]],
     rice:           [['fiber', 0.8, 1]],
     ginseng:        [['wood', 0.8, 2], ['bossFang', 0.25, 1]],
     tomato:         [['fiber', 0.35, 1]],
     rosemary:       [['fiber', 0.45, 1]],
-    frost_flower:   [['crystal', 0.65, 1]],
-    lightning_vine: [['iron', 0.55, 2], ['crystal', 0.2, 1], ['refined_iron', 0.06, 1]],
+    frost_flower:   [['crystal', 0.45, 1]],
+    lightning_vine: [['iron', 0.55, 1], ['crystal', 0.2, 1], ['refined_iron', 0.12, 1]],
     shadow_flower:  [['crystal', 0.5, 1], ['soul_ash', 0.45, 1]],
     deathcap:       [['venom', 0.7, 1], ['soul_ash', 0.5, 1], ['bossFang', 0.12, 1]],
   };
@@ -301,18 +301,18 @@
    * 七、12 Boss + 新精英怪 + 24 地图怪物池
    * -------------------------------------------------------- */
   const BOSSES = {
-    t1_boar_king:   { id: 't1_boar_king', name: '狂暴野猪王', tier: 1, hp: 820, dmg: 20, speed: 96, radius: 46, emoji: '🐗', color: '#c98a4b', skill: '震荡波 + 锁定冲锋（半血狂暴）', loot: ['bossFang', 'iron', 'stone'] },
-    t1_withered:    { id: 't1_withered', name: '枯木精', tier: 1, hp: 900, dmg: 18, speed: 70, radius: 48, emoji: '🌳', color: '#6f8f4e', skill: '树根缠绕定身 + 回血光环', loot: ['bossFang', 'wood', 'fiber'] },
-    t1_quarry:      { id: 't1_quarry', name: '采石巨魔', tier: 1, hp: 980, dmg: 24, speed: 64, radius: 50, emoji: '🗿', color: '#9b8b78', skill: '范围投石 + 岩石护甲减伤', loot: ['bossFang', 'stone', 'iron'] },
-    t2_gargoyle_lord: { id: 't2_gargoyle_lord', name: '石像鬼王', tier: 2, hp: 1180, dmg: 25, speed: 104, radius: 46, emoji: '🦇', color: '#7d8a99', flying: true, skill: '石化凝视 + 俯冲 + 弹幕散射', loot: ['bossFang', 'carapace', 'stone'] },
-    t2_ruin_golem:  { id: 't2_ruin_golem', name: '废墟魔像', tier: 2, hp: 1320, dmg: 27, speed: 60, radius: 52, emoji: '🗿', color: '#8d8578', skill: '血量分裂 + 反伤岩石护盾 + 碎石弹', loot: ['bossFang', 'refined_iron', 'crystal'] },
-    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 1500, dmg: 28, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼陷阱 + 召唤雾天 + 诅咒毒弹（远程风筝）', loot: ['bossFang', 'venom', 'soul_ash'] },
-    t3_brood_mother:{ id: 't3_brood_mother', name: '虫母', tier: 3, hp: 1640, dmg: 24, speed: 72, radius: 52, emoji: '🕷️', color: '#a06bb0', summoner: true, skill: '产卵虫潮 + 蛛网陷阱', loot: ['bossFang', 'carapace', 'venom'] },
-    t3_scorch_demon:{ id: 't3_scorch_demon', name: '焦林炎魔', tier: 3, hp: 1720, dmg: 32, speed: 88, radius: 48, emoji: '🔥', color: '#ff6a3c', skill: '火雨陷阱 + 召唤雷暴 + 火焰连射', loot: ['bossFang', 'crystal', 'soul_ash'] },
-    t4_abyss_lord:  { id: 't4_abyss_lord', name: '深渊领主', tier: 4, hp: 2100, dmg: 34, speed: 80, radius: 56, emoji: '👹', color: '#8a3bd8', skill: '复活尸体 + 深渊领域（雾天召唤）', loot: ['bossFang', 'soul_ash', 'crystal'] },
-    t4_time_warden: { id: 't4_time_warden', name: '时空守望', tier: 4, hp: 1980, dmg: 33, speed: 92, radius: 48, emoji: '⏳', color: '#5ad1c8', skill: '传送凝滞 + 环形弹幕齐射', loot: ['bossFang', 'soul_ash', 'refined_iron'] },
-    t4_moon_priestess: { id: 't4_moon_priestess', name: '月之祭司', tier: 4, hp: 1900, dmg: 31, speed: 86, radius: 46, emoji: '🌙', color: '#9bb8ff', healer: true, skill: '月光治疗 + 夜魇雾天召唤 + 月光弹', loot: ['bossFang', 'soul_ash', 'crystal'] },
-    t4_arena_champion: { id: 't4_arena_champion', name: '竞技场冠军', tier: 4, hp: 2240, dmg: 38, speed: 112, radius: 48, emoji: '⚔️', color: '#d8b25a', charger: true, skill: '突刺/横扫/跳劈三段连招 + 半血狂暴', loot: ['bossFang', 'refined_iron', 'crystal'] },
+    t1_boar_king:   { id: 't1_boar_king', name: '狂暴野猪王', tier: 1, hp: 3800, dmg: 22, speed: 96, radius: 46, emoji: '🐗', color: '#c98a4b', skill: '震荡波 + 锁定冲锋（半血狂暴）', loot: ['bossFang', 'iron', 'stone'] },
+    t1_withered:    { id: 't1_withered', name: '枯木精', tier: 1, hp: 4000, dmg: 20, speed: 70, radius: 48, emoji: '🌳', color: '#6f8f4e', skill: '树根缠绕定身 + 回血光环', loot: ['bossFang', 'wood', 'fiber'] },
+    t1_quarry:      { id: 't1_quarry', name: '采石巨魔', tier: 1, hp: 3600, dmg: 26, speed: 64, radius: 50, emoji: '🗿', color: '#9b8b78', skill: '范围投石 + 岩石护甲减伤', loot: ['bossFang', 'stone', 'iron'] },
+    t2_gargoyle_lord: { id: 't2_gargoyle_lord', name: '石像鬼王', tier: 2, hp: 8400, dmg: 28, speed: 104, radius: 46, emoji: '🦇', color: '#7d8a99', flying: true, skill: '石化凝视 + 俯冲 + 弹幕散射', loot: ['bossFang', 'carapace', 'stone'] },
+    t2_ruin_golem:  { id: 't2_ruin_golem', name: '废墟魔像', tier: 2, hp: 8600, dmg: 30, speed: 60, radius: 52, emoji: '🗿', color: '#8d8578', skill: '血量分裂 + 反伤岩石护盾 + 碎石弹', loot: ['bossFang', 'refined_iron', 'crystal'] },
+    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 9800, dmg: 32, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼陷阱 + 召唤雾天 + 诅咒毒弹（远程风筝）', loot: ['bossFang', 'venom', 'soul_ash'] },
+    t3_brood_mother:{ id: 't3_brood_mother', name: '虫母', tier: 3, hp: 21000, dmg: 28, speed: 72, radius: 52, emoji: '🕷️', color: '#a06bb0', summoner: true, skill: '产卵虫潮 + 蛛网陷阱', loot: ['bossFang', 'carapace', 'venom'] },
+    t3_scorch_demon:{ id: 't3_scorch_demon', name: '焦林炎魔', tier: 3, hp: 23000, dmg: 36, speed: 88, radius: 48, emoji: '🔥', color: '#ff6a3c', skill: '火雨陷阱 + 召唤雷暴 + 火焰连射', loot: ['bossFang', 'crystal', 'soul_ash'] },
+    t4_abyss_lord:  { id: 't4_abyss_lord', name: '深渊领主', tier: 4, hp: 170000, dmg: 40, speed: 80, radius: 56, emoji: '👹', color: '#8a3bd8', skill: '复活尸体 + 深渊领域（雾天召唤）', loot: ['bossFang', 'soul_ash', 'crystal'] },
+    t4_time_warden: { id: 't4_time_warden', name: '时空守望', tier: 4, hp: 160000, dmg: 38, speed: 92, radius: 48, emoji: '⏳', color: '#5ad1c8', skill: '传送凝滞 + 环形弹幕齐射', loot: ['bossFang', 'soul_ash', 'refined_iron'] },
+    t4_moon_priestess: { id: 't4_moon_priestess', name: '月之祭司', tier: 4, hp: 155000, dmg: 36, speed: 86, radius: 46, emoji: '🌙', color: '#9bb8ff', healer: true, skill: '月光治疗 + 夜魇雾天召唤 + 月光弹', loot: ['bossFang', 'soul_ash', 'crystal'] },
+    t4_arena_champion: { id: 't4_arena_champion', name: '竞技场冠军', tier: 4, hp: 180000, dmg: 44, speed: 112, radius: 48, emoji: '⚔️', color: '#d8b25a', charger: true, skill: '突刺/横扫/跳劈三段连招 + 半血狂暴', loot: ['bossFang', 'refined_iron', 'crystal'] },
   };
   CONFIG.bosses = BOSSES;
 
@@ -1744,6 +1744,29 @@
     if (!b.ai) b.ai = { cd: rand(2.5, 4), skill: 0, combo: 0, flags: {} };
     b.ai.flags = b.ai.flags || {};
     if (b.ai.skill == null) b.ai.skill = 0;
+    // v5.4 软狂暴：与玩家交战（650px 内）累计时间，50s 后阶梯加压（50/72/94/116s），双向收束长尾
+    if (b.baseDamage == null) { b.baseDamage = b.damage; b.baseSpeed = b.speed; b.baseAttackCd = b.attackCooldown || 1.6; b.enrageT = 0; b.enrageStage = 0; }
+    const engaged = dist(exp.player, b) < 650;
+    if (engaged) { b.enrageEngaged = true; b.enrageT += dt; }
+    if (b.enrageEngaged) {
+      const stage = b.enrageT > 50 ? (1 + Math.floor((b.enrageT - 50) / 22)) : 0; // r5 阶段不封顶，保证消耗战必然收束
+      if (stage > b.enrageStage) {
+        b.enrageStage = stage;
+        b.damage = Math.round(b.baseDamage * (1 + 0.20 * Math.min(4, stage)));
+        if (typeof showToast === 'function') showToast('「' + b.name + '」进入狂暴·第' + stage + '阶！', 'warning');
+        if (exp.spawnShockRing) exp.spawnShockRing(b.x, b.y, stage >= 3 ? '#ff3b30' : '#ff7a45', 90);
+        if (exp.spawnRadialBurst) exp.spawnRadialBurst(b.x, b.y, '#ff5a3c', 22);
+        exp.screenShake = Math.max(exp.screenShake || 0, 8);
+      }
+      if (b.enrageStage > 0) {
+        b.damage = Math.round(b.baseDamage * (1 + 0.20 * Math.min(4, b.enrageStage)));
+        b.speed = b.baseSpeed * (1 + 0.06 * Math.min(4, b.enrageStage));
+        b.attackCooldown = Math.max(0.7, b.baseAttackCd * (1 - 0.09 * Math.min(4, b.enrageStage)));
+        if (b.castState === 'idle' && b.ai.cd > 0) b.ai.cd = Math.max(0.25, b.ai.cd - dt * 0.15 * b.enrageStage);
+        b.enrageTick -= dt;
+        if (b.enrageTick <= 0) { b.enrageTick = 1.2; if (exp.spawnRadialBurst) exp.spawnRadialBurst(b.x, b.y, 'rgba(255,60,40,0.6)', 6); }
+      }
+    }
     // 岩石护盾反伤光环
     if (b.armorUntil && b.armorUntil > performance.now()) {
       b.ai.armorTick = (b.ai.armorTick || 0) - dt;
@@ -1762,7 +1785,7 @@
     const cfg = CONFIG.bosses[map.bossId] || BOSSES.t1_boar_king;
     let hpMul = 1, dmgMul = 1;
     if (window.DifficultySystem && DifficultySystem.getMultipliers) {
-      try { const mm = DifficultySystem.getMultipliers(); hpMul = mm.hp || 1; dmgMul = mm.dmg || 1; } catch (e) {}
+      try { const mm = DifficultySystem.getMultipliers(); hpMul = mm.hpMul != null ? mm.hpMul : 1; dmgMul = mm.dmgMul != null ? mm.dmgMul : 1; } catch (e) {}
     }
     const position = exp.findSafeSpawn(650, CONFIG.expedition.mapSize - 350, cfg.radius);
     const boss = {
@@ -1770,7 +1793,9 @@
       x: position.x, y: position.y, radius: cfg.radius,
       hp: Math.round(cfg.hp * hpMul), maxHp: Math.round(cfg.hp * hpMul),
       damage: Math.round(cfg.dmg * dmgMul), speed: cfg.speed,
-      attackRange: 70, attackCd: 1.5, abilityCd: 4, abilityIndex: 0, phase: 1, stunned: 0,
+      attackRange: 70, attackCd: 1.6, attackCooldown: 1.6, baseAttackCd: 1.6, abilityCd: 4, abilityIndex: 0, phase: 1, stunned: 0,
+      baseDamage: Math.round(cfg.dmg * dmgMul), baseSpeed: cfg.speed,
+      enrageT: 0, enrageStage: 0, enrageEngaged: false, enrageTick: 0,
       facing: 0, animTime: 0, hitFlash: 0, elite: true, boss: true,
       gold: 100 * cfg.tier, color: cfg.color, emoji: cfg.emoji,
       castState: 'idle', castTimer: 0, castIndex: 0, attackAnim: 0,
@@ -1991,6 +2016,26 @@
           if (m && CropArt.map[m[0]]) ic.innerHTML = '<img src="assets/'+CropArt.map[m[0]]+'" style="width:40px;height:40px;object-fit:contain;vertical-align:middle;" />';
         });
       } catch (e) {}
+      // v5.4 家园全景面板（填充左列底部空白）
+      const leftCol = document.querySelector('.farm-left');
+      if (leftCol && !document.getElementById('farmHomestead')) {
+        const hs = document.createElement('div');
+        hs.id = 'farmHomestead';
+        hs.style.cssText = 'margin-top:12px;border-radius:12px;overflow:hidden;border:1px solid #4a5a3a;background:#141a12;box-shadow:0 4px 14px rgba(0,0,0,.35);';
+        hs.innerHTML =
+          '<div style="padding:8px 12px 4px;color:#b9d18a;font-weight:bold;font-size:13px;">🏞️ 家园全景</div>' +
+          '<div style="position:relative;height:118px;margin:6px 10px 0;border-radius:10px;background:linear-gradient(180deg,#273044 0%,#33405a 45%,#6b5640 56%,#3c4a2c 57%,#2b3a22 100%);overflow:hidden;">' +
+          '<span style="position:absolute;top:8px;right:14px;font-size:24px;filter:drop-shadow(0 0 6px rgba(255,220,140,.7));">🌙</span>' +
+          '<span style="position:absolute;left:8%;bottom:34px;font-size:30px;">🛖</span>' +
+          '<span style="position:absolute;left:27%;bottom:32px;font-size:28px;">🏭</span>' +
+          '<span style="position:absolute;left:45%;bottom:35px;font-size:28px;">🏡</span>' +
+          '<span style="position:absolute;left:63%;bottom:30px;font-size:32px;">🌳</span>' +
+          '<span style="position:absolute;left:78%;bottom:33px;font-size:24px;">🌾</span>' +
+          '<span id="fhCrops" style="position:absolute;left:0;right:0;bottom:4px;font-size:17px;letter-spacing:3px;text-align:center;white-space:nowrap;overflow:hidden;"></span>' +
+          '</div>' +
+          '<div id="farmHomesteadChips" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 12px;"></div>';
+        leftCol.appendChild(hs);
+      }
     },
     farmThemed: false,
     injectFarmTheme() {
@@ -2032,6 +2077,35 @@
         '<span>' + ((typeof CropArt!=='undefined')?CropArt.dom('soil','🟫',16):'🟫') + ' 泥土 ' + res('soil') + '</span><span>' + ((typeof CropArt!=='undefined')?CropArt.dom('water','💧',16):'💧') + ' 清水 ' + res('water') + '</span><span>' + ((typeof CropArt!=='undefined')?CropArt.dom('compost','🍂',16):'🍂') + ' 堆肥 ' + res('compost') + '</span>' +
         '<span>' + ((typeof CropArt!=='undefined')?CropArt.dom('wood','🪵',16):'🪵') + ' 木材 ' + res('wood') + '</span><span>' + ((typeof CropArt!=='undefined')?CropArt.dom('iron','⛏️',16):'⛏️') + ' 铁矿 ' + res('iron') + '</span><span>' + ((typeof CropArt!=='undefined')?CropArt.dom('crystal','💠',16):'💠') + ' 晶核 ' + res('crystal') + '</span>' +
         '</span>';
+      // v5.4 家园全景实时数据
+      const hsChips = document.getElementById('farmHomesteadChips');
+      if (hsChips) {
+        const plots = GameState.farmPlots || [];
+        const total = plots.length || 48;
+        let planted = 0, ready = 0;
+        const cropIcons = [];
+        plots.forEach(pl => {
+          if (pl && pl.crop) {
+            planted++;
+            const cdef = (CONFIG.crops || []).find(c => c.id === pl.crop) || (CONFIG.greenhousePlants || []).find(c => c.id === pl.crop);
+            if (pl.ready) { ready++; if (cdef) cropIcons.push(cdef.icon || '🌱'); }
+            else if (cdef) cropIcons.push('🌱');
+          }
+        });
+        const astats = (typeof AchievementSystem !== 'undefined' && AchievementSystem.getStats) ? AchievementSystem.getStats() : (GameState.achievements && GameState.achievements.stats) || {};
+        const harvests = astats.harvests || 0;
+        const streak = astats.consecutiveExtracts || 0;
+        const beauty = GameState.farmBeauty || 0;
+        const chip = (t, c) => '<span style="background:rgba(255,255,255,.06);border:1px solid rgba(185,209,138,.25);color:' + c + ';border-radius:999px;padding:3px 10px;font-size:11px;">' + t + '</span>';
+        hsChips.innerHTML =
+          chip('农田 ' + planted + '/' + total, '#cfe6a0') +
+          chip('成熟 ' + ready, ready > 0 ? '#ffd76a' : '#9aa08c') +
+          chip('累计收获 ' + harvests, '#b9d18a') +
+          chip('美观度 ' + beauty, '#e6bd54') +
+          chip('连续撤离 ' + streak, '#9fd8ff');
+        const fhCrops = document.getElementById('fhCrops');
+        if (fhCrops) fhCrops.textContent = cropIcons.slice(-16).join(' ');
+      }
     },
   };
   V5.openCultivation = () => V5.ui.openCultivation();
