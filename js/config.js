@@ -516,7 +516,7 @@ const GameState = {
   farmPlots: [], // 6x6 = 36格
   unlockedPlots: 8,
   selectedCrop: 'wheat',
-  unlockedCrops: ['pea_shooter', 'sunflower', 'watermelon', 'cabbage', 'wheat'],
+  unlockedCrops: ['pea_shooter', 'sunflower', 'watermelon', 'cabbage', 'wheat', 'ningqi_grass'],
   skillLevels: { straw_smash: 1, vine_bind: 1, earth_dash: 1, smoke_screen: 1 },
   cardInventory: [],
   selectedBoostCards: [],

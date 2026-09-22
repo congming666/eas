@@ -18,8 +18,8 @@ const SaveSystem = {
         ? data.selectedWeapon : 'harvest_sickle';
       GameState.selectedCrop = CONFIG.crops.some(crop => crop.id === data.selectedCrop) ? data.selectedCrop : 'wheat';
       GameState.unlockedCrops = Array.isArray(data.unlockedCrops)
-        ? [...new Set(['wheat', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
-        : ['wheat'];
+        ? [...new Set(['wheat', 'ningqi_grass', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
+        : ['wheat', 'ningqi_grass'];
       GameState.loadout = { ...GameState.loadout, ...(data.loadout || {}) };
       GameState.farmItems = { ...GameState.farmItems, ...(data.farmItems || {}) };
       GameState.skillLevels = { ...GameState.skillLevels, ...(data.skillLevels || {}) };

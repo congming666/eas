@@ -400,6 +400,13 @@ const Game = {
     document.getElementById('resultScreen').classList.add('hidden');
     document.getElementById('farmScreen').classList.remove('hidden');
     GameState.screen = 'farm';
+    // 清理远征残留 UI（暂停菜单 quit 路径不经 showResult，这里兜底）
+    ['expeditionHUD', 'lowHealthVignette'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.classList.add('hidden');
+    });
+    const fl = document.getElementById('flash'); if (fl) fl.classList.remove('active');
+    if (typeof ctx !== 'undefined' && typeof canvas !== 'undefined') ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive) CombatEnhancement.branchActive = false;
     Farm.render();
     Farm.renderMapSelect();
     Farm.renderLoadout();

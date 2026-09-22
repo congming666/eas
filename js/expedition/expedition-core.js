@@ -291,7 +291,7 @@ class Expedition {
     this.blurHandler = () => {
       Object.keys(this.keys).forEach(k => { this.keys[k] = false; });
       this.mouse.down = false;
-      if (!this.gameOver) this.paused = true;
+      if (!this.gameOver && !this.paused) { this.paused = true; this.showPauseMenu(); }
     };
     this.keydownHandler = (e) => {
       this.keys[e.key.toLowerCase()] = true;
