@@ -1829,3 +1829,28 @@
   .consumable-bar { max-width: 36vw; gap: 5px; padding: 6px; }
   .consumable-bar .skill-slot { width: 84px; }
 }
+
+
+/* ============================================================
+   v5.5 design-taste polish（应用 design-taste / impeccable / taste 设计原则）
+   - 仅对 transform/opacity 做反馈动画（GPU、<300ms、ease-out）
+   - 统一 :active 按压反馈；尊重 prefers-reduced-motion
+   ============================================================ */
+button, .facility, .map-option, .farm-cell { -webkit-tap-highlight-color: transparent; }
+button:active:not(:disabled), .facility:active, .map-option:active {
+  transform: scale(0.97);
+  transition: transform 90ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+/* 弹层进入只动 opacity/transform，避免 width/top 类抖动 */
+.modal, .overlay, #inventoryOverlay, #v5Overlay, #processingModal {
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

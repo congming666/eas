@@ -1256,6 +1256,9 @@ Object.assign(Expedition.prototype, {
   },
 
   endExpedition() {
+    // 结算时强制关闭背包/安全箱浮层，避免遮罩压在结算面板上
+    const __invOv = document.getElementById('inventoryOverlay');
+    if (__invOv) __invOv.remove();
     // 标记存活植物（撤离时仍在场）
     this.plants.forEach(p => {
       if (p.hp > 0) {
@@ -1604,6 +1607,8 @@ Object.assign(Expedition.prototype, {
       amount *= 0.76;
     }
     if (window.V5) amount = V5.modifyIncomingDamage(this, amount);
+    // v5.5 固定撤离庇护：读条期间在撤离圈内受到的伤害大幅降低，保证"待在点里就能撤"
+    if (this.extracting && this.extractType === 'fixed') amount *= 0.35;
     this.player.hp -= amount;
     this._lastCombat = performance.now() / 1000;
     this.player.hitStun = (this.v5 && this.v5.iron > 0) ? 0 : 0.15; // 金刚藤甲霸体
@@ -1618,7 +1623,7 @@ Object.assign(Expedition.prototype, {
       const attacker = this.monsters.find(m => m.hp > 0 && Math.sqrt((m.x-this.player.x)**2+(m.y-this.player.y)**2) < 60);
       if (attacker) CombatEnhancement.onEliteHitPlayer(attacker);
     }
-    if (this.extracting) this.cancelExtract();
+    // v5.5 受击不再打断撤离：固定撤离点只在离开圈时取消，信号弹撤离只在死亡时失败（避免兽潮堆怪导致读条永远为0的软卡死）
     if (this.player.hp <= 0) {
       this.player.hp = 0;
       this.playerDeath();
@@ -2161,23 +2166,28 @@ Object.assign(Expedition.prototype, {
       // v5.4 撤离点清怪半径 40px：读条期间持续肃清圈内普通怪（Boss 不受影响）
       this._extractClearT = (this._extractClearT || 0) - dt;
       if (this._extractClearT <= 0) {
-        this._extractClearT = 0.5;
-        let _cx = this.player.x, _cy = this.player.y;
+        this._extractClearT = 0.22;
+        let _cx = this.player.x, _cy = this.player.y, _clearR = 46;
         if (this.extractType === 'fixed') {
-          const _ep = this.extractPoints.find(ep => dist(this.player, ep) < ep.radius);
-          if (_ep) { _cx = _ep.x; _cy = _ep.y; }
+          const _ep = this.extractPoints.find(ep => dist(this.player, ep) < ep.radius + 6);
+          if (_ep) { _cx = _ep.x; _cy = _ep.y; _clearR = _ep.radius + 46; }
         }
-        this.monsters.forEach(m => {
-          if (m.hp > 0 && !m.boss && Math.hypot(m.x - _cx, m.y - _cy) < 40 + (m.radius || 14) * 0.5) {
-            if (this.damageEnemy) this.damageEnemy(m, 200, '#9fe6ff', true);
-            const _a = Math.atan2(m.y - _cy, m.x - _cx);
-            if (this.moveEntityWithCollisions) this.moveEntityWithCollisions(m, Math.cos(_a) * 30, Math.sin(_a) * 30);
+        const _all = (this.monsters || []).concat(this.raiders || []);
+        _all.forEach(m => {
+          if (m.hp > 0 && !m.boss && Math.hypot(m.x - _cx, m.y - _cy) < _clearR + (m.radius || 14) * 0.5) {
+            if (this.damageEnemy) this.damageEnemy(m, 600, '#9fe6ff', true);
+            const _a = Math.atan2(m.y - _cy, m.x - _cx) || (Math.random() * Math.PI * 2);
+            if (this.moveEntityWithCollisions) this.moveEntityWithCollisions(m, Math.cos(_a) * 95, Math.sin(_a) * 95);
           }
+        });
+        // v5.5 撤离庇护：摧毁飞入圈内的敌方弹道
+        (this.projectiles || []).forEach(p => {
+          if (p.fromMonster && Math.hypot(p.x - _cx, p.y - _cy) < _clearR) { p.life = 0; }
         });
       }
       if (this.extractType === 'fixed') {
-        const inPoint = this.extractPoints.some(ep => dist(this.player, ep) < ep.radius);
-        if (!inPoint) { this.cancelExtract(); showToast('离开了撤离点，撤离取消', 'warning'); }
+        const inPoint = this.extractPoints.some(ep => dist(this.player, ep) < ep.radius + 16);
+        if (!inPoint) { if (this.extracting) showToast('离开了撤离点，撤离取消', 'warning'); this.cancelExtract(); }
       }
       const extractTime = this.extractType === 'signal' ? CONFIG.expedition.signalExtractTime : CONFIG.expedition.extractTime;
       if (this.extractType === 'signal' && !this.signalReinforced && this.extractProgress >= extractTime * 0.5) {

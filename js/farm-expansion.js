@@ -301,7 +301,7 @@
     tick(dt) {
       GameState.visitorTimer -= dt;
       if (GameState.visitorTimer <= 0 && GameState.visitorState === 'none') {
-        const chance = 0.3 + GameState.farmBeauty * 0.01;
+        const chance = FarmDecorationSystem.visitorChance();
         if (Math.random() < chance) {
           GameState.visitorState = 'visiting';
           GameState.visitorName = VisitorNames[Math.floor(Math.random()*VisitorNames.length)];
@@ -326,15 +326,22 @@
     },
     interactVisitor() {
       if (GameState.visitorState !== 'visiting') return;
-      const reward = 20 + GameState.farmBeauty * 2;
+      let reward = FarmDecorationSystem.visitorReward();
+      const rare = Math.random() < FarmDecorationSystem.rareVisitorChance();
+      if (rare) reward = Math.round(reward * 2);
       GameState.gold += reward;
-      if (Math.random() < 0.3) { Warehouse.addItem('seeds', 2); showToast(GameState.visitorName + '：' + reward + '金币 + 种子×2，再见！', 'gold'); }
-      else showToast(GameState.visitorName + '留下了 ' + reward + ' 金币', 'gold');
+      if (Math.random() < 0.3) { Warehouse.addItem('seeds', 2); showToast((rare?'⭐稀有访客 ':'') + GameState.visitorName + '：' + reward + '金币 + 种子×2，再见！', 'gold'); }
+      else showToast((rare?'⭐稀有访客 ':'') + GameState.visitorName + '留下了 ' + reward + ' 金币', 'gold');
       GameState.visitorState = 'none';
       GameState.visitorTimer = 60 + Math.random()*60;
       SaveSystem.save();
     },
-    beautyGoldBonus() { return 1 + GameState.farmBeauty * 0.005; }
+    beautyGoldBonus() { return 1 + (GameState.farmBeauty || 0) * 0.005; },
+    tier() { return Math.floor((GameState.farmBeauty || 0) / 50); },
+    growthMul() { return 1 + Math.min(this.tier(), 5) * 0.03; },
+    visitorChance() { return Math.min(0.9, 0.3 + (GameState.farmBeauty || 0) * 0.01); },
+    visitorReward() { return 20 + (GameState.farmBeauty || 0) * 2; },
+    rareVisitorChance() { return Math.min(0.4, this.tier() * 0.05); }
   };
 
   // 暴露到全局

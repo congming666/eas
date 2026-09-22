@@ -53,7 +53,8 @@ const Farm = {
         const elapsed = (now - plot.plantedAt) / 1000;
         const traitMul = (typeof FarmTraitSystem !== 'undefined') ? FarmTraitSystem.growSpeedMultiplier(idx) : 1;
         const statusFactor = plot.status === 'drought' ? 0.55 : (plot.status === 'pest' ? 0.72 : (plot.status === 'weeds' ? 0.82 : (plot.status === 'burn' ? 0.4 : 1)));
-        const progress = clamp((elapsed * statusFactor * traitMul) / plot.crop.growTime, 0, 1);
+        const beautyMul = (typeof FarmDecorationSystem !== 'undefined') ? FarmDecorationSystem.growthMul() : 1;
+        const progress = clamp((elapsed * statusFactor * traitMul * beautyMul) / plot.crop.growTime, 0, 1);
         plot.ready = progress >= 1;
         cell.classList.add(plot.ready ? 'ready' : 'planted');
         cell.classList.add(`rarity-${plot.crop.rarity || 'common'}`);
@@ -152,7 +153,7 @@ const Farm = {
     box.innerHTML = `
       <div class="crop-detail-title">${crop.icon} ${crop.name} <span style="color:#888;font-size:12px;font-weight:normal;">${crop.growTime}秒成熟 · 种子价 ${crop.seedPrice || crop.price || '-'} · 售价 💰${crop.sellPrice}</span></div>
       <div class="crop-detail-row"><span class="cdl-label">产出：</span><span class="cdl-value">${crop.rewardLabel || '金币（收获出售）'}</span></div>
-      ${crop.cultivation ? `<div class="crop-detail-row"><span class="cdl-label">修为：</span><span class="cdl-value">🧘 ${crop.cultivation} 点/株（高品质有加成）</span></div>` : ''}
+      ${crop.cultivation ? (() => { let _tip = '🧘 ' + crop.cultivation + ' 点/株（高品质有加成）'; try { const CS = window.CharacterSystem; if (CS && GameState.level < 100) { const _need = CS.expNeeded(GameState.level), _have = GameState.cultivation || 0, _n = Math.max(1, Math.ceil((_need - _have) / crop.cultivation)); _tip += '；再种约 ' + _n + ' 株可升 Lv' + (GameState.level + 1); } } catch (e) {} return `<div class="crop-detail-row"><span class="cdl-label">修为：</span><span class="cdl-value">${_tip}</span></div>`; })() : ''}
       ${mats.length ? `<div class="crop-detail-row"><span class="cdl-label">打造材料：</span><span class="cdl-value mat">${mats.join('　')}</span></div>` : '<div class="crop-detail-row"><span class="cdl-label">打造材料：</span><span class="cdl-value" style="color:#777;">无（该作物不出产武器材料）</span></div>'}
       ${buffTxt ? `<div class="crop-detail-row"><span class="cdl-label">特性：</span><span class="cdl-value" style="color:#9fc78f;">${buffTxt}</span></div>` : ''}
     `;
@@ -228,14 +229,15 @@ const Farm = {
     if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.tryMutate(idx);
     // 收集记录
     if (typeof FarmCollectionSystem !== 'undefined') FarmCollectionSystem.recordCollection(crop.id, plot.quality);
-    // 作物存入仓库
-    const added = Warehouse.addItem(crop.id, yieldQty);
+    // 修为作物（凝气草等）不进仓库、不掉种子/卡牌，只转化修为
+    const isCult = crop.rewardType === 'cultivation';
+    const added = isCult ? 0 : Warehouse.addItem(crop.id, yieldQty);
     let matGained = [];
     if (window.CharacterSystem) matGained = CharacterSystem.onCropHarvested(crop.id, yieldQty, plot.quality) || [];
-    let rewardText = `${crop.name} ×${added} 已入仓`;
-    if (matGained.length) rewardText += '，' + matGained.join('、') + ' 已入材料库';
-    // 30% 概率额外获得种子，存入仓库
-    if (Math.random() < 0.3) {
+    let rewardText = isCult ? `${crop.name} 已转化为修为` : `${crop.name} ×${added} 已入仓`;
+    if (!isCult && matGained.length) rewardText += '，' + matGained.join('、') + ' 已入材料库';
+    // 30% 概率额外获得种子，存入仓库（修为作物除外）
+    if (!isCult && Math.random() < 0.3) {
       Warehouse.addItem('seeds', 1);
       rewardText += '，种子 ×1 已入仓';
     }
@@ -267,7 +269,7 @@ const Farm = {
       GameState.cardInventory.push(card);
       CardSystem.showDrop(card);
       rewardText = `一次性技能卡：${card.name} x1`;
-    } else {
+    } else if (!isCult) {
       CardSystem.tryDrop(crop);
     }
     // v0.9.0 作物buff系统
@@ -518,8 +520,8 @@ const Farm = {
   renderLoadout() {
     const container = document.getElementById('loadoutGrid');
     container.innerHTML = '';
-    // v5.1 准备大厅只列 3 个战术消耗品（Q/R/E 带快捷键）；食品/药品等在远征内拾取或自动生效
-    CONFIG.consumables.filter(item => item.key).forEach(item => {
+    // v5.5 准备大厅：战术消耗品(Q/R/E) + 背包补给(食品/药品/火把，局内 Tab 背包使用)
+    const mkLoadoutSlot = (item, hot) => {
       const equipped = GameState.loadout[item.id] || 0;
       const inWarehouse = Warehouse.getCount(item.id);
       const div = document.createElement('div');
@@ -554,7 +556,13 @@ const Farm = {
         this.renderLoadout();
       };
       container.appendChild(div);
-    });
+      return div;
+    };
+    const grpHdr = (txt) => { const h = document.createElement('div'); h.style.cssText='width:100%;color:#cfe6a0;font-weight:bold;font-size:13px;margin:10px 0 2px;'; h.textContent=txt; container.appendChild(h); };
+    grpHdr('战术消耗品（快捷键 Q/R/E）');
+    CONFIG.consumables.filter(i => i.key).forEach(i => container.appendChild(mkLoadoutSlot(i, true)));
+    grpHdr('背包补给（食品/药品/火把等，局内 Tab 背包点击使用，死亡随背包损失）');
+    CONFIG.consumables.filter(i => !i.key).forEach(i => container.appendChild(mkLoadoutSlot(i, false)));
   },
 
   // 植物防线配置（培育到100可携带部署）

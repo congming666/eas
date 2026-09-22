@@ -34,7 +34,12 @@
       this.rage = 0; this.dodgeCd = 0;
       this.perfectDodgeWindow = 0; this.slowMotion = 0;
       this.nextAttackCrit = false; this.hitStop = 0;
-      this.torchFuel = 100; this.bossPhase = 1;
+      this.torchMax = 60; {
+        // v5.5 火把：进图自动点燃第一支（从携带数中扣除），无携带则开局视野极小
+        const _tc = (exp.consumables && exp.consumables.torch) ? exp.consumables.torch : 0;
+        if (_tc > 0) { exp.consumables.torch = _tc - 1; this.torchFuel = 60; } else { this.torchFuel = 0; }
+      }
+      this.bossPhase = 1;
       this.bossPhaseTriggered = {};
       this.executing = false; this.execTarget = null; this.execTimer = 0;
       this.branchActive = false; this.branchUsed = false; this.branchOptions = [];
@@ -503,18 +508,34 @@
 
     // ===== 系统10：生存压力（火把燃料） =====
     updateTorch(dt) {
-      this.torchFuel = Math.max(0, this.torchFuel - dt * 0.5); // 每分钟消耗30
-      // 火把耗尽时视野缩小（通过迷雾系统实现）
-      const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(this.exp) : 1;
+      const exp = this.exp; if (!exp) return;
+      const _ds = (typeof DifficultySystem !== 'undefined' && DifficultySystem.get) ? DifficultySystem.get() : { torchMul: 1, vision: 1 };
+      const _drain = (_ds.torchMul || 1); // 难度越高火把烧得越快
+      const _dv = _ds.vision || 1;
+      const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(exp) : 1;
+      if (this.torchFuel > 0) {
+        this.torchFuel = Math.max(0, this.torchFuel - dt * _drain);
+        if (this.torchFuel <= 0) this._tryAutoRelight();
+      } else { this._tryAutoRelight(); }
       if (this.torchFuel <= 0) {
-        this.exp.visionRadius = 120 * _vm; // 正常是300+
+        exp.visionRadius = 105 * _dv * _vm; // 无火把：视野极小
       } else {
-        this.exp.visionRadius = (300 + this.torchFuel * 0.5) * _vm;
+        exp.visionRadius = (330 + this.torchFuel * 0.4) * _dv * _vm; // 有火把：正常照明
+      }
+    },
+    _tryAutoRelight() {
+      const exp = this.exp; if (!exp || !exp.consumables) return;
+      const spare = exp.consumables.torch || 0;
+      if (spare > 0 && this.torchFuel <= 0) {
+        exp.consumables.torch = spare - 1;
+        this.torchFuel = this.torchMax || 60;
+        if (exp.updateHUD) exp.updateHUD();
+        showToast('自动点燃新火把（剩余 ' + (spare - 1) + ' 支）', 'success');
       }
     },
     useTorchItem() {
-      this.torchFuel = Math.min(this.torchMax, this.torchFuel + 40);
-      showToast('使用火把，燃料+40', 'success');
+      if (this.torchFuel > (this.torchMax || 60) * 0.5) { showToast('火把仍在燃烧中', 'warning'); return; }
+      this._tryAutoRelight();
     },
 
     // ===== 系统11：处决系统重做 =====
@@ -618,7 +639,10 @@
       ctx.save();
       ctx.font = '12px sans-serif'; ctx.fillStyle = this.torchFuel < 20 ? '#ff4444' : '#ffaa44';
       ctx.textAlign = 'left';
-      ctx.fillText(`🔥 火把 ${Math.floor(this.torchFuel)}%`, 20, H - 110);
+      const _spare = (this.exp && this.exp.consumables) ? (this.exp.consumables.torch || 0) : 0;
+      const _dm = (typeof DifficultySystem !== 'undefined' && DifficultySystem.get) ? (DifficultySystem.get().torchMul || 1) : 1;
+      if (this.torchFuel > 0) { ctx.fillStyle = '#ffaa44'; ctx.fillText('🔥 火把 ' + Math.ceil(this.torchFuel / _dm) + '秒（备用' + _spare + '支）', 20, H - 110); }
+      else { ctx.fillStyle = '#ff5555'; ctx.fillText('☠️ 无火把·视野极小（备用' + _spare + '支，背包点击点燃）', 20, H - 110); }
       ctx.restore();
       // 完美闪避提示
       if (this.perfectDodgeWindow > 0) {

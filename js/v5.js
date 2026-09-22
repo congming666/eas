@@ -179,15 +179,16 @@
     { id: 'egg', name: '荒野鸡蛋', icon: '🥚', key: '', value: 80, desc: '120 秒内攻击 +15%。' },
     { id: 'mint_tea', name: '薄荷茶', icon: '🍵', key: '', value: 70, desc: '60 秒内移速 +15%。' },
     { id: 'ginseng_soup', name: '人参汤', icon: '🍲', key: '', value: 260, desc: '回满生命，60 秒攻击 +20%。' },
-    { id: 'torch', name: '火把', icon: '🔥', key: '', value: 50, desc: '60 秒视野 +25%，可反复使用。' },
+    { id: 'torch', name: '火把', icon: '🔥', key: '', value: 50, desc: '每支照明60秒（休闲120/普通60/困难40/噩梦30秒），耗尽自动续下一支；无火把视野极小，务必携带。' },
     { id: 'poison_bomb', name: '毒雾弹', icon: '☠️', key: '', value: 110, desc: '投掷后范围 60 伤害并减速 3 秒。' },
+    { id: 'insecticide', name: '驱虫剂', icon: '🧪', key: '', value: 35, desc: '使用后 6 秒内身边怪物丢失目标（驱虫脱身），也可在农场治疗病虫害。' },
   ];
   const oldConsumableIds = new Set((CONFIG.consumables || []).map(c => c.id));
   NEW_CONSUMABLES.forEach(c => { if (!oldConsumableIds.has(c.id)) CONFIG.consumables.push(c); });
   // 全部消耗品注册进仓库白名单（否则撤离入库会被丢弃）
   if (CONFIG.warehouseItems) {
     CONFIG.consumables.forEach(c => { if (!CONFIG.warehouseItems[c.id]) CONFIG.warehouseItems[c.id] = { name: c.name, icon: c.icon, category: 'consumable' }; });
-    [['pumpkin_lantern','南瓜灯','🎃'],['insecticide','驱虫剂','🧪']].forEach(x => {
+    [['pumpkin_lantern','南瓜灯','🎃']].forEach(x => {
       if (!CONFIG.warehouseItems[x[0]]) CONFIG.warehouseItems[x[0]] = { name: x[1], icon: x[2], category: 'resource' };
     });
   }
@@ -279,13 +280,13 @@
    * 六、修为作物（农场）+ 成长常量
    * -------------------------------------------------------- */
   CONFIG.cultivationCrops = [
-    { id: 'ningqi_grass', name: '凝气草', icon: '🌱', growTime: 30, exp: 10, unlock: '初始解锁' },
+    { id: 'ningqi_grass', name: '凝气草', icon: '🌱', growTime: 20, exp: 10, unlock: '初始解锁' },
     { id: 'lingsui_wheat', name: '灵穗麦', icon: '🌾', growTime: 60, exp: 28, unlock: '角色 Lv15' },
   ];
   // 两种可在普通农田种植的修为作物
   const cultCropIds = new Set((CONFIG.crops || []).map(c => c.id));
   [
-    { id: 'ningqi_grass', name: '凝气草', icon: '🌱', growTime: 30, sellPrice: 12, price: 20, rarity: 1, cultivation: 10, rewardType: 'cultivation', desc: '修为作物，收获转化为修为。' },
+    { id: 'ningqi_grass', name: '凝气草', icon: '🌱', growTime: 20, sellPrice: 12, price: 20, rarity: 1, cultivation: 10, rewardType: 'cultivation', desc: '修为作物，收获转化为修为；新手首次收获额外 +30 修为。' },
     { id: 'lingsui_wheat', name: '灵穗麦', icon: '🌾', growTime: 60, sellPrice: 30, price: 60, rarity: 1, cultivation: 28, rewardType: 'cultivation', desc: '修为作物，Lv15 解锁。' },
   ].forEach(c => { if (!cultCropIds.has(c.id)) CONFIG.crops.push(c); });
 
@@ -402,7 +403,8 @@
       gs.cultivation = gs.cultivation || 0;
       gs.unlockedSkills = gs.unlockedSkills || ['straw_smash'];
       gs.skillLevels = gs.skillLevels || { straw_smash: 1 };
-      if (!gs.equippedSkills || !gs.equippedSkills.length) gs.equippedSkills = ['straw_smash'];
+      if (gs.equippedSkills == null) gs.equippedSkills = ['straw_smash'];
+      if (!Array.isArray(gs.equippedSkills)) gs.equippedSkills = [];
       gs.harvestCount = gs.harvestCount || {};
       gs.archive = gs.archive || {
         maps: {}, bosses: {}, elites: {}, claimed: {}, stats: {
@@ -510,12 +512,19 @@
         showToast('需要先完成突破档案：' + this.breakthroughText(nextLv), 'warning'); return false;
       }
       const need = this.expNeeded(lv);
-      if (GameState.cultivation < need) { showToast(`修为不足（需要 ${need}）`, 'warning'); return false; }
       const gold = this.goldNeeded(lv), soil = this.soilNeeded(lv), water = this.waterNeeded(lv), compost = this.compostNeeded(lv);
-      if (GameState.gold < gold) { showToast(`金币不足（需要 ${gold}）`, 'warning'); return false; }
-      if (!ResourceSystem.pay({ soil, water, compost })) { showToast('泥土/清水/堆肥不足', 'warning'); return false; }
+      const miss = [];
+      if (GameState.cultivation < need) miss.push(`修为 ${Math.floor(GameState.cultivation)}/${need}（去种凝气草）`);
+      if (GameState.gold < gold) miss.push(`金币 ${GameState.gold}/${gold}`);
+      const have = { soil: ResourceSystem.count('soil'), water: ResourceSystem.count('water'), compost: ResourceSystem.count('compost') };
+      if (have.soil < soil) miss.push(`泥土 ${have.soil}/${soil}`);
+      if (have.water < water) miss.push(`清水 ${have.water}/${water}`);
+      if (have.compost < compost) miss.push(`堆肥 ${have.compost}/${compost}`);
+      if (miss.length) { showToast('升级条件不足：' + miss.join('；'), 'warning'); return false; }
+      ResourceSystem.pay({ soil, water, compost });
       GameState.gold -= gold;
       this.addExp(0); // 触发结算（修为已够）
+      showToast(`修炼成功，达到 Lv${GameState.level}！`, 'gold');
       return true;
     },
     onCropHarvested(cropId, qty, quality) {
@@ -528,7 +537,9 @@
       const crop = (CONFIG.crops || []).find(c => c.id === cropId);
       if (crop && crop.cultivation) {
         const qmult = quality === 'legendary' ? 2 : quality === 'rare' ? 1.6 : quality === 'fine' ? 1.3 : 1;
-        this.addExp(Math.round(crop.cultivation * (qty || 1) * qmult), true);
+        let _gain = Math.round(crop.cultivation * (qty || 1) * qmult);
+        if (cropId === 'ningqi_grass' && !GameState._firstNingqi) { GameState._firstNingqi = true; _gain += 30; }
+        this.addExp(_gain, true);
       }
       const hq = qty || 1;
       ResourceSystem.add('soil', hq);
@@ -717,6 +728,7 @@
         default: return false;
       }
     },
+    claimable() { try { return ARCHIVES.some(a => this.isMet(a) && !GameState.archive.claimed[a.id]); } catch (e) { return false; } },
     claim(id) {
       CharacterSystem.init();
       const a = ARCHIVES.find(x => x.id === id);
@@ -968,10 +980,17 @@
       case 'ginseng_soup':
         p.hp = p.maxHp; this.v5.ginseng = 60; this.v5.tempAtkMul = Math.max(this.v5.tempAtkMul, 1.2); this.spawnAoeEffect(p.x, p.y, 90, '#ffe28a', 'ring'); break;
       case 'torch':
-        this.v5.torch = 60; this._visionBase = this._visionBase || this.visionRadius; showToast('火把点亮：视野 +25%', 'success'); break;
+        // v5.5 火把统一为燃料照明系统：消耗一支、续燃 60 秒（难度越高越短），无火把视野极小
+        if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.useTorchItem) { CombatEnhancement.useTorchItem(); used = false; }
+        else { this.v5.torch = 60; showToast('火把点亮：视野 +25%', 'success'); }
+        break;
       case 'poison_bomb': {
         enemies(this).forEach(m => { const d = Math.hypot(m.x - a.x, m.y - a.y); if (d < 130) { this_damage(this, m, 60, '#9b59ff', true); m.slow = Math.max(m.slow || 0, 3); } });
         this.spawnAoeEffect(a.x, a.y, 130, '#9b59ff', 'ring'); break; }
+      case 'insecticide':
+        this.v5.repel = 6;
+        enemies(this).forEach(m => { m.target = null; if (m.luredUntil) m.luredUntil = 0; });
+        this.spawnAoeEffect(p.x, p.y, 120, '#9be86b', 'ring'); showToast('驱虫剂：怪物丢失目标 6 秒', 'success'); break;
       case 'death_pardon':
         showToast('免死令为被动道具，阵亡时自动生效', 'warning'); used = false; break;
     }
@@ -1019,7 +1038,8 @@
     if (p.energy < p.maxEnergy) p.energy = Math.min(p.maxEnergy, p.energy + (p.energyRegen || 15) * dt * ((v.grape || 0) > 0 ? 2 : 1));
 
     // 计时状态
-    ['iron', 'rage', 'drum', 'scout', 'frost', 'thorns', 'shieldT', 'flame', 'grape', 'torch', 'egg', 'mint', 'ginseng'].forEach(k => { if (v[k] > 0) v[k] -= dt; });
+    ['iron', 'rage', 'drum', 'scout', 'frost', 'thorns', 'shieldT', 'flame', 'grape', 'torch', 'egg', 'mint', 'ginseng', 'repel'].forEach(k => { if (v[k] > 0) v[k] -= dt; });
+    if ((v.repel || 0) > 0) { enemies(exp).forEach(m => { if (dist(m, p) < 320) { m.target = null; if (m.luredUntil) m.luredUntil = 0; } }); }
     if (v.drum <= 0) {
       v.tempAtkMul = Math.max((v.rage || 0) > 0 ? 1.5 : 1, (v.flame || 0) > 0 ? 1.2 : 1, (v.egg || 0) > 0 ? 1.15 : 1, (v.ginseng || 0) > 0 ? 1.2 : 1);
       v.tempMoveMul = (v.mint || 0) > 0 ? 1.15 : 1;
@@ -1922,19 +1942,28 @@
           <span class="v5-pill">脱战回血 ${d.ocRegen}/s</span>
         </div>
         <div class="v5-card" style="margin:8px 0">
-          <h3>修为：${Math.floor(GameState.cultivation)} / ${need}</h3>
+          <h3>修为：${Math.floor(GameState.cultivation)} / ${need} <span style="font-size:11px;color:#9aa08c;font-weight:normal">（修为怎么来：种凝气草🌱等修为作物，收获自动转化；远征首通/档案给少量）</span></h3>
           <div class="v5-bar"><i style="width:${prog}%"></i></div>
           ${lv >= 100 ? '<div class="d">已达 Lv100 满级。</div>' :
             `<div class="d">突破/升级消耗：金币 ${gold} · 泥土 ${soil} · 清水 ${water} · 堆肥 ${compost}</div>
              ${isBrk && !brkOk ? `<div class="d" style="color:#e89a6b">突破门槛未达成：${CharacterSystem.breakthroughHint(lv + 1)}（见远征档案）</div>` : ''}
-             <button class="v5-btn" onclick="V5.ui.cultivate()">${isBrk ? '尝试突破 → Lv' + (lv + 1) : '修炼升级 → Lv' + (lv + 1)}</button>`}
-        </div>
-        <h2 style="font-size:17px;margin-top:14px">技能（点击装备/卸下，最多 ${d.slots} 个）</h2>
+             ${GameState.cultivation < need
+                ? '<button class="v5-btn" style="background:#3a5a3a" onclick="V5.ui.goPlantNingqi()">去种凝气草（每株 +10 修为，约 ' + Math.max(1, Math.ceil((need - GameState.cultivation) / 10)) + ' 株可升级）</button>'
+                : `<button class="v5-btn" onclick="V5.ui.cultivate()">${isBrk ? '尝试突破 → Lv' + (lv + 1) : '修炼升级 → Lv' + (lv + 1)}</button>`}
+        </div>`}
+        <h2 style="font-size:17px;margin-top:14px">技能（点击装备/卸下，最多 ${d.slots} 个） <button class="v5-btn" style="font-size:12px;padding:3px 10px;margin-left:8px" onclick="V5.ui.unequipAll()">一键卸下</button></h2>
         <div class="v5-grid">${skills}</div>
       `);
     },
     cultivate() { CharacterSystem.tryCultivate(); this.openCultivation(); },
     toggleEquip(id) { CharacterSystem.equip(id); this.openCultivation(); },
+    unequipAll() { CharacterSystem.init(); GameState.equippedSkills = []; try { SaveSystem.save(); } catch (e) {} showToast('已卸下全部技能', 'success'); this.openCultivation(); },
+    goPlantNingqi() {
+      this.close();
+      try { GameState.selectedCrop = 'ningqi_grass'; SaveSystem.save(); } catch (e) {}
+      try { if (typeof Farm !== 'undefined') { Farm.renderCropSelector(); Farm.renderCropDetail(); } } catch (e) {}
+      showToast('已选中凝气草🌱，点击任意空地块种植（约20秒成熟，收获转化为修为）', 'gold');
+    },
 
     openArchive() {
       CharacterSystem.init();
@@ -1979,8 +2008,27 @@
       } else if (this.tab === 'weapon') {
         body = `<div class="v5-grid">${CONFIG.weapons.map(w => `<div class="v5-card"><h3>${w.icon || '⚔️'} ${w.name}</h3><div class="d">基础伤害 ${w.damage} · ${w.mode === 'melee' ? '近战' : '远程'} · CD ${w.cooldown}s</div><div class="d" style="color:#9aa08c">来源：初始/蓝图/锻造台升级</div></div>`).join('')}</div>`;
       } else if (this.tab === 'item') {
-        const items = [...(CONFIG.consumables || []), ...Object.values(CONFIG.deployPlants || {})];
-        body = `<div class="v5-grid">${items.map(c => `<div class="v5-card"><h3>${c.icon} ${c.name}</h3><div class="d">${c.desc || ''}</div><div class="d" style="color:#9aa08c">来源：掉落/加工/温室</div></div>`).join('')}</div>`;
+        // 用途/来源映射：加工配方反查（字段 outputId/inputs/inputCrop/inputQty/workshopLevel）
+        const __recipeOf = {};
+        try {
+          const __nm = id => { try { if (RESOURCES && RESOURCES[id]) return RESOURCES[id].name; const c=(CONFIG.crops||[]).find(x=>x.id===id); if (c) return c.name; const wi=CONFIG.warehouseItems; if (wi){ const w=Array.isArray(wi)?wi.find(x=>x.id===id):wi[id]; if (w) return w.name; } } catch(e){} return id; };
+          (typeof FarmRecipes !== 'undefined' ? FarmRecipes : []).forEach(r => {
+            if (!r || !r.outputId) return;
+            let ins = '';
+            if (r.inputs) ins = Object.entries(r.inputs).map(([k,n]) => __nm(k)+'×'+n).join('+');
+            else if (r.inputCrop) ins = __nm(r.inputCrop)+'×'+(r.inputQty||1);
+            __recipeOf[r.outputId] = '加工工坊（'+ins+'）'+(r.workshopLevel?'，需工坊Lv.'+r.workshopLevel:'');
+          });
+        } catch (e) {}
+        const cons = (CONFIG.consumables || []).map(c => {
+          const src = __recipeOf[c.id] || (c.key ? '初始补给/怪物掉落' : '怪物掉落/档案奖励/温室');
+          const use = c.key ? ('战术消耗品（快捷键 '+c.key+'）') : '背包补给（准备大厅携带，局内 Tab 背包点击使用，死亡随背包损失）';
+          return '<div class="v5-card"><h3>'+c.icon+' '+c.name+'</h3><div class="d">'+(c.desc||'')+'</div><div class="d" style="color:#8fd0a0">用途：'+use+'</div><div class="d" style="color:#9aa08c">来源：'+src+'</div></div>';
+        });
+        const plants = Object.values(CONFIG.deployPlants || {}).map(c =>
+          '<div class="v5-card"><h3>'+(c.icon||'🌱')+' '+c.name+'</h3><div class="d">'+(c.desc||'')+'</div><div class="d" style="color:#8fd0a0">用途：战场植物（准备大厅携带种子，局内 F1-F5 种在地上协助作战，撤离/死亡均消失）</div><div class="d" style="color:#9aa08c">来源：农场种植对应作物，收获后作为种子带入</div></div>'
+        );
+        body = '<div class="v5-grid">'+cons.join('')+plants.join('')+'</div>';
       } else {
         body = `<div class="v5-grid">${Object.keys(RESOURCES).map(k => { const r = RESOURCES[k]; return `<div class="v5-card"><h3>${r.icon} ${r.name}</h3><div class="d">来源：${r.from}</div><div class="d" style="color:#9aa08c">去向：${r.to} · 持有 ${ResourceSystem.count(k)}</div></div>`; }).join('')}</div>`;
       }
@@ -2101,10 +2149,14 @@
           chip('农田 ' + planted + '/' + total, '#cfe6a0') +
           chip('成熟 ' + ready, ready > 0 ? '#ffd76a' : '#9aa08c') +
           chip('累计收获 ' + harvests, '#b9d18a') +
-          chip('美观度 ' + beauty, '#e6bd54') +
+          chip('美观度 ' + beauty + ' · ' + ((typeof FarmDecorationSystem!=='undefined')?FarmDecorationSystem.tier():0) + '档', '#e6bd54') +
           chip('连续撤离 ' + streak, '#9fd8ff');
         const fhCrops = document.getElementById('fhCrops');
         if (fhCrops) fhCrops.textContent = cropIcons.slice(-16).join(' ');
+        let fhDeco = document.getElementById('fhDeco');
+        const sceneEl = fhCrops ? fhCrops.parentElement : null;
+        if (sceneEl && !fhDeco) { fhDeco = document.createElement('span'); fhDeco.id = 'fhDeco'; fhDeco.style.cssText = 'position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:16px;letter-spacing:6px;white-space:nowrap;overflow:hidden;'; sceneEl.appendChild(fhDeco); }
+        if (fhDeco) fhDeco.textContent = (GameState.decorations || []).slice(0, 14).map(d => d.icon || '🌷').join(' ');
       }
     },
   };

@@ -43,6 +43,12 @@ Object.assign(Expedition.prototype, {
       fogCtx.globalCompositeOperation = 'destination-out';
       const px = this.player.x - this.camera.x;
       const py = this.player.y - this.camera.y;
+      // v5.5 边界迷雾：视野挖洞裁剪到地图矩形内，地图边界外始终保持全雾，迷雾与真实边界对齐
+      const _ms = CONFIG.expedition.mapSize;
+      fogCtx.save();
+      fogCtx.beginPath();
+      fogCtx.rect(-this.camera.x, -this.camera.y, _ms, _ms);
+      fogCtx.clip();
       const clearVision = fogCtx.createRadialGradient(px, py, radius * .82, px, py, radius * 1.08);
       clearVision.addColorStop(0, 'rgba(0,0,0,1)');
       clearVision.addColorStop(.78, 'rgba(0,0,0,1)');
@@ -51,6 +57,7 @@ Object.assign(Expedition.prototype, {
       fogCtx.beginPath();
       fogCtx.arc(px, py, radius * 1.08, 0, Math.PI * 2);
       fogCtx.fill();
+      fogCtx.restore();
 
       fogCtx.globalCompositeOperation = 'source-over';
       fogCtx.globalAlpha = 1;

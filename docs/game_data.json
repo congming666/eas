@@ -124,13 +124,13 @@
       "id": "ningqi_grass",
       "name": "凝气草",
       "icon": "🌱",
-      "growTime": 30,
+      "growTime": 20,
       "sellPrice": 12,
       "price": 20,
       "rarity": 1,
       "cultivation": 10,
       "rewardType": "cultivation",
-      "desc": "修为作物，收获转化为修为。"
+      "desc": "修为作物，收获转化为修为；新手首次收获额外 +30 修为。"
     },
     {
       "id": "lingsui_wheat",
@@ -1632,7 +1632,7 @@
       "id": "ningqi_grass",
       "name": "凝气草",
       "icon": "🌱",
-      "growTime": 30,
+      "growTime": 20,
       "exp": 10,
       "unlock": "初始解锁"
     },
@@ -1880,7 +1880,7 @@
       "icon": "🔥",
       "key": "",
       "value": 50,
-      "desc": "60 秒视野 +25%，可反复使用。"
+      "desc": "每支照明60秒（休闲120/普通60/困难40/噩梦30秒），耗尽自动续下一支；无火把视野极小，务必携带。"
     },
     {
       "id": "poison_bomb",
@@ -1889,8 +1889,218 @@
       "key": "",
       "value": 110,
       "desc": "投掷后范围 60 伤害并减速 3 秒。"
+    },
+    {
+      "id": "insecticide",
+      "name": "驱虫剂",
+      "icon": "🧪",
+      "key": "",
+      "value": 35,
+      "desc": "使用后 6 秒内身边怪物丢失目标（驱虫脱身），也可在农场治疗病虫害。"
     }
   ],
+  "deployPlants": {
+    "chili": {
+      "icon": "🌶️",
+      "name": "辣椒",
+      "hp": 60,
+      "range": 40,
+      "effect": "fire",
+      "desc": "火焰陷阱：每秒烧经过怪8血"
+    },
+    "sunflower": {
+      "icon": "🌻",
+      "name": "向日葵",
+      "hp": 40,
+      "range": 120,
+      "effect": "light",
+      "desc": "视野灯：照亮半径120"
+    },
+    "vine": {
+      "icon": "🌿",
+      "name": "藤蔓",
+      "hp": 100,
+      "range": 30,
+      "effect": "slow",
+      "desc": "减速墙：经过怪移速-50%"
+    },
+    "watermelon": {
+      "icon": "🍉",
+      "name": "西瓜",
+      "hp": 0,
+      "range": 80,
+      "effect": "boom",
+      "desc": "定时爆炸：3秒后AOE30"
+    },
+    "wheat": {
+      "icon": "🌾",
+      "name": "小麦稻草人",
+      "hp": 80,
+      "range": 150,
+      "effect": "taunt",
+      "desc": "嘲讽：怪优先打它"
+    },
+    "mushroom": {
+      "icon": "🍄",
+      "name": "月光菇",
+      "hp": 50,
+      "range": 60,
+      "effect": "heal",
+      "desc": "治疗站：每秒回2血"
+    },
+    "garlic": {
+      "icon": "🧄",
+      "name": "大蒜",
+      "hp": 40,
+      "range": 50,
+      "effect": "repel",
+      "desc": "驱虫：怪不靠近"
+    },
+    "cactus": {
+      "icon": "🌵",
+      "name": "仙人掌",
+      "hp": 120,
+      "range": 25,
+      "effect": "thorns",
+      "desc": "尖刺：碰它的怪受5反伤"
+    },
+    "firegrass": {
+      "icon": "🔥",
+      "name": "火龙草",
+      "hp": 80,
+      "range": 150,
+      "effect": "firebreath",
+      "desc": "喷火墙：直线每秒烧15"
+    },
+    "frost": {
+      "icon": "❄️",
+      "name": "寒霜花",
+      "hp": 60,
+      "range": 80,
+      "effect": "freeze",
+      "desc": "冰冻：半径内定身1.5s"
+    },
+    "electric": {
+      "icon": "⚡",
+      "name": "电藤",
+      "hp": 70,
+      "range": 200,
+      "effect": "tesla",
+      "desc": "特斯拉：链电打3个怪"
+    },
+    "shadow": {
+      "icon": "🌑",
+      "name": "暗影花",
+      "hp": 50,
+      "range": 80,
+      "effect": "stealth",
+      "desc": "隐身力场：玩家隐身3s"
+    },
+    "rainbow": {
+      "icon": "🌈",
+      "name": "虹光花",
+      "hp": 80,
+      "range": 100,
+      "effect": "buff",
+      "desc": "攻击塔：半径内攻击+20%"
+    },
+    "deathcap": {
+      "icon": "💀",
+      "name": "亡语菇",
+      "hp": 0,
+      "range": 20,
+      "effect": "deathboom",
+      "desc": "自爆：怪靠近爆50血"
+    },
+    "spike_root": {
+      "id": "spike_root",
+      "name": "地刺根茎",
+      "icon": "🌵",
+      "hp": 110,
+      "radius": 46,
+      "cooldown": 0,
+      "dps": 8,
+      "color": "#b0894f",
+      "desc": "经过的敌人持续流血。"
+    },
+    "poison_spore": {
+      "id": "poison_spore",
+      "name": "毒孢菇",
+      "icon": "🍄",
+      "hp": 70,
+      "radius": 95,
+      "cooldown": 3,
+      "dot": 12,
+      "color": "#9be86b",
+      "desc": "周期释放毒云，致盲并持续伤害。"
+    },
+    "ice_cactus": {
+      "id": "ice_cactus",
+      "name": "冰棘仙人掌",
+      "icon": "🌵",
+      "hp": 140,
+      "radius": 60,
+      "reflect": 0.2,
+      "color": "#7fd4ff",
+      "desc": "反伤近身敌人并概率冰冻。"
+    },
+    "thunder_vine": {
+      "id": "thunder_vine",
+      "name": "雷鸣藤",
+      "icon": "⚡",
+      "hp": 90,
+      "radius": 150,
+      "cooldown": 2.5,
+      "strike": 40,
+      "color": "#ffe46b",
+      "desc": "周期落雷打击范围内随机敌人。"
+    },
+    "purify_flower": {
+      "id": "purify_flower",
+      "name": "净化花",
+      "icon": "🌸",
+      "hp": 80,
+      "radius": 110,
+      "cooldown": 3,
+      "color": "#ffd6ec",
+      "desc": "周期清除玩家负面状态。"
+    },
+    "mirror_grass": {
+      "id": "mirror_grass",
+      "name": "镜草",
+      "icon": "🌿",
+      "hp": 100,
+      "radius": 70,
+      "reflect": 0.35,
+      "color": "#bfefff",
+      "desc": "光环内反弹敌方投射物/伤害。"
+    }
+  },
+  "cropToDeploy": {
+    "chili": "chili",
+    "pepper": "chili",
+    "sunflower": "sunflower",
+    "vine_plant": "vine",
+    "vine": "vine",
+    "watermelon": "watermelon",
+    "wheat": "wheat",
+    "mushroom": "mushroom",
+    "moon_mushroom": "mushroom",
+    "garlic": "garlic",
+    "cactus": "cactus",
+    "fire_grass": "firegrass",
+    "frost_flower": "frost",
+    "electric_vine": "electric",
+    "shadow_flower": "shadow",
+    "rainbow_flower": "rainbow",
+    "death_cap": "deathcap",
+    "spike_root": "spike_root",
+    "poison_spore": "poison_spore",
+    "ice_cactus": "ice_cactus",
+    "purify_flower": "purify_flower",
+    "thunder_vine": "thunder_vine",
+    "mirror_grass": "mirror_grass"
+  },
   "maps": [
     {
       "id": "t1_1",
@@ -3703,6 +3913,16 @@
       "desc": "全能植物：弱化输出+减速+控制+产养分，单局限1株"
     }
   ],
+  "decorations": null,
+  "torch": {
+    "baseFuel": 60,
+    "perDifficulty": {
+      "casual": 120,
+      "normal": 60,
+      "hard": 40,
+      "nightmare": 30
+    }
+  },
   "craftCosts": {
     "harvest_sickle": {
       "gold": 100,
