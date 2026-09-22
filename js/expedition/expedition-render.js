@@ -580,6 +580,7 @@ Object.assign(Expedition.prototype, {
     // 消耗品（v5.0：只展示已携带道具；未携带时给核心道具占位 + 折叠提示，避免 26 格撑爆屏幕）
     const consumableBar = document.getElementById('consumableBar');
     consumableBar.innerHTML = '';
+    const KEYLABEL = { herb_kit: 'Q', signal_flare: 'E' };
     const CORE_CONS = ['herb_kit', 'signal_flare', 'thorn_storm'];
     const carried = CONFIG.consumables.filter(item => (this.consumables[item.id] || 0) > 0);
     const visList = carried.length
@@ -591,22 +592,27 @@ Object.assign(Expedition.prototype, {
       const div = document.createElement('div');
       div.className = 'skill-slot consumable' + (count > 0 ? ' ready' : '') + ((this.consumableFlashes[item.id] || 0) > 0 ? ' spent' : '');
       div.title = item.desc;
-      const effectText = item.heal ? `治疗 ${item.heal}` : (item.damage ? `伤害 ${item.damage}` : (item.effectLabel || '局内道具'));
+      const effectText = item.heal ? ('治疗 ' + item.heal) : (item.damage ? ('伤害 ' + item.damage) : (item.effectLabel || '局内道具'));
       const consArt = (typeof CropArt !== 'undefined' && CropArt.ready(item.id)) ? CropArt.dom(item.id, item.icon, 26) : item.icon;
-      div.innerHTML = `
-        <span class="skill-key">${item.key || '·'}</span>
-        <span class="skill-icon">${consArt}</span>
-        <span class="skill-name">${item.name}</span>
-        <div class="skill-meta"><span>${effectText}</span><span>${count > 0 ? '一次性' : '未携带'}</span></div>
-        <span class="skill-count">×${count}</span>
-      `;
+      const keyLabel = count > 0 ? (KEYLABEL[item.id] || 'R') : '·';
+      div.innerHTML =
+        '<span class="skill-key">' + keyLabel + '</span>'
+        + '<span class="skill-icon">' + consArt + '</span>'
+        + '<span class="skill-name">' + item.name + '</span>'
+        + '<div class="skill-meta"><span>' + effectText + '</span><span>' + (count > 0 ? (KEYLABEL[item.id] ? '快捷键' : 'R 转盘') : '未携带') + '</span></div>'
+        + '<span class="skill-count">×' + count + '</span>';
       consumableBar.appendChild(div);
     });
+    const wheelChip = document.createElement('div');
+    wheelChip.className = 'skill-slot consumable cons-wheel-chip';
+    wheelChip.title = '按 R 打开道具转盘，鼠标点选使用携带的消耗品（含火把/食品/药品）';
+    wheelChip.innerHTML = '<span class="skill-key">R</span><span class="skill-icon" style="font-size:20px">🎡</span><span class="skill-name">道具转盘</span><div class="skill-meta"><span>' + (carried.length || 0) + ' 种已携带</span></div>';
+    consumableBar.appendChild(wheelChip);
     if (hiddenCount > 0) {
       const chip = document.createElement('div');
       chip.className = 'skill-slot consumable cons-more';
-      chip.title = '其余道具未携带，可在出征准备大厅或背包中查看';
-      chip.innerHTML = `<span class="skill-icon" style="font-size:20px">🎒</span><span class="skill-name">+${hiddenCount} 种道具</span><div class="skill-meta"><span>Tab 背包</span></div>`;
+      chip.title = '其余道具未携带，可在出征准备大厅携带（最多 6 种）';
+      chip.innerHTML = '<span class="skill-icon" style="font-size:20px">🎒</span><span class="skill-name">+' + hiddenCount + ' 种</span><div class="skill-meta"><span>准备大厅</span></div>';
       consumableBar.appendChild(chip);
     }
 

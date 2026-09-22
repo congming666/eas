@@ -219,13 +219,8 @@ async function main() {
   if (!(await page.locator('#expeditionPrepScreen').isVisible())) throw new Error('远征准备大厅未显示');
   if (await page.locator('#farmScreen').isVisible()) throw new Error('农场与远征准备界面同时显示');
   if ((await page.locator('.map-option').count()) !== (await page.evaluate(() => CONFIG.maps.length + 1))) throw new Error('地图数量不正确');
-  if ((await page.locator('#loadoutGrid .loadout-slot').count()) !== 3) throw new Error('消耗品槽位数量不正确');
+  if ((await page.locator('#loadoutGrid .loadout-slot').count()) !== (await page.evaluate(() => CONFIG.consumables.length))) throw new Error('消耗品槽位数量不正确');
   if ((await page.locator('.prep-skill').count()) !== 4) throw new Error('准备大厅技能信息不完整');
-  if ((await page.locator('.boost-card').count()) < 4) throw new Error('强化卡选择区没有显示库存卡牌');
-  for (let i = 0; i < 3; i++) await page.locator('.boost-card').nth(i).click();
-  if ((await page.locator('#boostCardCount').innerText()).trim() !== '3/3') throw new Error('强化卡携带计数不正确');
-  await page.locator('.boost-card').nth(3).click();
-  if ((await page.locator('.boost-card.selected').count()) !== 3) throw new Error('强化卡携带上限没有限制为3张');
 
   // v5.1 消耗品携带闭环：无库存不可携带，携带扣库存，右键归还
   const loadoutCheck = await page.evaluate(() => {
@@ -272,11 +267,12 @@ async function main() {
   if ((await page.evaluate(() => Game.expedition.terrainPatches.length)) < 18) throw new Error('地形色块生成不足');
   if ((await page.evaluate(() => Game.expedition.terrainFields.length)) < 7) throw new Error('农田地形生成不足');
   if ((await page.evaluate(() => Game.expedition.obstacles.length)) < 30) throw new Error('立体障碍物生成不足');
-  if ((await page.evaluate(() => Object.values(Game.expedition.skillBoosts).reduce((sum, value) => sum + value, 0))) <= 0) throw new Error('携带强化卡没有应用到远征技能');
   if ((await page.evaluate(() => Game.expedition.traps.length)) < 10) throw new Error('环境陷阱生成不足');
   if ((await page.locator('.skill-meta').count()) < 7) throw new Error('技能数值信息未显示');
   if ((await page.locator('#skillBar .skill-slot').count()) !== 4) throw new Error('常驻技能栏布局不正确');
-  if ((await page.locator('#consumableBar .skill-slot.consumable:not(.cons-more)').count()) !== 3) throw new Error('消耗品栏没有独立显示');
+  // v5.6 消耗品 HUD：固定 R 道具转盘入口 + 未携带时回退显示 3 个核心道具（草药/信号弹/荆棘）
+  if ((await page.locator('#consumableBar .cons-wheel-chip').count()) !== 1) throw new Error('R 道具转盘入口未显示');
+  if ((await page.locator('#consumableBar .skill-slot.consumable:not(.cons-more):not(.cons-wheel-chip)').count()) !== 3) throw new Error('消耗品核心栏没有独立显示');
   if (!(await page.locator('#musicToggle').isVisible())) throw new Error('音乐控制器未显示');
   await page.evaluate(() => {
     const expedition = Game.expedition;

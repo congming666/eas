@@ -168,8 +168,8 @@
   /* ---------- 天气特效覆盖层（DOM/CSS，柔和不闪眼） ---------- */
   const CSS = [
     '#farmWeatherFx{position:absolute;inset:0;pointer-events:none;z-index:5;overflow:hidden;border-radius:inherit;}',
-    '.fwx-rain::before,.fwx-storm::before{content:"";position:absolute;inset:-40%;background:repeating-linear-gradient(105deg,rgba(170,195,230,0) 0 6px,rgba(170,195,230,.28) 6px 7px);animation:fwxRain .55s linear infinite;}',
-    '.fwx-storm::before{background:repeating-linear-gradient(105deg,rgba(190,205,240,0) 0 4px,rgba(200,215,250,.42) 4px 5px);animation-duration:.38s;}',
+    '.fwx-rain::before,.fwx-storm::before{content:"";position:absolute;inset:-40%;background:linear-gradient(rgba(90,110,150,.05),rgba(90,110,150,.05)),repeating-linear-gradient(102deg,rgba(170,195,230,0) 0 28px,rgba(170,195,230,.10) 28px 29px);animation:fwxRain 1.1s linear infinite;}',
+    '.fwx-storm::before{background:linear-gradient(rgba(70,80,120,.08),rgba(70,80,120,.08)),repeating-linear-gradient(102deg,rgba(200,215,250,0) 0 22px,rgba(200,215,250,.15) 22px 23px);animation-duration:.85s;}',
     '@keyframes fwxRain{from{transform:translateY(-3%)}to{transform:translateY(3%)}}',
     '.fwx-fog::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(210,215,220,.12),rgba(190,195,205,.34));animation:fwxFog 9s ease-in-out infinite alternate;}',
     '@keyframes fwxFog{from{opacity:.55}to{opacity:.9}}',
@@ -266,17 +266,6 @@
     const plots = GameState.farmPlots || [];
     const total = GameState.unlockedPlots || plots.length || 48;
     const statusName = { drought: '干旱', pest: '虫害', weeds: '杂草', burn: '烧苗', beast: '野兽' };
-    let cells = '';
-    for (let i = 0; i < total; i++) {
-      const p = plots[i]; let cls = 'empty', tip = '空地', act = '';
-      if (p && p.crop) {
-        const cname = p.crop.name || '作物';
-        if (p.ready) { cls = 'ready'; tip = cname + ' 已成熟，点击收获'; act = 'Farm.harvest(' + i + ')'; }
-        else if (p.status) { cls = 'bad'; tip = cname + ' 需要照料（' + (statusName[p.status] || p.status) + '）'; act = 'Farm.tend(' + i + ')'; }
-        else { cls = 'grow'; tip = cname + ' 生长中'; }
-      }
-      cells += '<div class="fcmd-cell ' + cls + '"' + (act ? ' onclick="' + act + '"' : '') + ' title="' + tip + '"></div>';
-    }
     const CS = window.CharacterSystem;
     const lv = GameState.level || 1;
     const cultPct = CS && lv < 100 ? Math.min(100, Math.round((GameState.cultivation || 0) / CS.expNeeded(lv) * 100)) : 100;
@@ -292,8 +281,8 @@
     };
     box.innerHTML =
       '<h4>🏞️ 家园指挥台</h4>' +
-      '<div class="fcmd-mini">' + cells + '</div>' +
       '<div class="fcmd-acts">' +
+        '<button onclick="Farm.plantAllPicker()">🌱 一键种植</button>' +
         '<button onclick="Farm.harvestAllRipe()">🌾 一键收成熟</button>' +
         '<button onclick="Farm.tendAll()">🧹 一键除害照料</button>' +
         '<button onclick="FarmUI.openProcessing()">🏭 打开工坊</button>' +

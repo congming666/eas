@@ -62,12 +62,8 @@ const CardSystem = {
   },
 
   getSelectedBoosts() {
-    const boosts = {};
-    GameState.selectedBoostCards.forEach(id => {
-      const card = GameState.cardInventory.find(item => item.id === id);
-      if (card) boosts[card.skillId] = (boosts[card.skillId] || 0) + card.power;
-    });
-    return boosts;
+    // v5.6：强化卡只在卡牌工坊“使用”做永久升级（skillLevels），不再局前临选
+    return {};
   },
 
   toggleBoost(cardId) {
@@ -117,23 +113,82 @@ const CardSystem = {
       const skill = getSkillStats(baseSkill);
       const div = document.createElement('div');
       div.className = 'workshop-skill';
-      const effect = skill.damage ? `伤害 ${skill.damage}` : (skill.stunDuration ? `控制 ${skill.stunDuration}s` : (skill.dashDistance ? `位移 ${skill.dashDistance}` : `隐身 ${skill.stealthDuration}s`));
+      const EFFECT_TAG = { 稻草猛击:'横扫伤害', 藤蔓缠绕:'定身控制', 泥土遁走:'突进无敌', 烟幕诀:'隐身脱战', 辣椒火息:'锥形灼烧', 豌豆风暴:'速射弹幕', 寒冰屏障:'护盾减速', 荆棘爆发:'反伤光环', 裂地猛击:'范围眩晕', 疾风斩:'位移风刃', 治愈甘霖:'范围回血', 骄阳战鼓:'攻速移速', 毒雾蔓延:'毒云致盲', 金刚藤甲:'减伤霸体', 雷霆链:'连锁闪电', 死神镰舞:'旋转绞杀' };
+      const effect = skill.damage ? `伤害 ${skill.damage}` : (skill.heal ? `回血 ${skill.heal}` : (skill.shield ? `护盾 ${skill.shield}` : (skill.stunDuration ? `控制 ${skill.stunDuration}s` : (skill.dashDistance ? `位移 ${skill.dashDistance}` : (skill.stealthDuration ? `隐身 ${skill.stealthDuration}s` : (EFFECT_TAG[skill.name] || '主动技能'))))));
       const wsArt = (typeof CropArt!=='undefined' && CropArt.ready(baseSkill.id)) ? CropArt.dom(baseSkill.id, skill.icon, 32) : skill.icon;
       div.innerHTML = `<div style="height:34px;display:flex;align-items:center;justify-content:center;">${wsArt}</div><div style="font-size:12px;font-weight:800;">${skill.name}</div><div class="level">Lv.${skill.level}</div><div style="font-size:9px;color:#9eb2a7;margin-top:4px;">${effect} · 能量 ${skill.energyCost} · CD ${skill.cooldown}s</div>`;
       skills.appendChild(div);
     });
     cards.innerHTML = '';
     if (GameState.cardInventory.length === 0) {
-      cards.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#7f9288;padding:46px;">收获作物时有概率掉落强化卡。高价值作物更容易掉落高品质卡牌。</div>';
-      return;
+      cards.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#7f9288;padding:36px;">收获作物时有概率掉落强化卡。高价值作物更容易掉落高品质卡牌；多余的卡可在下方 5 合 1 升级。</div>';
+    } else {
+      GameState.cardInventory.forEach(card => {
+        const div = document.createElement('div');
+        div.className = 'upgrade-card ' + card.rarity;
+        div.onclick = () => this.apply(card.id);
+        const wcArt = (typeof CropArt!=='undefined' && CropArt.ready(card.skillId)) ? CropArt.dom(card.skillId, card.icon, 34) : card.icon;
+        div.innerHTML = '<div class="card-rarity">'+this.rarityNames[card.rarity]+'强化卡</div><div class="card-icon" style="display:flex;align-items:center;justify-content:center;">'+wcArt+'</div><div class="card-name">'+card.name+'</div><div class="card-desc">'+card.desc+'<br><span style="color:#f0c866;">点击使用（永久升级）</span></div>';
+        cards.appendChild(div);
+      });
     }
-    GameState.cardInventory.forEach(card => {
-      const div = document.createElement('div');
-      div.className = `upgrade-card ${card.rarity}`;
-      div.onclick = () => this.apply(card.id);
-      const wcArt = (typeof CropArt!=='undefined' && CropArt.ready(card.skillId)) ? CropArt.dom(card.skillId, card.icon, 34) : card.icon;
-      div.innerHTML = `<div class="card-rarity">${this.rarityNames[card.rarity]}强化卡</div><div class="card-icon" style="display:flex;align-items:center;justify-content:center;">${wcArt}</div><div class="card-name">${card.name}</div><div class="card-desc">${card.desc}<br><span style="color:#f0c866;">点击使用</span></div>`;
-      cards.appendChild(div);
+    this.renderSynth();
+  },
+
+  // v5.6 强化卡 5 合 1
+  countByRarity(rarity) {
+    return GameState.cardInventory.filter(c => c.rarity === rarity).length;
+  },
+  makeCardOfRarity(rarity) {
+    const skill = CONFIG.skills[randInt(0, CONFIG.skills.length - 1)];
+    const power = this.rarityPower[rarity] || 1;
+    return {
+      id: 'card_' + Date.now() + '_' + Math.floor(Math.random() * 100000),
+      rarity, power, skillId: skill.id, icon: skill.icon,
+      name: skill.name + ' · ' + this.rarityNames[rarity] + '强化',
+      desc: '使用后令「' + skill.name + '」永久提升 ' + power + ' 级，最高 8 级。'
+    };
+  },
+  combineCards(rarity) {
+    const order = ['common', 'rare', 'legendary'];
+    const idx = order.indexOf(rarity);
+    const have = this.countByRarity(rarity);
+    if (have < 5) { showToast('需要 5 张' + this.rarityNames[rarity] + '卡', 'warning'); return; }
+    // 移除 5 张该品质
+    let removed = 0;
+    GameState.cardInventory = GameState.cardInventory.filter(c => {
+      if (c.rarity === rarity && removed < 5) { removed++; return false; }
+      return true;
+    });
+    let out;
+    if (idx < order.length - 1) {
+      out = this.makeCardOfRarity(order[idx + 1]);
+      showToast('5 张' + this.rarityNames[rarity] + '卡合成 1 张' + this.rarityNames[out.rarity] + '卡：' + out.name, 'gold');
+    } else {
+      // 传说为最高品质：5 张重铸为 1 张随机传说（清理重复）
+      out = this.makeCardOfRarity('legendary');
+      showToast('传说卡已达最高品质，5 张重铸为 1 张新传说卡：' + out.name, 'gold');
+    }
+    GameState.cardInventory.push(out);
+    if (typeof CardSystem !== 'undefined') CardSystem.showDrop && CardSystem.showDrop(out);
+    SaveSystem.save();
+    this.renderWorkshop();
+  },
+  renderSynth() {
+    const box = document.getElementById('workshopSynth');
+    if (!box) return;
+    const order = ['common', 'rare', 'legendary'];
+    box.innerHTML = '';
+    order.forEach((r, i) => {
+      const have = this.countByRarity(r);
+      const next = i < order.length - 1 ? this.rarityNames[order[i + 1]] : '随机传说（重铸）';
+      const row = document.createElement('div');
+      row.className = 'synth-row' + (have >= 5 ? ' ready' : '');
+      row.innerHTML = '<div class="synth-left"><span class="synth-badge synth-' + r + '">' + this.rarityNames[r] + '</span>'
+        + '<span class="synth-formula">5 张' + this.rarityNames[r] + ' → 1 张' + next + '</span></div>'
+        + '<div class="synth-right"><span class="synth-count">持有 ' + have + '</span>'
+        + '<button class="secondary-btn" ' + (have < 5 ? 'disabled' : '') + ' onclick="CardSystem.combineCards(\'' + r + '\')">合成</button></div>';
+      box.appendChild(row);
     });
   }
 };

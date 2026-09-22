@@ -3,7 +3,7 @@
 //   带版本号参数：先更新此处，再同步 index.html 的标题、meta 与所有本地 js/css 的 ?v= 缓存戳；
 //   不带参数：按当前版本刷新 index.html。
 const GAME_NAME = '农庄牌：荒野远征';
-const GAME_VERSION = '5.5.0';
+const GAME_VERSION = '5.6.0';
 
 const CONFIG = {
   version: GAME_VERSION,
@@ -335,7 +335,8 @@ const CONFIG = {
     { id: 'carrot', name: '胡萝卜', icon: '🥕', growTime: 20, sellPrice: 25, seedPrice: 10, rarity: 'common', cardChance: 0.14, upgradeSkill: 'earth_dash', trait: 'mutate' },
     { id: 'corn', name: '玉米', icon: '🌽', growTime: 30, sellPrice: 45, seedPrice: 15, rarity: 'rare', cardChance: 0.20, upgradeSkill: 'vine_bind', trait: 'beast' },
     { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen', trait: 'carve' },
-    { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary' }
+    { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary' },
+    { id: 'tinder_grass', name: '火绒草', icon: '🔥', growTime: 22, sellPrice: 14, seedPrice: 6, rarity: 'common', cardChance: 0, upgradeSkill: null, rewardType: 'torch', rewardLabel: '火把 ×2', torchQty: 2, trait: null }
   ],
   // v1.6 战场种植：可带进远征种下去的植物
   deployPlants: {
@@ -394,6 +395,7 @@ const CONFIG = {
     corn: { name: '玉米', icon: '🌽', category: 'crop', sellPrice: 45, rarity: 'rare' },
     pumpkin: { name: '南瓜', icon: '🎃', category: 'crop', sellPrice: 80, rarity: 'rare' },
     moon_rice: { name: '月光稻', icon: '✨', category: 'crop', sellPrice: 200, rarity: 'legendary' },
+    tinder_grass: { name: '火绒草', icon: '🔥', category: 'crop', sellPrice: 14, rarity: 'common' },
     chili: { name: '辣椒', icon: '🌶️', category: 'crop', sellPrice: 20, rarity: 'common' },
     garlic: { name: '大蒜', icon: '🧄', category: 'crop', sellPrice: 30, rarity: 'common' },
     mint: { name: '薄荷', icon: '🌿', category: 'crop', sellPrice: 18, rarity: 'common' },
@@ -516,7 +518,7 @@ const GameState = {
   farmPlots: [], // 6x6 = 36格
   unlockedPlots: 8,
   selectedCrop: 'wheat',
-  unlockedCrops: ['pea_shooter', 'sunflower', 'watermelon', 'cabbage', 'wheat', 'ningqi_grass'],
+  unlockedCrops: ['pea_shooter', 'sunflower', 'watermelon', 'cabbage', 'wheat', 'ningqi_grass', 'tinder_grass'],
   skillLevels: { straw_smash: 1, vine_bind: 1, earth_dash: 1, smoke_screen: 1 },
   cardInventory: [],
   selectedBoostCards: [],

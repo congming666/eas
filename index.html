@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>农庄牌：荒野远征 v5.5.0</title>
-<meta name="game-version" content="5.5.0">
-<link rel="stylesheet" href="css/style.css?v=5.5.0">
+<title>农庄牌：荒野远征 v5.6.0</title>
+<meta name="game-version" content="5.6.0">
+<link rel="stylesheet" href="css/style.css?v=5.6.0">
 </head>
 <body>
 <div id="gameContainer">
@@ -29,7 +29,7 @@
       <p class="nebula-sub nebula-glow-soft">星云之下 · 守望农场 · 远征在即</p>
       <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
       <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
-      <div class="version-info nebula-ver nebula-glow-soft">v5.5 · 家园联动：工坊成品全部接入远征 × 火把照明/视野分级 × 家园指挥台 × 美观度增益 × 天气屏幕特效 × 全量数据表</div>
+      <div class="version-info nebula-ver nebula-glow-soft">v5.6 · 家园精修：R 道具转盘 × 消耗品限带 6 种 × 强化卡 5 合 1 × 一键种植 × 火绒草产火把 × 天气特效柔化</div>
     </div>
     <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
@@ -160,10 +160,6 @@
           <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
         </div>
         <div class="prep-panel">
-          <div class="panel-title" style="display:flex;justify-content:space-between;"><span>✨ 携带强化卡</span><span class="boost-count" id="boostCardCount">0/3</span></div>
-          <div class="boost-card-grid" id="boostCardGrid"></div>
-        </div>
-        <div class="prep-panel">
           <div class="panel-title">带入武器（死亡永久失去！）</div>
           <div id="weaponLoadoutSelect" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
           <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">⚠️ 失败将永久失去此武器，成功撤离自动回仓</div>
@@ -257,7 +253,8 @@
         <button class="secondary-btn" onclick="Game.closeCardWorkshop()">关闭</button>
       </div>
       <div class="workshop-section"><div class="panel-title">基础技能等级</div><div class="workshop-skills" id="workshopSkills"></div></div>
-      <div class="workshop-section workshop-inventory"><div class="panel-title">作物卡牌库存</div><div class="workshop-cards" id="workshopCards"></div></div>
+      <div class="workshop-section workshop-inventory"><div class="panel-title">作物卡牌库存（点击卡片＝永久升级技能）</div><div class="workshop-cards" id="workshopCards"></div></div>
+      <div class="workshop-section workshop-synth"><div class="panel-title">强化卡合成（5 张同品质 → 1 张更高品质）</div><div class="workshop-synth-grid" id="workshopSynth"></div></div>
     </div>
   </div>
 
@@ -310,37 +307,37 @@
   <div id="toastContainer"></div>
 </div>
 
-  <script src="js/config.js?v=5.5.0"></script>
-  <script src="js/crop-art.js?v=5.5.0"></script>
-  <script src="js/save.js?v=5.5.0"></script>
-  <script src="js/telemetry.js?v=5.5.0"></script>
-  <script src="js/ui.js?v=5.5.0"></script>
-  <script src="js/card.js?v=5.5.0"></script>
-  <script src="js/farm.js?v=5.5.0"></script>
-  <script src="js/farm-expansion.js?v=5.5.0"></script>
-  <script src="js/warehouse.js?v=5.5.0"></script>
-  <script src="js/greenhouse.js?v=5.5.0"></script>
-  <script src="js/performance.js?v=5.5.0"></script>
+  <script src="js/config.js?v=5.6.0"></script>
+  <script src="js/crop-art.js?v=5.6.0"></script>
+  <script src="js/save.js?v=5.6.0"></script>
+  <script src="js/telemetry.js?v=5.6.0"></script>
+  <script src="js/ui.js?v=5.6.0"></script>
+  <script src="js/card.js?v=5.6.0"></script>
+  <script src="js/farm.js?v=5.6.0"></script>
+  <script src="js/farm-expansion.js?v=5.6.0"></script>
+  <script src="js/warehouse.js?v=5.6.0"></script>
+  <script src="js/greenhouse.js?v=5.6.0"></script>
+  <script src="js/performance.js?v=5.6.0"></script>
   <script src="vendor/pixi.min.js"></script>
-  <script src="js/pixi-renderer.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-types.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-core.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-terrain.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-combat.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-effects.js?v=5.5.0"></script>
-  <script src="js/expedition/expedition-render.js?v=5.5.0"></script>
-  <script src="js/world-fx.js?v=5.5.0"></script>
-  <script src="js/difficulty-system.js?v=5.5.0"></script>
-  <script src="js/npc-system.js?v=5.5.0"></script>
-  <script src="js/tech-system.js?v=5.5.0"></script>
-  <script src="js/v080-ui.js?v=5.5.0"></script>
-  <script src="js/crop-expansion.js?v=5.5.0"></script>
-  <script src="js/crop-render-ext.js?v=5.5.0"></script>
-  <script src="js/combat-enhancement.js?v=5.5.0"></script>
-  <script src="js/achievement-system.js?v=5.5.0"></script>
-  <script src="js/loadout-system.js?v=5.5.0"></script>
-  <script src="js/v5.js?v=5.5.0"></script>
-  <script src="js/game.js?v=5.5.0"></script>
+  <script src="js/pixi-renderer.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-types.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-core.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-terrain.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-combat.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-effects.js?v=5.6.0"></script>
+  <script src="js/expedition/expedition-render.js?v=5.6.0"></script>
+  <script src="js/world-fx.js?v=5.6.0"></script>
+  <script src="js/difficulty-system.js?v=5.6.0"></script>
+  <script src="js/npc-system.js?v=5.6.0"></script>
+  <script src="js/tech-system.js?v=5.6.0"></script>
+  <script src="js/v080-ui.js?v=5.6.0"></script>
+  <script src="js/crop-expansion.js?v=5.6.0"></script>
+  <script src="js/crop-render-ext.js?v=5.6.0"></script>
+  <script src="js/combat-enhancement.js?v=5.6.0"></script>
+  <script src="js/achievement-system.js?v=5.6.0"></script>
+  <script src="js/loadout-system.js?v=5.6.0"></script>
+  <script src="js/v5.js?v=5.6.0"></script>
+  <script src="js/game.js?v=5.6.0"></script>
 
   <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -351,8 +348,8 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js?v=5.5.0"></script>
-  <script src="js/nebula-text.js?v=5.5.0"></script>
+  <script src="js/nebula.js?v=5.6.0"></script>
+  <script src="js/nebula-text.js?v=5.6.0"></script>
 
   <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
@@ -395,7 +392,7 @@
   </div>
 
 
-  <script src="js/farm-ui.js?v=5.5.0"></script>
+  <script src="js/farm-ui.js?v=5.6.0"></script>
 
   <!-- v0.8.0 NPC模态 -->
   <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">

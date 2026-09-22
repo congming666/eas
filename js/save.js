@@ -18,7 +18,7 @@ const SaveSystem = {
         ? data.selectedWeapon : 'harvest_sickle';
       GameState.selectedCrop = CONFIG.crops.some(crop => crop.id === data.selectedCrop) ? data.selectedCrop : 'wheat';
       GameState.unlockedCrops = Array.isArray(data.unlockedCrops)
-        ? [...new Set(['wheat', 'ningqi_grass', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
+        ? [...new Set(['wheat', 'ningqi_grass', 'tinder_grass', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
         : ['wheat', 'ningqi_grass'];
       GameState.loadout = { ...GameState.loadout, ...(data.loadout || {}) };
       GameState.farmItems = { ...GameState.farmItems, ...(data.farmItems || {}) };
@@ -31,9 +31,7 @@ const SaveSystem = {
       GameState.harvestCount = (data.harvestCount && typeof data.harvestCount === 'object') ? data.harvestCount : {};
       GameState.archive = (data.archive && typeof data.archive === 'object') ? data.archive : null;
       GameState.cardInventory = Array.isArray(data.cardInventory) ? data.cardInventory : [];
-      GameState.selectedBoostCards = Array.isArray(data.selectedBoostCards)
-        ? data.selectedBoostCards.filter(id => GameState.cardInventory.some(card => card.id === id)).slice(0, 3)
-        : [];
+      GameState.selectedBoostCards = []; // v5.6 强化卡改为永久升级，不再局前临选
       GameState.lastDailyClaim = typeof data.lastDailyClaim === 'string' ? data.lastDailyClaim : '';
       GameState.dailyStreak = Math.max(0, Number(data.dailyStreak) || 0);
       GameState.lastReliefClaim = typeof data.lastReliefClaim === 'string' ? data.lastReliefClaim : '';

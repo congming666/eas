@@ -70,7 +70,7 @@ class Expedition {
     this.attackBuffMult = this._getCropBuffMult('attack');
     this.cdrBuffMult = 1 - this._getCropBuffMult('cooldown_reduction');
     this.consumableFlashes = {};
-    this.skillBoosts = CardSystem.getSelectedBoosts();
+    this.skillBoosts = {}; // v5.6 强化卡永久升级，不再局前临选
     this.consumables = { ...GameState.loadout };
     // ===== 植物防线系统（养分/部署/培育） =====
     this.nutrient = CONFIG.nutrients.start;
@@ -236,6 +236,7 @@ class Expedition {
     this.keys = {};
     this.mouse = { x: 0, y: 0, down: false };
     this.paused = false;
+    this.wheelOpen = false;
     this.gameOver = false;
     this.result = null;
 
@@ -297,8 +298,14 @@ class Expedition {
       this.keys[e.key.toLowerCase()] = true;
       if (e.key === 'Escape') {
         e.preventDefault();
+        if (this.wheelOpen) { this.closeConsumableWheel(); return; }
         this.paused = !this.paused;
         if (this.paused) this.showPauseMenu(); else this.hidePauseMenu();
+      }
+      // v5.6 道具转盘打开时，除 R/ESC 外屏蔽其他玩法键
+      if (this.wheelOpen) {
+        if (e.key.toLowerCase() === 'r') { e.preventDefault(); this.closeConsumableWheel(); }
+        return;
       }
       const _branchActive = (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive);
       if (!_branchActive) {
@@ -321,7 +328,7 @@ class Expedition {
       if (e.key.toLowerCase() === 'v') { e.preventDefault(); this.cycleWeapon(1); }
       if (e.key === 'q' && e.shiftKey) { e.preventDefault(); this.cycleWeapon(-1); }
       if (e.key.toLowerCase() === 'q' && !e.shiftKey) this.useConsumable('herb_kit');
-      if (e.key.toLowerCase() === 'r') this.useConsumable('thorn_storm');
+      if (e.key.toLowerCase() === 'r') { e.preventDefault(); this.openConsumableWheel(); }
       if (e.key === ' ' || e.key === 'Shift') { e.preventDefault(); if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryDodge(); }
       if (e.key.toLowerCase() === 'f') { if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.tryUltimate(); }
       if (e.key.toLowerCase() === 'g') { if (typeof CombatEnhancement !== 'undefined') { const ex = this.monsters.find(m => CombatEnhancement.canExecute(m)); if (ex) CombatEnhancement.tryExecute(ex); } }
@@ -407,6 +414,49 @@ class Expedition {
     if (el) el.remove();
   }
 
+  // v5.6 R 键道具转盘：最多 6 种携带消耗品圆周均布，鼠标点选使用
+  openConsumableWheel() {
+    if (this.gameOver) return;
+    if (document.getElementById('consumableWheel')) { this.closeConsumableWheel(); return; }
+    const ids = CONFIG.consumables.filter(c => (this.consumables[c.id] || 0) > 0).map(c => c.id);
+    this.wheelOpen = true;
+    const overlay = document.createElement('div');
+    overlay.id = 'consumableWheel';
+    overlay.className = 'cons-wheel-overlay';
+    overlay.onclick = (ev) => { if (ev.target === overlay) this.closeConsumableWheel(); };
+    const n = ids.length;
+    let wedges = '';
+    if (!n) {
+      wedges = '<div class="cons-wheel-empty">未携带任何消耗品<br><small>在出征准备大厅携带（最多 6 种，火把计入）</small></div>';
+    } else {
+      ids.forEach((id, i) => {
+        const item = CONFIG.consumables.find(c => c.id === id);
+        const cnt = this.consumables[id] || 0;
+        const ang = n === 1 ? -Math.PI / 2 : (-Math.PI / 2 + i * 2 * Math.PI / n);
+        const R = 150;
+        const x = Math.cos(ang) * R, y = Math.sin(ang) * R;
+        const art = (typeof CropArt !== 'undefined' && CropArt.ready(id)) ? CropArt.dom(id, item.icon, 36) : item.icon;
+        wedges += '<button class="cons-wedge" style="left:calc(50% + ' + x.toFixed(1) + 'px);top:calc(50% + ' + y.toFixed(1) + 'px);" onclick="Game.expedition.useWheelItem(\'' + id + '\')">'
+          + '<span class="cons-wedge-icon">' + art + '</span>'
+          + '<span class="cons-wedge-name">' + item.name + '</span>'
+          + '<span class="cons-wedge-count">×' + cnt + '</span></button>';
+      });
+    }
+    overlay.innerHTML = '<div class="cons-wheel">'
+      + '<div class="cons-wheel-hub"><div class="cons-wheel-hub-icon">🎡</div><div class="cons-wheel-hub-text">道具转盘</div><div class="cons-wheel-hint">点击使用 · R / ESC 关闭</div></div>'
+      + wedges + '</div>';
+    document.body.appendChild(overlay);
+  }
+  closeConsumableWheel() {
+    const el = document.getElementById('consumableWheel');
+    if (el) el.remove();
+    this.wheelOpen = false;
+  }
+  useWheelItem(id) {
+    this.closeConsumableWheel();
+    this.useConsumable(id);
+  }
+
   quitToFarm() {
     this.hidePauseMenu();
     // 等同死亡：损失带入武器
@@ -417,7 +467,7 @@ class Expedition {
   }
 
   update(dt) {
-    if (this.paused || this.gameOver) return;
+    if (this.paused || this.wheelOpen || this.gameOver) return;
     // 外部子系统 / 植物 / 空间索引 / 自动拾取（保持原有每帧两次 updatePlants 调用）
     this.updateRunSystems(dt);
 

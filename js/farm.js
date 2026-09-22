@@ -87,6 +87,62 @@ const Farm = {
     RewardSystem.render();
   },
 
+  plantAllPicker() {
+    const old = document.getElementById('cropPickerOverlay');
+    if (old) old.remove();
+    const unlocked = CONFIG.crops.filter(c => GameState.unlockedCrops.includes(c.id));
+    const emptyCount = GameState.farmPlots.filter((p,i) => i < GameState.unlockedPlots && !p.crop).length;
+    const seedCount = Warehouse.getCount('seeds');
+    const overlay = document.createElement('div');
+    overlay.id = 'cropPickerOverlay';
+    overlay.className = 'crop-picker-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    let cards = '';
+    unlocked.forEach(crop => {
+      const art = (typeof CropArt !== 'undefined' && CropArt.ready(crop.id)) ? CropArt.dom(crop.id, crop.icon, 34) : crop.icon;
+      cards += '<div class="crop-picker-item" onclick="Farm.plantAll(\''+crop.id+'\')">'
+        + '<div style="height:36px;display:flex;align-items:center;justify-content:center;">'+art+'</div>'
+        + '<div style="font-weight:800;font-size:12px;">'+crop.name+'</div>'
+        + '<div style="font-size:10px;color:#9fb3a5;">'+(crop.rewardLabel || ('卖 '+crop.sellPrice+' 金'))+'</div>'
+        + '<div style="font-size:10px;color:#d8c27a;">生长 '+crop.growTime+'s</div></div>';
+    });
+    overlay.innerHTML = '<div class="crop-picker-panel">'
+      + '<div class="crop-picker-title">🌱 一键种植 · 种满全部空地</div>'
+      + '<div style="font-size:12px;color:#b9c8bd;margin:6px 0 10px;">空闲地块 <b style="color:#cfe6a0">'+emptyCount+'</b> 块 · 通用种子 <b style="color:#e0c878">'+seedCount+'</b>（每格耗 1 种子，自动跳过已种地块）</div>'
+      + '<div class="crop-picker-grid">'+cards+'</div>'
+      + '<button class="secondary-btn" style="margin-top:12px;" onclick="this.closest(\'#cropPickerOverlay\').remove()">取消</button>'
+      + '</div>';
+    document.body.appendChild(overlay);
+  },
+  plantAll(cropId) {
+    const crop = CONFIG.crops.find(c => c.id === cropId);
+    if (!crop) return;
+    GameState.selectedCrop = cropId;
+    let planted = 0;
+    let lackSeed = false;
+    for (let i = 0; i < GameState.unlockedPlots; i++) {
+      const plot = GameState.farmPlots[i];
+      if (plot.crop) continue;
+      if (Warehouse.getCount('seeds') <= 0) { lackSeed = true; break; }
+      if (!Warehouse.removeItem('seeds', 1)) { lackSeed = true; break; }
+      plot.crop = crop;
+      plot.plantedAt = Date.now();
+      plot.ready = false;
+      plot.moisture = 80;
+      plot.harvestCount = 0;
+      plot.fertilized = false;
+      plot.quality = (typeof FarmCollectionSystem !== 'undefined') ? FarmCollectionSystem.rollQuality(crop) : 'common';
+      const r = Math.random();
+      plot.status = r < 0.08 ? 'drought' : (r < 0.14 ? 'pest' : (r < 0.21 ? 'weeds' : null));
+      planted++;
+    }
+    const ov = document.getElementById('cropPickerOverlay');
+    if (ov) ov.remove();
+    if (planted <= 0) { showToast(lackSeed ? '通用种子不足，无法一键种植' : '没有空闲地块', 'warning'); return; }
+    showToast('已在 '+planted+' 块空地种满'+crop.name+(lackSeed?'（种子用完了）':''), 'success');
+    SaveSystem.save();
+    this.render();
+  },
   showCropPicker(idx) {
     const existing = document.getElementById('cropPickerOverlay');
     if (existing) { existing.remove(); return; }
@@ -249,6 +305,10 @@ const Farm = {
     } else if (crop.rewardType === 'healing') {
       Warehouse.addItem('herb_kit', 1);
       rewardText += '，草药包扎包 ×1 已入仓';
+    } else if (crop.rewardType === 'torch') {
+      const torchQty = (crop.torchQty || 2) * yieldQty;
+      Warehouse.addItem('torch', torchQty);
+      rewardText += '，火把 ×' + torchQty + ' 已入仓';
     } else if (crop.rewardType === 'attack_card') {
       const card = CardSystem.createCard(crop);
       card.name = `豌豆连射 · ${card.name}`;
@@ -480,7 +540,7 @@ const Farm = {
     const container = document.getElementById('prepSkillGrid');
     if (!container) return;
     container.innerHTML = '';
-    const boosts = CardSystem.getSelectedBoosts();
+    const boosts = {}; // v5.6 强化卡改为卡牌工坊永久升级，准备大厅不再临选
     // v5.1 只显示修行台已装备的技能
     let equippedIds = [];
     if (typeof CharacterSystem !== 'undefined') {
@@ -536,6 +596,8 @@ const Farm = {
       `;
       div.onclick = () => {
         const cur = GameState.loadout[item.id] || 0;
+        const typeCount = Object.keys(GameState.loadout).filter(k => (GameState.loadout[k] || 0) > 0).length;
+        if (cur === 0 && typeCount >= 6) { showToast('最多携带 6 种消耗品（含火把），请先卸下其他种类', 'warning'); return; }
         if (cur >= 5) { showToast('每种消耗品最多携带 5 个', 'warning'); return; }
         if (Warehouse.getCount(item.id) <= 0) { showToast(`仓库中没有 ${item.name}，无法携带`, 'warning'); return; }
         if (!Warehouse.removeItem(item.id, 1)) { showToast(`仓库中没有 ${item.name}，无法携带`, 'warning'); return; }
@@ -559,10 +621,9 @@ const Farm = {
       return div;
     };
     const grpHdr = (txt) => { const h = document.createElement('div'); h.style.cssText='width:100%;color:#cfe6a0;font-weight:bold;font-size:13px;margin:10px 0 2px;'; h.textContent=txt; container.appendChild(h); };
-    grpHdr('战术消耗品（快捷键 Q/R/E）');
-    CONFIG.consumables.filter(i => i.key).forEach(i => container.appendChild(mkLoadoutSlot(i, true)));
-    grpHdr('背包补给（食品/药品/火把等，局内 Tab 背包点击使用，死亡随背包损失）');
-    CONFIG.consumables.filter(i => !i.key).forEach(i => container.appendChild(mkLoadoutSlot(i, false)));
+    const carriedTypes = Object.keys(GameState.loadout).filter(k => (GameState.loadout[k] || 0) > 0).length;
+    grpHdr('携带消耗品（最多 6 种，每种最多 5 个，火把计入种类；Q 草药 · E 信号弹 · R 道具转盘，当前 ' + carriedTypes + '/6 种）');
+    CONFIG.consumables.forEach(i => container.appendChild(mkLoadoutSlot(i, !!i.key)));
   },
 
   // 植物防线配置（培育到100可携带部署）

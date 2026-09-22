@@ -1,5 +1,5 @@
 {
-  "version": "5.4.0",
+  "version": "5.6.0",
   "crops": [
     {
       "id": "pea_shooter",
@@ -119,6 +119,21 @@
       "upgradeSkill": "all",
       "rare": true,
       "trait": "legendary"
+    },
+    {
+      "id": "tinder_grass",
+      "name": "火绒草",
+      "icon": "🔥",
+      "growTime": 22,
+      "sellPrice": 14,
+      "seedPrice": 6,
+      "rarity": "common",
+      "cardChance": 0,
+      "upgradeSkill": null,
+      "rewardType": "torch",
+      "rewardLabel": "火把 ×2",
+      "torchQty": 2,
+      "trait": null
     },
     {
       "id": "ningqi_grass",
@@ -4344,6 +4359,13 @@
       "category": "crop",
       "sellPrice": 200,
       "rarity": "legendary"
+    },
+    "tinder_grass": {
+      "name": "火绒草",
+      "icon": "🔥",
+      "category": "crop",
+      "sellPrice": 14,
+      "rarity": "common"
     },
     "chili": {
       "name": "辣椒",
