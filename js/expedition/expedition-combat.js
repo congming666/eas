@@ -1502,6 +1502,7 @@ Object.assign(Expedition.prototype, {
     if (!target || target.hp <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
     if (target.armorUntil && target.armorUntil > performance.now()) amount *= (1 - (target.armorReduce || 0.35)); // v5.1 Boss 岩石护甲
+    if (window.WeatherSystem) amount = WeatherSystem.modifyOutgoing(this, amount, { weaponId: (hitInfo && hitInfo.weaponId) || (this.weapon && this.weapon.id), color: color, element: hitInfo && hitInfo.element }); // v5.7 雨弱火/湿导电
     const isBoss = target.type === 'boss';
     if (isBoss && target.enrageStage > 0) amount *= (1 + 0.12 * target.enrageStage); // v5.4 r4 狂暴阶防御崩坏：每阶受伤+12%，长尾双向收束
     const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;

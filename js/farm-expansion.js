@@ -11,7 +11,8 @@
       if (plot.moisture < 30) mul *= 0.5;
       else if (plot.moisture < 60) mul *= 0.8;
       if (plot.fertilized) mul *= 1.2;
-      if (GameState.weather === 'rain') mul *= 1.15;
+      if (window.WeatherSystem) mul *= WeatherSystem.farmGrowthMul(plot);
+      else if (GameState.weather === 'rain') mul *= 1.15;
       else if (GameState.weather === 'fog') mul *= 0.85;
       else if (GameState.weather === 'storm') mul *= 0.7;
       if (GameState.season === 'winter' && plot.crop.trait !== 'hardy') mul *= 0.75;
@@ -105,11 +106,17 @@
       setTimeout(() => el.remove(), 950);
     },
     tick(dt) {
-      GameState.weatherTimer -= dt;
-      if (GameState.weatherTimer <= 0) {
-        GameState.weather = Weathers[Math.floor(Math.random()*Weathers.length)];
-        GameState.weatherTimer = 60 + Math.random()*120;
-        showToast('天气变化：' + this.weatherName(GameState.weather), 'info');
+      if (window.WeatherSystem) {
+        WeatherSystem.updateFarm(dt);
+        const _wmap = { clear:'sunny', cloud:'sunny', rain:'rain', heavy_rain:'rain', storm:'storm', fog:'fog', snow:'sunny' };
+        GameState.weather = _wmap[GameState.farmWeather.state] || 'sunny';
+      } else {
+        GameState.weatherTimer -= dt;
+        if (GameState.weatherTimer <= 0) {
+          GameState.weather = Weathers[Math.floor(Math.random()*Weathers.length)];
+          GameState.weatherTimer = 60 + Math.random()*120;
+          showToast('天气变化：' + this.weatherName(GameState.weather), 'info');
+        }
       }
       GameState.seasonDay++;
       if (GameState.seasonDay > 7) {
@@ -121,7 +128,8 @@
       for (let i = 0; i < GameState.farmPlots.length; i++) {
         const p = GameState.farmPlots[i];
         if (!p.crop) continue;
-        if (GameState.weather === 'rain') p.moisture = Math.min(100, p.moisture + dt*5);
+        const _pre = window.WeatherSystem ? WeatherSystem.farmPrecip() : (GameState.weather === 'rain' ? 1 : 0);
+        if (_pre > 0) p.moisture = Math.min(100, p.moisture + dt*(2 + _pre*6));
         else p.moisture = Math.max(0, p.moisture - dt*0.15);
         if (p.moisture < 20 && !p.status && Math.random() < 0.005) {
           p.status = 'drought';

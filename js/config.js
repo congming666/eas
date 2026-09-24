@@ -3,7 +3,7 @@
 //   带版本号参数：先更新此处，再同步 index.html 的标题、meta 与所有本地 js/css 的 ?v= 缓存戳；
 //   不带参数：按当前版本刷新 index.html。
 const GAME_NAME = '农庄牌：荒野远征';
-const GAME_VERSION = '5.6.0';
+const GAME_VERSION = '5.7.0';
 
 const CONFIG = {
   version: GAME_VERSION,

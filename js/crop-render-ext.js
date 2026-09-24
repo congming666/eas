@@ -26,7 +26,8 @@
       // 品质（成熟时roll）
       let quality = plot.quality || 'common';
       if (ready && !plot.quality) {
-        const bonusQ = combo.qualityBonus + (env.moistureBoost > 0 ? 1 : 0);
+        let bonusQ = combo.qualityBonus + (env.moistureBoost > 0 ? 1 : 0);
+        if (window.WeatherSystem) bonusQ += WeatherSystem.farmQualityBonus(plot) * 6; // v5.7 雾天品质↑
         quality = CropExpansion.QualitySystem.rollQuality(crop.rarity, bonusQ);
         plot.quality = quality;
       }

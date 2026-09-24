@@ -212,18 +212,22 @@
   }
   function updateWeatherFx() {
     const fx = ensureFx(); if (!fx) return;
-    const w = GameState.weather || 'sunny';
-    fx.className = ({ rain: 'fwx-rain', storm: 'fwx-storm', fog: 'fwx-fog', sunny: 'fwx-sun' }[w]) || '';
-  }
-  // 雷暴随机轻闪光（柔和、短促）
-  setInterval(function () {
+    let cv = document.getElementById('farmWeatherCanvas');
+    if (!cv) {
+      cv = document.createElement('canvas'); cv.id = 'farmWeatherCanvas';
+      cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      fx.appendChild(cv);
+    }
     const screen = document.getElementById('farmScreen');
-    if (!screen || screen.classList.contains('hidden')) return;
-    if ((GameState.weather || 'sunny') !== 'storm') return;
-    const flash = document.getElementById('fwxFlash'); if (!flash) return;
-    flash.style.transition = 'none'; flash.style.opacity = '0.24';
-    setTimeout(function () { flash.style.transition = 'opacity .18s'; flash.style.opacity = '0'; }, 110);
-  }, 5200);
+    const ww = screen ? screen.clientWidth : cv.width, hh = screen ? screen.clientHeight : cv.height;
+    if (ww > 0 && cv.width !== ww) cv.width = ww;
+    if (hh > 0 && cv.height !== hh) cv.height = hh;
+    const c = cv.getContext('2d');
+    c.clearRect(0, 0, cv.width, cv.height);
+    if (window.WeatherFX) { try { WeatherFX.renderScreen(c, cv.width, cv.height); } catch (e) {} }
+    fx.className = '';
+  }
+  // v5.7：雷暴闪电/柔光由 WeatherFX 统一渲染，不再用 DOM 定时闪光
 
   /* ---------- 家园指挥台 ---------- */
   function canCultivate() {
@@ -251,6 +255,29 @@
       const m = CONFIG.expedition.maps.find(function (x) { return x.id === id; });
       return m ? ('T' + m.tier + ' · ' + m.name) : '未选择';
     } catch (e) { return '未选择'; }
+  }
+
+  function weatherForecastHtml() {
+    try {
+      const _fw = GameState.farmWeather;
+      if (!_fw || !window.WeatherSystem) return '';
+      const C = WeatherSystem.CAT, cur = C[_fw.state];
+      const txt = cur.icon + ' 当前' + cur.name + (_fw.next ? (' → ' + C[_fw.next].icon + C[_fw.next].name + '（' + Math.max(0, Math.ceil(_fw.timer)) + 's）') : '');
+      return '<div class="fcmd-intel" style="margin-top:6px"><span>' + txt + '</span></div>';
+    } catch (e) { return ''; }
+  }
+  function weatherFacHtml() {
+    try {
+      if (!window.WeatherSystem) return '';
+      GameState.facilities = GameState.facilities || { rain_barrel: 0, lightning_rod: 0 };
+      const one = function (id) {
+        const f = WeatherSystem.FACILITY[id];
+        const built = GameState.facilities[id];
+        return '<div class="fcmd-b"' + (built ? '' : ' onclick="WeatherSystem.buildFacility(\'' + id + '\');FarmUI.refreshCommand()"') + '>' +
+          '<div class="bn">' + f.icon + ' ' + f.name + '</div><div class="bs">' + (built ? '已建成' : f.desc) + '</div></div>';
+      };
+      return '<div class="fcmd-blds" style="margin-top:6px">' + one('rain_barrel') + one('lightning_rod') + '</div>';
+    } catch (e) { return ''; }
   }
 
   function renderCommand() {
@@ -295,7 +322,9 @@
         b('🔐', '安全箱', safeUsed + '/' + safeCap + ' 格', 'Game.openSafeBox()') +
         b('📜', '远征档案', '突破/战略物资', 'V5.openArchive()', claimableArchive()) +
       '</div>' +
-      '<div class="fcmd-intel"><span>🗺️ ' + mapName() + '</span><span>累计撤离 ' + totalEx + '</span><span>连续撤离 ' + streak + '</span><span>✨ 美观度 ' + (GameState.farmBeauty || 0) + '</span></div>';
+      '<div class="fcmd-intel"><span>🗺️ ' + mapName() + '</span><span>累计撤离 ' + totalEx + '</span><span>连续撤离 ' + streak + '</span><span>✨ 美观度 ' + (GameState.farmBeauty || 0) + '</span></div>' +
+      weatherFacHtml() +
+      weatherForecastHtml();
   }
 
   /* ---------- 挂钩 Farm.render，刷新指挥台与天气 ---------- */
@@ -306,9 +335,11 @@
     try { renderCommand(); } catch (e) {}
     return r;
   };
-  setInterval(function () {
+  // v5.7：农场天气以 rAF 连续渲染（仅在农场可见时）
+  (function _farmFxLoop() {
     const screen = document.getElementById('farmScreen');
-    if (!screen || screen.classList.contains('hidden')) return;
-    try { updateWeatherFx(); } catch (e) {}
-  }, 2000);
+    if (screen && !screen.classList.contains('hidden')) { try { updateWeatherFx(); } catch (e) {} }
+    requestAnimationFrame(_farmFxLoop);
+  })();
+  window.FarmUI = Object.assign(window.FarmUI || {}, { refreshCommand: function () { try { renderCommand(); } catch (e) {} } });
 })();

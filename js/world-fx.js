@@ -64,7 +64,7 @@ const WorldFX = (() => {
     const size = CONFIG.expedition.mapSize;
     const tier = g.map.tier;
     g.fxWalls = []; g.fxProps = []; g.fxDecals = []; g.fxForest = [];
-    g.fxWeather = { state: 'clear', timer: rand(90, 160), flash: 0, nextFlash: 4, wet: 0 };
+    g.fxWeather = window.WeatherSystem ? WeatherSystem.attachExpedition(g) : { state: 'clear', timer: rand(90, 160), flash: 0, nextFlash: 4, wet: 0 };
     g.fxHowlTimer = rand(30, 60);
 
     // ---- 密林带 2-3 片 ----
@@ -148,35 +148,38 @@ const WorldFX = (() => {
 
   // ---------- 更新（天气循环 / 狼嚎）----------
   function update(g, dt) {
-    const w = g.fxWeather;
-    if (!w) return;
-    w.timer -= dt;
-    if (w.flash > 0) w.flash = Math.max(0, w.flash - dt * 3.2);
-    // 湿地表随天气
-    const wetTarget = (w.state === 'rain' || w.state === 'storm') ? 1 : 0;
-    w.wet += (wetTarget - w.wet) * Math.min(1, dt * 0.5);
-    // 雾天压缩战争迷雾视野到约 200px
-    if (g._baseVision == null) g._baseVision = g.visionRadius;
-    const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(g) : 1;
-    if (w.state === 'fog') g.visionRadius = g._baseVision * 0.55 * _vm;
-    else if (Math.abs(g.visionRadius - g._baseVision * _vm) > 0.5) g.visionRadius = g._baseVision * _vm;
-    if (w.timer <= 0) {
-      const order = ['clear', 'cloud', 'rain', 'storm', 'fog'];
-      const idx = order.indexOf(w.state);
-      w.state = order[(idx + 1) % order.length];
-      w.timer = rand(55, 100);
-      w.nextFlash = rand(1.5, 5);
-      if (typeof showToast === 'function') {
-        const name = { clear: '天气放晴', cloud: '云层渐厚', rain: '下起了雨', storm: '雷暴来袭', fog: '雾气弥漫' }[w.state];
-        showToast(name, 'info');
+    if (window.WeatherSystem) {
+      // v5.7：统一连续天气（状态机/视野/湿/闪电/寒冷/音频全部由 WeatherSystem 处理）
+      WeatherSystem.updateExpedition(g, dt);
+    } else {
+      const w = g.fxWeather;
+      if (w) {
+        w.timer -= dt;
+        if (w.flash > 0) w.flash = Math.max(0, w.flash - dt * 3.2);
+        const wetTarget = (w.state === 'rain' || w.state === 'storm') ? 1 : 0;
+        w.wet += (wetTarget - w.wet) * Math.min(1, dt * 0.5);
+        if (g._baseVision == null) g._baseVision = g.visionRadius;
+        const _vm = (window.V5 && V5.visionMul) ? V5.visionMul(g) : 1;
+        if (w.state === 'fog') g.visionRadius = g._baseVision * 0.55 * _vm;
+        else if (Math.abs(g.visionRadius - g._baseVision * _vm) > 0.5) g.visionRadius = g._baseVision * _vm;
+        if (w.timer <= 0) {
+          const order = ['clear', 'cloud', 'rain', 'storm', 'fog'];
+          const idx = order.indexOf(w.state);
+          w.state = order[(idx + 1) % order.length];
+          w.timer = rand(55, 100);
+          w.nextFlash = rand(1.5, 5);
+          if (typeof showToast === 'function') {
+            const name = { clear: '天气放晴', cloud: '云层渐厚', rain: '下起了雨', storm: '雷暴来袭', fog: '雾气弥漫' }[w.state];
+            showToast(name, 'info');
+          }
+        }
+        if (w.state === 'storm') {
+          w.nextFlash -= dt;
+          if (w.nextFlash <= 0) { w.flash = 1; w.nextFlash = rand(3, 8); }
+        }
+        updateRainAudio(g);
       }
     }
-    if (w.state === 'storm') {
-      w.nextFlash -= dt;
-      if (w.nextFlash <= 0) { w.flash = 1; w.nextFlash = rand(3, 8); }
-    }
-    // 雨声音效
-    updateRainAudio(g);
     // 远处狼嚎
     g.fxHowlTimer -= dt;
     if (g.fxHowlTimer <= 0) {
@@ -585,8 +588,8 @@ const WorldFX = (() => {
     const t = performance.now() / 1000;
     const w = g.fxWeather;
 
-    // 天气压暗
-    if (w) {
+    // 天气压暗（v5.7：WeatherSystem 在场时由 WeatherFX 统一调色，跳过避免叠加）
+    if (w && !window.WeatherSystem) {
       if (w.state === 'cloud') { ctx.fillStyle = 'rgba(70,76,90,0.08)'; ctx.fillRect(0, 0, W, H); }
       else if (w.state === 'rain') { ctx.fillStyle = 'rgba(40,52,72,0.16)'; ctx.fillRect(0, 0, W, H); }
       else if (w.state === 'storm') { ctx.fillStyle = 'rgba(30,38,58,0.22)'; ctx.fillRect(0, 0, W, H); }
@@ -608,7 +611,7 @@ const WorldFX = (() => {
 
     // 环境粒子 + 雨雾
     renderAmbient(ctx, g);
-    renderWeatherFX(ctx, g);
+    if (!window.WeatherSystem) renderWeatherFX(ctx, g);
 
     // 全局暖褐色调（统一美术语言）
     ctx.fillStyle = 'rgba(180,130,80,0.13)';
@@ -635,8 +638,8 @@ const WorldFX = (() => {
     for (let x = -ox; x < W; x += 256) for (let y = -oy; y < H; y += 256) ctx.drawImage(tile, x, y);
     ctx.restore();
 
-    // 雷暴白闪
-    if (w && w.flash > 0) {
+    // 雷暴白闪（v5.7：WeatherSystem 在场时由 WeatherFX 处理柔光）
+    if (w && w.flash > 0 && !window.WeatherSystem) {
       ctx.fillStyle = `rgba(235,240,255,${w.flash * 0.55})`;
       ctx.fillRect(0, 0, W, H);
     }

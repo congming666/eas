@@ -706,6 +706,7 @@ Object.assign(Expedition.prototype, {
     // 分层地形：道路、水域、田块、树林和地图专属地标。
     this.renderTerrain(ctx, cam);
     if (typeof WorldFX !== 'undefined') WorldFX.renderGround(ctx, this);
+    if (window.WeatherFX) WeatherFX.renderGroundWet(ctx, this, cam); // v5.7 积水/反光/积雪/云影
     // v3.8 脚印
     this.renderFootprints(ctx, cam);
 
@@ -1502,34 +1503,8 @@ Object.assign(Expedition.prototype, {
     const tier = this.map.tier;
     const t = performance.now() / 1000;
     ctx.save();
-    const w = GameState.weather || 'sunny';
-    if (w === 'rain') {
-      ctx.strokeStyle = 'rgba(150,180,220,0.45)'; ctx.lineWidth = 1.2;
-      for (let i = 0; i < 60; i++) {
-        const x = (i * 53 + t * 600) % (CONFIG.canvas.width + 40) - 20;
-        const y = (i * 97 + t * 900) % (CONFIG.canvas.height + 40) - 20;
-        ctx.globalAlpha = 0.35;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 18); ctx.stroke();
-      }
-    } else if (w === 'storm') {
-      if (Math.random() < 0.008) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height); }
-      ctx.strokeStyle = 'rgba(180,180,220,0.5)'; ctx.lineWidth = 1.5;
-      for (let i = 0; i < 45; i++) {
-        const x = (i * 61 + t * 700) % (CONFIG.canvas.width + 40) - 20;
-        const y = (i * 83 + t * 1100) % (CONFIG.canvas.height + 40) - 20;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 22); ctx.stroke();
-      }
-    } else if (w === 'snow' || w === 'winter') {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      for (let i = 0; i < 40; i++) {
-        const x = (i * 73 + Math.sin(t + i) * 30 + 40) % CONFIG.canvas.width;
-        const y = (i * 101 + t * 40) % CONFIG.canvas.height;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    ctx.globalAlpha = 1;
+    // v5.7：统一连续天气（世界空间雨/雾/闪电/雪/调色），替代旧的农场天气屏幕绘制
+    if (window.WeatherFX) WeatherFX.renderWorld(ctx, this, this.camera);
     if (tier === 1) {
       for (let i = 0; i < 26; i++) {
         const x = (i * 83 + t * (9 + i % 4)) % CONFIG.canvas.width;
