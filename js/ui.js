@@ -669,10 +669,14 @@ const AudioManager = {
 };
 
 function getSkillStats(skill, extraLevels = 0) {
-  const baseLevel = clamp(GameState.skillLevels[skill.id] || 1, 1, 8);
+  // v5.8：基础等级改由桥接（CardV58.skillEffectiveLevel）提供；运行时被 v5.js 覆写，
+  // 此处仅作回退。无精通时 base=1，与旧公式结果一致。
+  const baseLevel = (typeof window !== 'undefined' && window.__v58Bridge && window.__v58Bridge.baseLevel)
+    ? window.__v58Bridge.baseLevel(skill.id)
+    : clamp(GameState.skillLevels[skill.id] || 1, 1, 8);
   const level = clamp(baseLevel + extraLevels, 1, 12);
   const bonus = level - 1;
-  return {
+  const out = {
     ...skill,
     level,
     baseLevel,
@@ -685,4 +689,13 @@ function getSkillStats(skill, extraLevels = 0) {
     cooldown: +Math.max(1, skill.cooldown * (1 - bonus * 0.055)).toFixed(1),
     energyCost: Math.max(8, skill.energyCost - bonus * 2),
   };
+  // v5.8 附魔词条（无词条时 mods=null，不改变数值）
+  try {
+    if (typeof window !== 'undefined' && window.__v58Bridge) {
+      const am = window.__v58Bridge.affixModsFor(skill.id);
+      window.__v58Bridge.applyAffix(out, am);
+      out.damage = out.damage || out.dmg || 0;
+    }
+  } catch (e) { /* noop */ }
+  return out;
 }

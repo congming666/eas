@@ -57,6 +57,10 @@ const Farm = {
         const progress = clamp((elapsed * statusFactor * traitMul * beautyMul) / plot.crop.growTime, 0, 1);
         plot.ready = progress >= 1;
         cell.classList.add(plot.ready ? 'ready' : 'planted');
+        // v5.8 真实土壤：湿润/干旱/暴晒差异
+        if (plot.status === 'drought') cell.classList.add('dry');
+        else if (GameState.weather === 'rain' || GameState.weather === 'heavy_rain' || GameState.rainBucket) cell.classList.add('wet');
+        else if (GameState.weather === 'sunny') cell.classList.add('dry');
         cell.classList.add(`rarity-${plot.crop.rarity || 'common'}`);
         const qColor = (typeof FarmCollectionSystem !== 'undefined') ? FarmCollectionSystem.qualityColor(plot.quality) : '#fff';
         const statusIcons = { drought: '🍂', pest: '🐛', weeds: '🌿', burn: '🔥', beast: '🐗' };

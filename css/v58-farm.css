@@ -1,0 +1,211 @@
+/* ============================================================
+ * v5.8 农场整体重设计（FARM 代理）
+ * 仅覆盖/新增；不改 index.html 与 css/style.css。
+ * 覆盖顺序：本文件在 style.css 之后加载，同等特异性后者生效。
+ * ============================================================ */
+
+/* ---------- 1. 顶栏 + 修为条：占满整行，最上方只有这两块 ---------- */
+#farmScreen .farm-top-bar{
+  left:0 !important; right:0 !important; width:100% !important; max-width:none !important;
+  margin:0 !important; padding:0 18px !important;
+  justify-content:space-between !important;
+}
+#farmScreen .resource-display{ flex:1; justify-content:center; gap:10px; flex-wrap:wrap; }
+
+/* v5.js 注入的修为条 #v5FarmBar：紧跟顶栏下方，占满整行，不再缩中间 */
+#v5FarmBar{
+  position:absolute !important; top:64px; left:0; right:0; width:100% !important; max-width:none !important;
+  margin:0 !important; z-index:4; border-radius:0 !important;
+  padding:7px 18px !important; flex-wrap:wrap;
+}
+#v5FarmBar .v5expwrap{ max-width:none !important; flex:1 1 260px !important; }
+#v5FarmBar .v5res{ flex:1 1 100%; justify-content:flex-end; }
+
+/* farm-content 下移，避开修为条；取消大屏居中限宽，消除两侧黑边 */
+#farmScreen .farm-content{
+  top:112px !important; left:0 !important; right:0 !important; bottom:0 !important;
+  max-width:none !important; width:100% !important; margin:0 !important;
+  padding:14px !important; gap:14px !important;
+}
+@media (min-width:1600px){
+  #farmScreen .farm-content{ max-width:none !important; margin:0 !important; }
+}
+
+/* ---------- 2. 农田网格铺满 + 真实土壤 ---------- */
+#farmScreen .farm-left{ gap:12px; }
+#farmScreen .farm-grid{
+  max-width:none !important; width:100% !important;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(78px, 1fr));
+  gap:8px; margin:0 !important;
+}
+#farmScreen .crop-detail-panel{ max-width:none !important; width:100% !important; }
+
+/* 真实土壤：田垄纹理 + 明暗 + 边缘 */
+#farmScreen .farm-cell{
+  border-radius:10px !important;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.22) 0 3px,
+      rgba(255,222,170,.06) 3px 6px,
+      transparent 6px 16px),
+    linear-gradient(160deg, #6f4623 0%, #53331a 55%, #3a2412 100%);
+  border:1px solid rgba(130,88,44,.55) !important;
+  box-shadow:
+    inset 0 3px 6px rgba(255,225,170,.10),
+    inset 0 -6px 10px rgba(0,0,0,.45),
+    0 3px 0 #22150a, 0 6px 10px rgba(0,0,0,.3) !important;
+}
+#farmScreen .farm-cell.planted{
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.18) 0 3px,
+      rgba(120,180,80,.10) 3px 7px,
+      transparent 7px 16px),
+    linear-gradient(160deg, #4c6f2a 0%, #2f521c 60%, #1f3a13 100%);
+  border-color:rgba(96,140,60,.6) !important;
+}
+#farmScreen .farm-cell.ready{
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.14) 0 3px,
+      rgba(255,230,140,.14) 3px 7px,
+      transparent 7px 16px),
+    linear-gradient(160deg, #8a9a30 0%, #5d6f1c 60%, #46520f 100%);
+  border-color:#e9c65a !important;
+}
+/* 湿润（深暗反光）/ 干旱（干裂发灰）由 JS 加类 */
+#farmScreen .farm-cell.wet{ filter:brightness(.8) saturate(1.25); }
+#farmScreen .farm-cell.dry{ filter:saturate(.55) brightness(1.06) sepia(.15); }
+#farmScreen .farm-cell.locked{
+  background:repeating-linear-gradient(135deg, rgba(60,48,32,.85) 0 8px, rgba(38,32,22,.9) 8px 16px) !important;
+}
+
+/* ---------- 3. 家园指挥台：去重后紧凑（删除底部重复信息栏） ---------- */
+#farmScreen .fcmd{ margin-top:0 !important; }
+#farmScreen .fcmd .fcmd-intel{ display:none !important; } /* 删除与右侧/顶栏重复的信息栏 */
+#farmScreen .fcmd .fcmd-blds.fcmd-dup{ display:none !important; } /* 与右侧家园设施重复的入口 */
+#farmScreen .fcmd-acts button{ flex:1 1 auto; }
+
+/* 修为药圃（凝气草重做） */
+.v58-cult-bed{
+  display:flex; align-items:center; gap:12px; padding:10px 14px;
+  border-radius:12px; border:1px solid rgba(180,150,220,.35);
+  background:linear-gradient(120deg, rgba(70,50,110,.35), rgba(40,30,70,.35));
+}
+.v58-cult-bed .cb-icon{ font-size:26px; }
+.v58-cult-bed .cb-mid{ flex:1; min-width:0; }
+.v58-cult-bed .cb-title{ color:#d9c6f5; font-weight:700; font-size:13px; }
+.v58-cult-bed .cb-desc{ color:#b9a8d6; font-size:11px; margin-top:2px; line-height:1.4; }
+.v58-cult-bed .cb-acts{ display:flex; gap:6px; }
+.v58-cult-bed .cb-acts button{
+  background:#3a2f5e; border:1px solid #6a5a9e; color:#e6dbff;
+  border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; white-space:nowrap;
+}
+.v58-cult-bed .cb-acts button:hover{ background:#4a3f7e; }
+
+/* ---------- 4. 家园全景：2.5D 画布容器 ---------- */
+#farmHomestead{
+  margin-top:0 !important; border-radius:14px !important; overflow:hidden;
+  border:1px solid rgba(235,205,143,.22) !important;
+  background:linear-gradient(180deg, #101c2c 0%, #1a2436 55%, #241d14 100%) !important;
+}
+#farmHomestead .hs-titlebar{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; color:#f0d58f; font-weight:700; font-size:13px;
+}
+#farmHomestead .hs-titlebar .hs-live{ font-size:11px; color:#9fd8ff; font-weight:400; }
+#farmHomestead canvas#v58Panorama{
+  display:block; width:100%; height:230px; margin:0;
+}
+#farmHomestead .hs-chips{
+  display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px 10px;
+}
+#farmHomestead .hs-chips span{
+  background:rgba(255,255,255,.06); border:1px solid rgba(185,209,138,.25);
+  color:#cfe6a0; border-radius:999px; padding:3px 10px; font-size:11px;
+}
+
+/* ---------- 5. 一键种植/选择弹窗：强制视口内 ---------- */
+#cropPickerOverlay:not(.hidden){
+  position:fixed !important; inset:0; z-index:99998 !important;
+  display:flex !important; align-items:center; justify-content:center;
+  padding:20px; box-sizing:border-box;
+  background:rgba(0,0,0,.62); backdrop-filter:blur(3px);
+}
+#cropPickerOverlay h3{
+  width:min(680px,94vw); margin:0 0 6px; color:#f0d58f; text-align:center;
+}
+#cropPickerOverlay p{
+  width:min(680px,94vw); margin:0 0 12px; color:#bcd0c0; text-align:center;
+}
+#cropPickerOverlay .crop-picker-grid{
+  width:min(680px,94vw);
+  max-height:56vh; overflow-y:auto;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:8px;
+  background:rgba(18,24,16,.92); border:1px solid rgba(185,209,138,.3);
+  border-radius:12px; padding:12px;
+}
+#cropPickerOverlay > button{
+  margin-top:12px; padding:8px 22px; border-radius:8px;
+  background:#3a5a3a; color:#eaffe; border:1px solid #6a9a6a; cursor:pointer;
+}
+
+/* ---------- 6. 物资仓库：独立全屏界面（带返回，不叠在农场） ---------- */
+#warehouseModal:not(.hidden){
+  position:fixed !important; inset:0 !important; z-index:30000 !important;
+  display:flex !important; flex-direction:column !important;
+  align-items:stretch !important; justify-content:flex-start !important;
+  padding:0 !important; background:rgba(4,8,16,.97) !important;
+  backdrop-filter:blur(8px);
+}
+#warehouseModal .warehouse-modal{
+  position:static !important; width:100% !important; max-width:none !important;
+  height:100% !important; max-height:none !important; margin:0 !important;
+  border-radius:0 !important; border:none !important;
+  display:flex; flex-direction:column; background:transparent !important;
+  box-shadow:none !important;
+}
+#warehouseModal .warehouse-modal-header{
+  display:flex; align-items:center; gap:14px; padding:14px 22px;
+  background:rgba(10,18,34,.9) !important; border-bottom:1px solid rgba(150,200,255,.18) !important;
+  border-radius:0 !important;
+}
+#warehouseModal .warehouse-modal-header h2{ margin:0; color:#eaf6ff; font-size:18px; }
+#warehouseModal .warehouse-modal-header .close-btn{ order:3; }
+#whBackBtn{
+  order:-1; background:#2a4a6a; color:#dff2ff; border:1px solid #5a8ab5;
+  border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer;
+}
+#whBackBtn:hover{ background:#3a6a9a; }
+#whSearch{
+  flex:1; max-width:340px; background:rgba(0,0,0,.35); border:1px solid rgba(150,200,255,.25);
+  color:#eaf6ff; border-radius:8px; padding:7px 12px; font-size:13px;
+}
+#whTabs{ display:flex; gap:6px; flex-wrap:wrap; }
+#whTabs button{
+  background:rgba(255,255,255,.05); border:1px solid rgba(150,200,255,.2);
+  color:#bcd4ee; border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer;
+}
+#whTabs button.on{ background:rgba(90,150,220,.35); color:#fff; border-color:#7ab5ee; }
+#warehouseContent{
+  flex:1; overflow-y:auto; padding:16px 22px;
+}
+.wh-cap-row{ display:flex; align-items:center; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+.wh-cap-bar{ flex:1; min-width:200px; height:10px; background:rgba(0,0,0,.4); border-radius:6px; overflow:hidden; }
+.wh-cap-bar i{ display:block; height:100%; background:linear-gradient(90deg,#4aa3ff,#7be0c0); }
+.wh-cat{ color:#f0d58f; font-weight:700; font-size:14px; margin:16px 0 8px; }
+.wh-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:10px; }
+.wh-cell{
+  background:rgba(255,255,255,.045); border:1px solid rgba(150,200,255,.14);
+  border-radius:12px; padding:10px; text-align:center; position:relative;
+}
+.wh-cell .wh-ic{ font-size:30px; }
+.wh-cell .wh-nm{ color:#dcecff; font-size:12px; margin-top:4px; }
+.wh-cell .wh-ct{ position:absolute; top:4px; right:6px; color:#ffd76a; font-weight:700; font-size:12px; }
+.wh-cell .wh-src{ color:#8fa8c0; font-size:10px; margin-top:4px; line-height:1.3; }
+.wh-cell .wh-sell{ margin-top:6px; }
+.wh-cell .wh-sell button{
+  background:#3a5a3a; color:#dfffdF; border:none; border-radius:6px;
+  padding:3px 8px; font-size:11px; cursor:pointer; margin:2px;
+}
+.wh-empty{ text-align:center; color:#7a8aa0; padding:60px 0; }

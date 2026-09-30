@@ -1,0 +1,49 @@
+/* =========================================================================
+ * v5.8 标题 / 启动界面改造（TITLE 代理专属）
+ * 只做：删除三行提示文字、放大中央标题主视觉、隐藏 DOM 渐变字形
+ * （「荒野远征」改由 js/nebula-text.js 的粒子汇聚构成）。
+ * 不改动 index.html 与 style.css。
+ * ========================================================================= */
+
+/* 1) 删除顶栏副标：星云序章 · 拖拽旋转 · 悬浮聚光 */
+.nebula-topbar .nebula-brand-meta {
+  display: none !important;
+}
+
+/* 2) 删除整行 v5.7 天气副标题 */
+.nebula-card .nebula-ver {
+  display: none !important;
+}
+
+/* 3) 删除最底部操作提示 */
+#mainMenu .nebula-hint {
+  display: none !important;
+}
+
+/* 4) 中央主视觉更大更聚焦 */
+.nebula-card {
+  width: min(620px, 92%) !important;
+  padding: 58px 64px 44px !important;
+}
+.nebula-title {
+  font-size: 96px !important;
+  letter-spacing: 18px !important;
+  line-height: 1.04 !important;
+  margin-bottom: 12px !important;
+}
+@media (max-width: 760px) {
+  .nebula-card { padding: 40px 26px 30px !important; }
+  .nebula-title { font-size: 56px !important; letter-spacing: 10px !important; }
+}
+
+/* 5) 隐藏 DOM 渐变字形，保留布局盒用于粒子采样；
+ *    「荒野远征」由 canvas 粒子汇聚/流动构成。 */
+#mainMenu .nebula-title.nebula-glow {
+  background: none !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  filter: none !important;
+}

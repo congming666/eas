@@ -1,7 +1,44 @@
 // ==================== 育种温室系统 ====================
+// v5.8：注册制卡材料资源 + 4 种温室新作物（墨铃花/符文藤/灵光菇/彩果）
+(function () {
+  // 制卡材料资源（v5.js 已把 CONFIG.resources 指向 RESOURCES 对象，这里追加同对象即被 ResourceSystem 识别）
+  function registerV58Resources() {
+    try {
+      if (!window.CONFIG) return;
+      CONFIG.resources = CONFIG.resources || {};
+      const R = CONFIG.resources;
+      if (!R.enchant_essence) R.enchant_essence = { name: '附魔精华', icon: '✨', kind: 'craft', from: '温室：灵光菇 + 符文藤', to: '卡牌附魔工位' };
+      if (!R.pigment) R.pigment = { name: '颜料', icon: '🎨', kind: 'craft', from: '温室：彩果', to: '卡牌印制工位' };
+      if (!R.ink) R.ink = { name: '墨汁', icon: '🖋️', kind: 'craft', from: '温室：墨铃花', to: '卡牌印制工位' };
+      // 追加新作物到温室植物表（幂等）
+      CONFIG.greenhousePlants = CONFIG.greenhousePlants || [];
+      const have = id => CONFIG.greenhousePlants.some(p => p.id === id);
+      const add = p => { if (!have(p.id)) CONFIG.greenhousePlants.push(p); };
+      add({ id: 'inkbell', name: '墨铃花', icon: '🔔', growTime: 120, rarity: 'rare', seedPrice: 60,
+        desc: '铃瓣渗出浓墨，是卡牌印制的墨汁来源。',
+        drops: [ { id: 'ink', chance: 0.7, amount: [1, 2] }, { id: 'gold', chance: 0.5, amount: [40, 90] } ] });
+      add({ id: 'runevine', name: '符文藤', icon: '🪢', growTime: 210, rarity: 'epic', seedPrice: 150,
+        desc: '藤脉刻满古符文，与灵光菇同产附魔精华。',
+        drops: [ { id: 'enchant_essence', chance: 0.5, amount: [1, 2] }, { id: 'gold', chance: 0.4, amount: [80, 160] } ] });
+      add({ id: 'glowshroom', name: '灵光菇', icon: '🍄', growTime: 220, rarity: 'epic', seedPrice: 150,
+        desc: '伞盖流淌灵光，与符文藤同产附魔精华。',
+        drops: [ { id: 'enchant_essence', chance: 0.55, amount: [1, 2] }, { id: 'gold', chance: 0.4, amount: [80, 160] } ] });
+      add({ id: 'colorfruit', name: '彩果', icon: '🫐', growTime: 130, rarity: 'rare', seedPrice: 80,
+        desc: '果皮可榨出鲜艳颜料，用于卡牌印制。',
+        drops: [ { id: 'pigment', chance: 0.7, amount: [1, 2] }, { id: 'gold', chance: 0.6, amount: [50, 110] } ] });
+    } catch (e) { console.warn('[gh] registerV58Resources', e); }
+  }
+  window.__ghRegisterV58 = registerV58Resources;
+  registerV58Resources();
+})();
+
 const Greenhouse = {
+  // v5.8 新作物默认解锁（不依赖旧存档 unlockedPlants 数组）
+  V58_PLANTS: ['inkbell', 'runevine', 'glowshroom', 'colorfruit'],
+  isV58Plant(id){ return this.V58_PLANTS.indexOf(id) >= 0; },
   // 初始化温室格子（4x4 = 16格）
   init() {
+    if (window.__ghRegisterV58) window.__ghRegisterV58();
     if (GameState.greenhouse.plots.length === 16) return;
     GameState.greenhouse.plots = [];
     for (let i = 0; i < 16; i++) {
@@ -95,7 +132,8 @@ const Greenhouse = {
     if (!container) return;
     container.innerHTML = '';
     CONFIG.greenhousePlants.forEach(plant => {
-      const unlocked = GameState.greenhouse.unlockedPlants.includes(plant.id);
+      const unlocked = this.isV58Plant(plant.id) ||
+        (Array.isArray(GameState.greenhouse.unlockedPlants) && GameState.greenhouse.unlockedPlants.includes(plant.id));
       const button = document.createElement('div');
       button.className = `gh-plant-choice ${plant.rarity} ${GameState.greenhouse.selectedPlant === plant.id ? 'selected' : ''} ${!unlocked ? 'locked' : ''}`;
       button.innerHTML = `
@@ -196,6 +234,11 @@ const Greenhouse = {
         if (drop.id === 'gold') {
           GameState.gold += amount;
           rewards.push(`💰+${amount}`);
+        } else if (CONFIG.resources && CONFIG.resources[drop.id]) {
+          // v5.8 制卡材料资源（墨汁/颜料/附魔精华）：进材料背包
+          try { (window.ResourceSystem ? ResourceSystem.add(drop.id, amount) : (GameState.warehouse.materials = GameState.warehouse.materials || {})[drop.id] = ((GameState.warehouse.materials[drop.id]||0)+amount)); } catch (e) {}
+          const rd = CONFIG.resources[drop.id];
+          rewards.push(`${rd.icon||'✨'}${rd.name}×${amount}`);
         } else {
           // v5.0 修为类产物直接转化为修为
           const _gd = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];

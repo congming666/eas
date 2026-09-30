@@ -19,3 +19,11 @@ tools/balance-history/balance-smoke*.json
 tools/balance-history/balance-dbg*.json
 tools/balance-history/balance-lever-smoke*.json
 tools/balance-history/balance-lever-nm-2*.json
+
+# v5.8 local screenshots and smoke/diag archives
+shots/
+tools/_v58_shots/
+tools/v58-shots/
+tools/balance-history/raw-v58-smoke*.json
+tools/balance-history/raw-v58-diag*.json
+tools/balance-history/v58-probe.json

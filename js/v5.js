@@ -134,10 +134,14 @@
     out.range = base.range;
     return out;
   }
-  // 覆写全局 getSkillStats（ui.js 定义），支持 16 技能、1-5 级 + 卡牌临时等级
+  // 覆写全局 getSkillStats（ui.js 定义），支持 16 技能、精通(=1+精通) + 卡牌临时等级 + 附魔词条
+  // v5.8：基础等级改由 window.__v58Bridge.baseLevel（CardV58.skillEffectiveLevel）提供，
+  //       无精通时 =1（与旧 skillLevels=1 完全一致，回归不破坏）；再叠加装备卡词条。
   window.getSkillStats = function (skill, extraLevels = 0) {
     if (!skill) return skill;
-    const base = (typeof GameState !== 'undefined' && GameState.skillLevels) ? (GameState.skillLevels[skill.id] || 1) : 1;
+    const base = (typeof window !== 'undefined' && window.__v58Bridge && window.__v58Bridge.baseLevel)
+      ? window.__v58Bridge.baseLevel(skill.id)
+      : ((typeof GameState !== 'undefined' && GameState.skillLevels) ? (GameState.skillLevels[skill.id] || 1) : 1);
     const lvl = Math.max(1, Math.min(8, base + (extraLevels || 0)));
     const s = scaleSkill(skill, Math.min(5, Math.max(1, base)));
     s.level = lvl;
@@ -146,6 +150,13 @@
       const e = scaleSkill(skill, Math.min(8, lvl));
       s.damage = e.dmg; s.dmg = e.dmg; s.cooldown = e.cooldown; s.energyCost = e.energyCost;
     }
+    // v5.8 附魔词条（仅当该技能装备卡带词条时生效；无词条时 mods=null，不改变任何数值）
+    try {
+      if (typeof window !== 'undefined' && window.__v58Bridge) {
+        const am = window.__v58Bridge.affixModsFor(skill.id);
+        window.__v58Bridge.applyAffix(s, am);
+      }
+    } catch (e) { /* noop */ }
     s.damage = s.dmg || 0;
     s.energyCost = s.energyCost;
     s.dashDistance = s.dash; s.invulnDuration = s.invuln; s.stealthDuration = s.stealth;

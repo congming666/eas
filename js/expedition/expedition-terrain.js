@@ -979,6 +979,23 @@ Object.assign(Expedition.prototype, {
     showToast(`区域首领「${this.boss.name}」已现身`, 'warning');
   },
 
+  // v5.8 篝火（升级/移除/回血）与商人（买/删/升级/补货）世界交互物
+  spawnCardNodes() {
+    const size = CONFIG.expedition.mapSize;
+    const cf = this.findSafeSpawn(200, size - 200, 24, 260);
+    this.campfire = { x: cf.x + 60, y: cf.y + 40, radius: 26, used: false };
+    const mp = this.findSafeSpawn(260, size - 260, 26, 360);
+    this.merchant = { x: mp.x, y: mp.y, radius: 26, restocked: 0 };
+    // 商人初始在售 3 张道具卡
+    if (typeof CardV58 !== 'undefined' && CardV58.getDef) {
+      const ids = Object.keys(CARD_DATA.items || {});
+      this.merchantStock = [];
+      for (let i = 0; i < 3 && ids.length; i++) {
+        this.merchantStock.push(ids[Math.floor(Math.random() * ids.length)]);
+      }
+    }
+  },
+
   isInWater(wx, wy, radius) {
     for (const patch of this.terrainPatches) {
       if (patch.type !== 'water') continue;

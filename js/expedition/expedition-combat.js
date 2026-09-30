@@ -553,7 +553,7 @@ Object.assign(Expedition.prototype, {
         if (dist(m, this.player) < skill.range) {
           this.damageEnemy(m, skill.damage, '#f2c45b', true, {
             x: m.x, y: m.y, angle: Math.atan2(m.y - this.player.y, m.x - this.player.x),
-            weaponId: '', fromPlayer: true
+            weaponId: '', fromPlayer: true, skillId: skill.id, faction: (CARD_DATA.skills[skill.id] || {}).element
           });
           m.stunned = 0.5;
         }
@@ -580,6 +580,21 @@ Object.assign(Expedition.prototype, {
       this.player.stealth = skill.stealthDuration;
       this.spawnSmokeEffect(px, py);
       showToast('进入隐身状态', 'success');
+    }
+    // 注：其余 12 个技能（chili_breath/frost_barrier/thunder_chain/poison_mist/pea_storm/
+    // healing_rain/sun_drum/death_scythe/iron_armor/thorn_burst/earth_slam/gale_slash）
+    // 由后加载的 js/v5.js 在 E.useSkill 里数据驱动实现（写入 this.v5.{zones,channels,frost,
+    // thorns,iron,shield,drum}），并由 updateRunSystems 里 V5.tick(this,dt) 推进；伤害吸收/减伤
+    // 由 damagePlayer 内 V5.modifyIncomingDamage 消费。本文件不重复实现，避免双份效果。
+
+    // v5.8 词条：recast 命中后再施放一次（返还能量/清冷却，不额外耗能不进CD，最多一次）
+    const _cs = this._skillCardStats(skill.id);
+    if (!this._recastGuard && _cs.recastChance && Math.random() < _cs.recastChance) {
+      this._recastGuard = true;
+      this.player.energy += skill.energyCost;
+      this.skillCooldowns[idx] = 0;
+      this.useSkill(idx);
+      this._recastGuard = false;
     }
   },
 
@@ -999,6 +1014,9 @@ Object.assign(Expedition.prototype, {
   tryInteract() {
     const worldMouseX = this.mouse.x + this.camera.x;
     const worldMouseY = this.mouse.y + this.camera.y;
+    // v5.8 篝火 / 商人
+    if (this.campfire && dist(this.player, this.campfire) < 50 && dist({ x: worldMouseX, y: worldMouseY }, this.campfire) < 44) { this.openCampfire(); return; }
+    if (this.merchant && dist(this.player, this.merchant) < 50 && dist({ x: worldMouseX, y: worldMouseY }, this.merchant) < 44) { this.openMerchant(); return; }
     // 检查宝箱
     for (const chest of this.chests) {
       if (!chest.opened && dist(this.player, chest) < 50 && dist({x:worldMouseX,y:worldMouseY}, chest) < 40) {
@@ -1025,6 +1043,301 @@ Object.assign(Expedition.prototype, {
     }
     // 普通攻击
     this.playerAttack();
+  },
+
+  /* ==================== v5.8 夺卡 / 篝火 / 商人 ==================== */
+  _mountModal(id, innerHtml) {
+    this._closeModal(id);
+    const ov = document.createElement('div');
+    ov.id = id;
+    ov.className = 'v58-overlay';
+    ov.innerHTML = '<div class="v58-modal">' + innerHtml + '</div>';
+    ov.onclick = (e) => { if (e.target === ov && id !== 'v58CaptureOverlay') this._closeModal(id); };
+    document.body.appendChild(ov);
+  },
+  _closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  },
+
+  // 构造 CardV58.rollCapture 所需 ctx（背包稀有度/道具容量）
+  _captureCtx() {
+    const existingCards = (this.equippedSkills || []).map(sid => ({ type: 'skill', defId: sid }));
+    const itemCounts = {};
+    (this.tempCards || []).forEach(c => {
+      if (c.type === 'item') itemCounts[c.defId] = (itemCounts[c.defId] || 0) + 1;
+    });
+    return { existingCards, itemCounts, distinctItemTypes: Object.keys(itemCounts).length, rng: Math.random };
+  },
+
+  // 弹出三选一夺卡（道路节点/精英/Boss/宝箱/商人）
+  offerCapture(reason) {
+    if (this.gameOver || this.choiceOpen) return;
+    if (typeof CardV58 === 'undefined' || !CardV58.rollCapture) return;
+    let res;
+    try { res = CardV58.rollCapture(this._captureCtx()); } catch (e) { return; }
+    const choices = res.choices;
+    this._captureChoices = choices;
+    this._captureCtxData = this._captureCtx();
+    this.choiceOpen = true;
+    const title = { road: '道路节点 · 三选一', elite: '精英讨伐 · 三选一', boss: 'Boss 讨伐 · 三选一', chest: '宝箱 · 三选一', merchant: '商人 · 三选一' }[reason] || '战利品三选一';
+    const cardsHtml = choices.map((c, i) => {
+      const info = this._describeCaptureChoice(c);
+      return `<div class="v58-cap-card${c.grey ? ' v58-cap-grey' : ''}" data-idx="${i}">
+        <div class="v58-cap-kind">${info.kindName}</div>
+        <div class="v58-cap-icon">${info.icon}</div>
+        <div class="v58-cap-name">${info.name}</div>
+        <div class="v58-cap-desc">${info.desc}</div>
+        ${c.grey ? `<div class="v58-cap-reason">${c.reason || '不可选'}</div>` : ''}
+      </div>`;
+    }).join('');
+    this._mountModal('v58CaptureOverlay', `<h3 class="v58-modal-title">🎴 ${title}</h3>
+      <div class="v58-cap-row">${cardsHtml}</div>
+      <div class="v58-modal-hint">仅给 精通附魔 / 道具卡 / 种子卡 · 新技能卡走 Boss 蓝图</div>`);
+    const ov = document.getElementById('v58CaptureOverlay');
+    if (ov) ov.querySelectorAll('.v58-cap-card').forEach(el => el.addEventListener('click', () => this._chooseCapture(Number(el.getAttribute('data-idx')))));
+  },
+
+  _describeCaptureChoice(c) {
+    const gd = (t, id) => (typeof CardV58 !== 'undefined' && id) ? (CardV58.getDef(t, id) || {}) : {};
+    if (c.kind === 'upgrade') {
+      const d = gd('skill', c.card && c.card.defId);
+      return { kindName: '精通/附魔', icon: d.icon || '⬆️', name: d.name || '无可升级卡', desc: d.name ? `精通进度 +0.5` : '本局没有已装备技能' };
+    }
+    if (c.kind === 'item') {
+      const d = gd('item', c.defId);
+      return { kindName: '道具卡', icon: d.icon || '🧪', name: d.name || (c.reason || '道具位满'), desc: d.desc || '' };
+    }
+    const d = gd('seed', c.defId);
+    return { kindName: '种子卡', icon: d.icon || '🌱', name: d.name || '种子', desc: d.desc || '' };
+  },
+
+  _chooseCapture(i) {
+    const c = (this._captureChoices || [])[i];
+    if (!c) return;
+    if (c.grey) { showToast(c.reason || '该选项不可选', 'warning'); return; }
+    if (c.kind === 'upgrade') {
+      const r = CardV58.applyCapture(c, this._captureCtxData || {});
+      const nm = c.card && (CardV58.getDef('skill', c.card.defId) || {}).name;
+      if (r && r.ok) showToast(`⬆️ ${nm || '卡'} 精通进度提升（Lv.${r.masteryLv}）`, 'gold');
+      else showToast(r && r.reason || '无法升级', 'warning');
+    } else if (c.kind === 'item') {
+      const card = CardV58.makeCard('item', c.defId, { acquiredFrom: 'capture' });
+      if (card) { this.tempCards.push(card); showToast(`🧪 获得道具卡：${(CardV58.getDef('item', c.defId)||{}).name}（物理副本，撤离铭记）`, 'gold'); }
+    } else if (c.kind === 'seed') {
+      const card = CardV58.makeCard('seed', c.defId, { acquiredFrom: 'capture' });
+      if (card) { this.tempCards.push(card); showToast(`🌱 获得种子卡：${(CardV58.getDef('seed', c.defId)||{}).name}（物理副本，撤离铭记）`, 'gold'); }
+    }
+    this.captureLog.push({ kind: c.kind, defId: c.defId || (c.card && c.card.defId) });
+    this._closeModal('v58CaptureOverlay');
+    this.choiceOpen = false;
+    this.updateHUD();
+  },
+
+  // 篝火：升级卡 / 移除卡 / 休息回血
+  openCampfire() {
+    if (this.gameOver || this.choiceOpen) return;
+    this.choiceOpen = true;
+    this._mountModal('v58CampfireOverlay', `<h3 class="v58-modal-title">🔥 篝火休息</h3>
+      <div class="v58-cap-row">
+        <div class="v58-cap-card" data-act="upgrade"><div class="v58-cap-kind">升级卡</div><div class="v58-cap-icon">⬆️</div><div class="v58-cap-name">升级一张卡</div><div class="v58-cap-desc">随机已装备技能精通 +1</div></div>
+        <div class="v58-cap-card" data-act="remove"><div class="v58-cap-kind">移除卡</div><div class="v58-cap-icon">🗑️</div><div class="v58-cap-name">移除一张卡</div><div class="v58-cap-desc">销毁一张本局道具/种子卡</div></div>
+        <div class="v58-cap-card" data-act="rest"><div class="v58-cap-kind">休息</div><div class="v58-cap-icon">💤</div><div class="v58-cap-name">休息回血</div><div class="v58-cap-desc">生命回复至上限</div></div>
+      </div>
+      <div class="v58-modal-hint">三选一</div>`);
+    const ov = document.getElementById('v58CampfireOverlay');
+    if (ov) ov.querySelectorAll('.v58-cap-card').forEach(el => el.addEventListener('click', () => this._campfireChoice(el.getAttribute('data-act'))));
+  },
+  _campfireChoice(act) {
+    if (act === 'upgrade') {
+      const skills = this.equippedSkills || [];
+      if (!skills.length) { showToast('没有可升级的技能', 'warning'); return; }
+      const sid = skills[Math.floor(Math.random() * skills.length)];
+      const lv = CardV58.addMasteryProgress({ type: 'skill', defId: sid }, 1.0);
+      showToast(`⬆️ ${(CardV58.getDef('skill', sid) || {}).name} 精通升至 Lv.${lv}`, 'gold');
+    } else if (act === 'remove') {
+      const idx = (this.tempCards || []).findIndex(c => c.type === 'item' || c.type === 'seed');
+      if (idx < 0) { showToast('本局没有可移除的道具/种子卡', 'warning'); return; }
+      const c = this.tempCards.splice(idx, 1)[0];
+      showToast(`🗑️ 已移除 ${(CardV58.getDef(c.type, c.defId) || {}).name || c.defId}`, 'warning');
+    } else if (act === 'rest') {
+      this.player.hp = this.player.maxHp;
+      this.spawnAoeEffect(this.player.x, this.player.y, 80, '#ffd968');
+      showToast('💤 篝火休息，生命已回满', 'success');
+    }
+    this._closeModal('v58CampfireOverlay');
+    this.choiceOpen = false;
+    this.updateHUD();
+  },
+
+  // 商人：买卡 / 删卡 / 升级 / 补货
+  openMerchant() {
+    if (this.gameOver || this.choiceOpen) return;
+    this.choiceOpen = true;
+    const stockHtml = (this.merchantStock || []).map((defId, i) => {
+      const d = (typeof CardV58 !== 'undefined') ? (CardV58.getDef('item', defId) || {}) : {};
+      return `<div class="v58-mrow"><span>${d.icon || '🧪'} ${d.name || defId}</span><button class="secondary-btn v58-buy" data-i="${i}">购入 100金</button></div>`;
+    }).join('') || '<div class="v58-modal-hint">货架空空，点「补货」</div>';
+    this._mountModal('v58MerchantOverlay', `<h3 class="v58-modal-title">🧑‍🌾 流浪商人</h3>
+      <div class="v58-mgrid">
+        <button class="v58-cap-card" data-act="buy"><div class="v58-cap-kind">买卡</div><div class="v58-cap-icon">🛒</div><div class="v58-cap-name">买卡</div><div class="v58-cap-desc">100金购随机道具卡</div></button>
+        <button class="v58-cap-card" data-act="delete"><div class="v58-cap-kind">删卡</div><div class="v58-cap-icon">💀</div><div class="v58-cap-name">删卡</div><div class="v58-cap-desc">销毁本局一张卡返40金</div></button>
+        <button class="v58-cap-card" data-act="upgrade"><div class="v58-cap-kind">升级</div><div class="v58-cap-icon">⬆️</div><div class="v58-cap-name">升级</div><div class="v58-cap-desc">150金精通+1</div></button>
+        <button class="v58-cap-card" data-act="restock"><div class="v58-cap-kind">补货</div><div class="v58-cap-icon">🔄</div><div class="v58-cap-name">补货</div><div class="v58-cap-desc">${this.merchantRestockCost}金刷新货架</div></button>
+      </div>
+      <div class="v58-stock">${stockHtml}</div>
+      <div class="v58-modal-hint">当前金币 ${Math.floor(GameState.gold || 0)}</div>`);
+    const ov = document.getElementById('v58MerchantOverlay');
+    if (ov) {
+      ov.querySelectorAll('.v58-cap-card').forEach(el => el.addEventListener('click', () => this._merchantAction(el.getAttribute('data-act'))));
+      ov.querySelectorAll('.v58-buy').forEach(el => el.addEventListener('click', () => this._merchantBuyStock(Number(el.getAttribute('data-i')))));
+    }
+  },
+  _spendGold(n) {
+    if ((GameState.gold || 0) < n) { showToast('金币不足', 'warning'); return false; }
+    GameState.gold -= n; return true;
+  },
+  _merchantAction(act) {
+    if (act === 'buy') {
+      if (!this._spendGold(100)) return;
+      const ids = Object.keys((typeof CARD_DATA !== 'undefined' && CARD_DATA.items) || {});
+      if (!ids.length) return;
+      const defId = ids[Math.floor(Math.random() * ids.length)];
+      const card = CardV58.makeCard('item', defId, { acquiredFrom: 'merchant' });
+      if (card) { this.tempCards.push(card); showToast(`🛒 购入 ${(CardV58.getDef('item', defId) || {}).name}`, 'gold'); }
+    } else if (act === 'delete') {
+      const idx = (this.tempCards || []).findIndex(c => c.type === 'item' || c.type === 'seed');
+      if (idx < 0) { showToast('本局没有可删的卡', 'warning'); return; }
+      this.tempCards.splice(idx, 1);
+      GameState.gold = (GameState.gold || 0) + 40;
+      showToast('💀 已删卡，返还 40 金', 'gold');
+    } else if (act === 'upgrade') {
+      if (!this._spendGold(150)) return;
+      const skills = this.equippedSkills || [];
+      if (skills.length) {
+        const sid = skills[Math.floor(Math.random() * skills.length)];
+        const lv = CardV58.addMasteryProgress({ type: 'skill', defId: sid }, 1.0);
+        showToast(`⬆️ ${(CardV58.getDef('skill', sid) || {}).name} 精通 Lv.${lv}`, 'gold');
+      }
+    } else if (act === 'restock') {
+      if (!this._spendGold(this.merchantRestockCost)) return;
+      const ids = Object.keys((typeof CARD_DATA !== 'undefined' && CARD_DATA.items) || {});
+      this.merchantStock = [];
+      for (let i = 0; i < 3 && ids.length; i++) this.merchantStock.push(ids[Math.floor(Math.random() * ids.length)]);
+      showToast('🔄 货架已补货', 'success');
+    }
+    this.openMerchant(); // 刷新
+  },
+  _merchantBuyStock(i) {
+    const defId = (this.merchantStock || [])[i];
+    if (!defId) return;
+    if (!this._spendGold(100)) return;
+    const card = CardV58.makeCard('item', defId, { acquiredFrom: 'merchant' });
+    if (card) { this.tempCards.push(card); showToast(`🛒 购入 ${(CardV58.getDef('item', defId) || {}).name}`, 'gold'); }
+    this.openMerchant();
+  },
+
+  // ===== v5.8 战斗层：协同(synergyMods) + 词条(cardStats.affixMods) =====
+  buildCardSynergy() {
+    if (typeof CardV58 === 'undefined' || !CardV58.synergyMods) { this.syn = {}; this.synBuffs = []; this.cardShield = 0; return; }
+    const loadout = {
+      weapons: [],
+      skills: (this.equippedSkills || []).map(s => ({ type: 'skill', defId: s })),
+      items: (this.tempCards || []).filter(c => c.type === 'item').map(c => ({ type: 'item', defId: c.defId })),
+      seeds: (this.tempCards || []).filter(c => c.type === 'seed').map(c => ({ type: 'seed', defId: c.defId }))
+    };
+    try {
+      this.syn = CardV58.synergyMods(loadout) || {};
+      this.synBuffs = ((CardV58.synergyState(loadout) || {}).buffs) || [];
+    } catch (e) { this.syn = {}; this.synBuffs = []; }
+    this.cardShield = this.syn.startShield || 0;   // armor2/3 开战叠甲
+    this._wrapRecast();
+  },
+
+  _wrapRecast() {
+    const proto = Expedition.prototype;
+    if (proto._v58RecastWrapped) return;
+    const origUse = proto.useSkill;
+    const self = this;
+    proto.useSkill = function (idx) {
+      origUse.call(this, idx);
+      if (this._recastGuard) return;
+      if (typeof CardV58 === 'undefined' || !this._skillCardStats) return;
+      const sid = (CONFIG.skills[idx] || {}).id;
+      if (!sid) return;
+      const cs = this._skillCardStats(sid);
+      if (cs.recastChance && Math.random() < cs.recastChance) {
+        this._recastGuard = true;
+        this._recastFired = (this._recastFired || 0) + 1;
+        let cost = 0;
+        try { cost = getSkillStats(CONFIG.skills[idx], this.skillBoosts[sid] || 0).energyCost || 0; } catch (e) {}
+        this.player.energy += cost;
+        this.skillCooldowns[idx] = 0;
+        origUse.call(this, idx);
+        this._recastGuard = false;
+      }
+    };
+    proto._v58RecastWrapped = true;
+  },
+
+  _skillCardStats(skillId) {
+    if (typeof CardV58 === 'undefined' || !skillId) return {};
+    const c = (typeof GameState !== 'undefined' && GameState.collection) ? (GameState.collection.skill || GameState.collection.skills || {}) : {};
+    const rec = c[skillId] || {};
+    try {
+      return CardV58.cardStats({ type: 'skill', defId: skillId, affixes: rec.affixes || [], masteryLv: rec.masteryLv || 0 }) || {};
+    } catch (e) { return {}; }
+  },
+
+  _playerFaction() {
+    if (this.weapon && typeof CARD_DATA !== 'undefined' && CARD_DATA.weapons) {
+      const w = CARD_DATA.weapons[this.weapon.id];
+      if (w) return w.element || w;
+    }
+    return null;
+  },
+
+  _counterMultFor(hitInfo, target) {
+    try {
+      if (typeof CARD_DATA === 'undefined' || !CARD_DATA.counter) return 1;
+      const atkF = (hitInfo && hitInfo.faction) || this._playerFaction();
+      const defF = target && (target.faction || target.element);
+      if (!atkF || !defF || atkF === defF) return 1;
+      const row = CARD_DATA.counter[atkF];
+      if (row && row[defF]) return row[defF];
+    } catch (e) {}
+    return 1;
+  },
+
+  _procOnHit(target, hitInfo, cs, rng) {
+    rng = rng || Math.random;
+    const oh = Object.assign({}, (this.syn && this.syn.onHit) || {}, (cs && cs.onHit) || {});
+    if (!oh || !target || target.hp <= 0) return;
+    if (oh.burnChance && rng() < oh.burnChance) this.applyBurn(target, 10 * (oh.burnStack || 1), 3);
+    if (oh.bleedChance && rng() < oh.bleedChance) { target.bleedStack = (target.bleedStack || 0) + 1; target.bleedUntil = performance.now() + 3000; }
+    if (oh.shockChance && rng() < oh.shockChance) target.shockTimer = 2;
+    if (oh.poisonChance && rng() < oh.poisonChance) target.poisonTimer = 3;
+    if (oh.slowChance && rng() < oh.slowChance) target.slow = Math.max(target.slow || 0, oh.slowAmt || 0.2);
+  },
+
+  // Boss 签名卡 + 必给蓝图
+  _bossSignatureDrop(m) {
+    if (typeof CardV58 === 'undefined' || !CARD_DATA.signatures) return;
+    const sig = Object.values(CARD_DATA.signatures).find(s => s.bossId === m.bossId);
+    if (sig) {
+      const card = CardV58.makeCard('signature', sig.defId, { rarity: 'legendary', acquiredFrom: 'boss:' + m.bossId });
+      if (card) {
+        this.tempCards.push(card);
+        showToast(`💀 获得 Boss 签名卡：${sig.name}`, 'gold');
+      }
+    }
+    // 蓝图必给（去重）
+    GameState.ownedBlueprints = GameState.ownedBlueprints || [];
+    if (m.bossId && this.blueprintGiven.indexOf(m.bossId) < 0) {
+      this.blueprintGiven.push(m.bossId);
+      if (GameState.ownedBlueprints.indexOf(m.bossId) < 0) GameState.ownedBlueprints.push(m.bossId);
+      showToast('📜 已解锁 Boss 蓝图（撤离必铭记）', 'gold');
+    }
   },
 
   playerAttack() {
@@ -1168,6 +1481,7 @@ Object.assign(Expedition.prototype, {
     showToast(`宝箱打开，掉落${loot.length}件物品，进入攻击范围后自动拾取`, 'gold');
     this.spawnAoeEffect(chest.x, chest.y, 50, '#ffd700');
     this.updateHUD();
+    this.offerCapture('chest');   // v5.8 宝箱处三选一夺卡
   },
 
   startExtract(type) {
@@ -1255,6 +1569,46 @@ Object.assign(Expedition.prototype, {
     this.endExpedition();
   },
 
+  // v5.8 撤离铭记：tempCards 物理副本按稀有度铭记（普通25/稀有15/史诗8，蓝图必成，重复转精通）
+  _runExtractSettlement() {
+    if (typeof CardV58 === 'undefined' || !CardV58.onExtract) return;
+    const loot = (this.tempCards || []).filter(Boolean);
+    let res = { inscribed: [], dropped: [], safeBoxKept: [] };
+    try {
+      res = CardV58.onExtract({ loot: loot, safeBox: this.safeBox || [], rng: Math.random });
+    } catch (e) { console.warn('onExtract', e); }
+    // 物理副本进背包按格收费 100 金/格（金币不足时仅扣到 0，不阻断铭记）
+    const fee = Math.min(Math.floor(GameState.gold || 0), loot.length * 100);
+    GameState.gold = (GameState.gold || 0) - fee;
+    this._extractReport = { inscribed: res.inscribed || [], dropped: res.dropped || [], fee: fee };
+    const n = (res.inscribed || []).length;
+    if (n) showToast(`📖 撤离铭记 ${n} 张卡${(res.dropped && res.dropped.length) ? '，' + res.dropped.length + ' 张未铭记遗失' : ''}`, 'gold');
+  },
+
+  // v5.8 死亡结算：战利品全丢、安全箱保留、收藏/精通不丢、免死令自动免降级、硬核全损
+  _runDeathSettlement() {
+    if (typeof CardV58 === 'undefined' || !CardV58.onDeath) return;
+    const hasPardon = !!(this.consumables && (this.consumables['death_pardon'] || 0) > 0);
+    let res = { safeBoxKept: [], lost: [], downgrade: false, pardonUsed: false, hardcore: false, skillCollectionKept: true };
+    try {
+      res = CardV58.onDeath({
+        carriedItems: Object.keys(this.consumables || {}),
+        carriedSeeds: (this.seedBar || []).map(s => s.type),
+        broughtWeapons: this.broughtUids || [],
+        tempLoot: this.tempCards || [],
+        safeBox: this.safeBox || [],
+        hasDeathPardon: hasPardon,
+        rng: Math.random
+      });
+    } catch (e) { console.warn('onDeath', e); }
+    if (res.pardonUsed) {
+      if (this.consumables) this.consumables['death_pardon'] = Math.max(0, (this.consumables['death_pardon'] || 0) - 1);
+      showToast('🛡️ 免死令自动生效，免除本次死亡降级', 'gold');
+    }
+    this.tempCards = [];   // 局内战利品（物理卡副本）全丢
+    this._deathReport = res;
+  },
+
   endExpedition() {
     // 结算时强制关闭背包/安全箱浮层，避免遮罩压在结算面板上
     const __invOv = document.getElementById('inventoryOverlay');
@@ -1284,6 +1638,7 @@ Object.assign(Expedition.prototype, {
     const lostItems = [];
 
     if (this.result === 'success') {
+      this._runExtractSettlement();   // v5.8 撤离铭记（25/15/8，蓝图必成，重复转精通）
       Warehouse.beginBatch();
       // 成功：全部保留（含安全箱里的）
       this.bag.forEach(i => keptItems.push({ ...i, kept: true }));
@@ -1335,6 +1690,8 @@ Object.assign(Expedition.prototype, {
       });
       Warehouse.endBatch();
     } else {
+      // v5.8 死亡结算：带入消耗品/种子/武器实例丢失、局内战利品全丢、安全箱保留、收藏精通不丢、免死令免降级
+      this._runDeathSettlement();
       // v3.6 失败：玩家主动存入 this.safeBox 的物品必保留，其余全掉
       const safeItems = this.safeBox || [];
       safeItems.forEach(i => keptItems.push({ ...i, kept: true }));
@@ -1512,6 +1869,12 @@ Object.assign(Expedition.prototype, {
       CombatEnhancement.onEnemyHit();
       if (hitInfo && hitInfo.x !== undefined) CombatEnhancement.damageDestructible(hitInfo.x, hitInfo.y, amount);
     }
+    // v5.8 玩家伤害：词条 dmgMult + 克制环 ±25% + onHit 状态(燃烧/流血/感电/中毒/减速)
+    if (fromPlayer) {
+      const _cs = hitInfo && hitInfo.skillId ? this._skillCardStats(hitInfo.skillId) : {};
+      amount *= (1 + (_cs.dmgMult || 0)) * this._counterMultFor(hitInfo, target);
+      this._procOnHit(target, hitInfo, _cs);
+    }
     // quiet：持续伤害/电击链不产生击退顿帧，避免抖动刷屏
     const quiet = !!(hitInfo && hitInfo.quiet);
     // v2.0 武器等级：暴击率加成（镰刀Lv6 +10%、飞刃Lv6 +15%）
@@ -1526,6 +1889,8 @@ Object.assign(Expedition.prototype, {
     }
     const _prevSeg = typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 ? Math.min(CombatEnhancement.getSegments(target), Math.ceil((target.hp/target.maxHp)*CombatEnhancement.getSegments(target))) : 0;
     target.hp -= amount;
+    // v5.8 bleed5 低血处决：20% 血线以下直接斩杀
+    if (fromPlayer && this.syn && this.syn.execute && target.maxHp > 0 && target.hp > 0 && target.hp / target.maxHp < 0.2) target.hp = 0;
     if (typeof CombatEnhancement !== 'undefined' && target.maxHp > 0 && target.hp > 0) {
       const seg = CombatEnhancement.getSegments(target);
       const curSeg = Math.min(seg, Math.ceil((target.hp/target.maxHp)*seg));
@@ -1610,7 +1975,18 @@ Object.assign(Expedition.prototype, {
     if (window.V5) amount = V5.modifyIncomingDamage(this, amount);
     // v5.5 固定撤离庇护：读条期间在撤离圈内受到的伤害大幅降低，保证"待在点里就能撤"
     if (this.extracting && this.extractType === 'fixed') amount *= 0.35;
+    // v5.8 协同：summon2/armor3 减伤(damageTaken 为负) + armor2/3 开战叠甲吸收 + 反伤
+    // 注：frost_barrier/iron_armor/thorn_burst 的护盾/减伤/反伤由 js/v5.js 的 V5.modifyIncomingDamage
+    // （上方 amount = V5.modifyIncomingDamage(this, amount)）统一消费 this.v5.shield / iron / reflect，此处不重复。
+    if (this.syn && this.syn.damageTaken) amount *= (1 + this.syn.damageTaken);
+    if (this.cardShield > 0 && amount > 0) {
+      const absorbed = Math.min(this.cardShield, amount);
+      this.cardShield -= absorbed; amount -= absorbed;
+    }
     this.player.hp -= amount;
+    if (this.syn && this.syn.reflect && source && source.hp !== undefined && source.hp > 0 && source !== this.player) {
+      source.hp -= amount * this.syn.reflect;
+    }
     this._lastCombat = performance.now() / 1000;
     this.player.hitStun = (this.v5 && this.v5.iron > 0) ? 0 : 0.15; // 金刚藤甲霸体
     AudioManager.playPlayerHurt();
@@ -1852,6 +2228,8 @@ Object.assign(Expedition.prototype, {
           // v5.1 Boss 不再掉落打造材料（材料改由农作物产出），改为稳定补给
           this.spawnGroundLoot({ type: 'consumable', name: '草药包扎包', amount: randInt(1, 2), icon: '💊', id: 'herb_kit' }, m.x, m.y+15);
           this.boss = null;
+          this._bossSignatureDrop(m);   // v5.8 签名卡 + 必给蓝图
+          this.offerCapture('boss');
         }
         // v2.0 法杖Lv7 击杀小爆炸
         if (this.weapon && this.weapon.explosionOnKill) {
@@ -1893,6 +2271,7 @@ Object.assign(Expedition.prototype, {
         if (m.elite) {
           if (Math.random() < 0.5) this.spawnGroundLoot({ type: 'gold', name: '精英赏金', amount: randInt(30,80), icon: '💰' }, m.x, m.y-10);
           if (Math.random() < 0.5) this.spawnGroundLoot({ type: 'gold', name: '精英赏金', amount: randInt(20,50), icon: '💰' }, m.x+10, m.y+10);
+          this.offerCapture('elite');   // v5.8 精英处三选一
         }
         // v1.0 精英/Boss 掉临时武器
         if (m.elite && Math.random() < 0.5 && typeof LoadoutSystem !== 'undefined') {
@@ -2202,3 +2581,6 @@ Object.assign(Expedition.prototype, {
     }
   },
 });
+
+// v5.8 recast 词条：v5.js 在本文件之后加载并覆写 E.useSkill，故不在此顶层包装，
+// 改在 buildCardSynergy()（运行时、所有脚本加载完）里包一层"命中后再触发一次"。

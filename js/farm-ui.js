@@ -312,17 +312,7 @@
         '<button onclick="Farm.plantAllPicker()">🌱 一键种植</button>' +
         '<button onclick="Farm.harvestAllRipe()">🌾 一键收成熟</button>' +
         '<button onclick="Farm.tendAll()">🧹 一键除害照料</button>' +
-        '<button onclick="FarmUI.openProcessing()">🏭 打开工坊</button>' +
       '</div>' +
-      '<div class="fcmd-blds">' +
-        b('🧘', '修行台', 'Lv.' + lv + ' · 修为' + cultPct + '%', 'V5.openCultivation()', canCultivate()) +
-        b('🏭', '加工工坊', qLen > 0 ? ('加工中 ' + qLen + ' 件') : '空闲', 'FarmUI.openProcessing()', qLen > 0) +
-        b('🏡', '育种温室', '稀有/修为作物', 'Greenhouse.open()') +
-        b('🔨', '锻造台', '武器锻造/升级', 'Game.openBlacksmith()') +
-        b('🔐', '安全箱', safeUsed + '/' + safeCap + ' 格', 'Game.openSafeBox()') +
-        b('📜', '远征档案', '突破/战略物资', 'V5.openArchive()', claimableArchive()) +
-      '</div>' +
-      '<div class="fcmd-intel"><span>🗺️ ' + mapName() + '</span><span>累计撤离 ' + totalEx + '</span><span>连续撤离 ' + streak + '</span><span>✨ 美观度 ' + (GameState.farmBeauty || 0) + '</span></div>' +
       weatherFacHtml() +
       weatherForecastHtml();
   }
@@ -343,3 +333,173 @@
   })();
   window.FarmUI = Object.assign(window.FarmUI || {}, { refreshCommand: function () { try { renderCommand(); } catch (e) {} } });
 })();
+
+/* ===================== v5.8 家园全景 2.5D 重设计 + 修为药圃 ===================== */
+(function () {
+  function farmVisible() {
+    const s = document.getElementById('farmScreen');
+    return s && !s.classList.contains('hidden');
+  }
+
+  /* ---------- 修为药圃（凝气草重做：有交互、有产出） ---------- */
+  function ensureCultBed() {
+    const left = document.querySelector('.farm-left');
+    if (!left || document.getElementById('v58CultBed')) return;
+    const bed = document.createElement('div');
+    bed.id = 'v58CultBed'; bed.className = 'v58-cult-bed';
+    bed.innerHTML =
+      '<div class="cb-icon">🌿</div>' +
+      '<div class="cb-mid"><div class="cb-title">修为药圃 · 凝气草</div>' +
+      '<div class="cb-desc" id="v58CultDesc">凝气草每株 +10 修为，收获自动转化。一键种满空地 / 一键收获成熟修为。</div></div>' +
+      '<div class="cb-acts">' +
+      '<button onclick="FarmUI._plantNingqi()">🌱 种满凝气草</button>' +
+      '<button onclick="Farm.harvestAllRipe()">🌾 收成熟</button>' +
+      '</div>';
+    left.appendChild(bed);
+  }
+  FarmUI._plantNingqi = function () {
+    try {
+      GameState.selectedCrop = 'ningqi_grass';
+      SaveSystem.save();
+      Farm.plantAll('ningqi_grass');
+    } catch (e) { showToast('凝气草种植失败', 'warning'); }
+  };
+
+  /* ---------- 家园全景：接管 #farmHomestead 为 2.5D 画布 ---------- */
+  function ensurePanorama() {
+    const hs = document.getElementById('farmHomestead');
+    if (!hs) return null;
+    if (!document.getElementById('v58Panorama')) {
+      hs.innerHTML =
+        '<div class="hs-titlebar">🏞️ 家园全景 · 实时联动<span class="hs-live">作物/建筑/天气</span></div>' +
+        '<canvas id="v58Panorama"></canvas>' +
+        '<div class="hs-chips" id="v58HsChips"></div>';
+    }
+    return hs;
+  }
+
+  function seasonTint() {
+    const s = GameState.season || 'spring';
+    return { spring: '#7ec850', summer: '#4f9d3a', autumn: '#c89a4a', winter: '#cfe0e8' }[s] || '#7ec850';
+  }
+  function skyColors() {
+    const w = (GameState.farmWeather && GameState.farmWeather.state) || GameState.weather || 'sunny';
+    if (w === 'rain' || w === 'heavy_rain') return ['#3a4a5e', '#5a6a7a'];
+    if (w === 'storm') return ['#232a3a', '#3a3f4e'];
+    if (w === 'fog') return ['#8a9098', '#aab0b6'];
+    return ['#3a6ea8', '#7fb2d8'];
+  }
+
+  function drawPanorama() {
+    if (!farmVisible()) return;
+    const hs = ensurePanorama();
+    if (!hs) return;
+    const cv = document.getElementById('v58Panorama');
+    if (!cv) return;
+    const W = cv.clientWidth, H = 230;
+    if (W === 0) return;
+    if (cv.width !== W * devicePixelRatio) { cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio; }
+    const c = cv.getContext('2d');
+    c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    c.clearRect(0, 0, W, H);
+    const t = (Date.now() / 1000);
+
+    // 天空
+    const sky = skyColors();
+    let g = c.createLinearGradient(0, 0, 0, H * 0.55);
+    g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]);
+    c.fillStyle = g; c.fillRect(0, 0, W, H * 0.55);
+    // 太阳/月
+    const sx = W * 0.82, sy = H * 0.18;
+    c.fillStyle = 'rgba(255,236,160,.9)';
+    c.beginPath(); c.arc(sx, sy, 16, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,236,160,.18)';
+    c.beginPath(); c.arc(sx, sy, 28, 0, Math.PI * 2); c.fill();
+
+    // 地面（近大远小透视）
+    g = c.createLinearGradient(0, H * 0.5, 0, H);
+    const gt = seasonTint();
+    g.addColorStop(0, '#4a5a30'); g.addColorStop(1, '#2a3a1c');
+    c.fillStyle = g; c.fillRect(0, H * 0.5, W, H * 0.5);
+
+    // 后方房屋（2.5D 小木屋）
+    const hx = W * 0.5, hy = H * 0.52;
+    c.fillStyle = '#6b4a2a'; c.fillRect(hx - 26, hy - 26, 52, 26);
+    c.fillStyle = '#8a3a2a';
+    c.beginPath(); c.moveTo(hx - 32, hy - 26); c.lineTo(hx, hy - 44); c.lineTo(hx + 32, hy - 26); c.closePath(); c.fill();
+    c.fillStyle = '#3a2412'; c.fillRect(hx - 7, hy - 12, 14, 12);
+
+    // 农田成排（真实数据）：按透视排到地面
+    const plots = GameState.farmPlots || [];
+    const n = GameState.unlockedPlots || plots.length;
+    const rows = 4, cols = Math.ceil(n / rows);
+    const groundTop = H * 0.58, groundBot = H - 14;
+    for (let i = 0; i < n; i++) {
+      const row = Math.floor(i / cols), col = i % cols;
+      const p = plots[i];
+      const fy = groundTop + (groundBot - groundTop) * (row / (rows - 1 || 1));
+      const spread = (fy - H * 0.5) / (groundBot - H * 0.5); // 0远→1近
+      const cellW = (W * 0.8) / cols;
+      const fx = W * 0.1 + cellW * (col + 0.5) + (W * 0.1) * spread;
+      const size = 5 + 7 * spread;
+      // 土块
+      c.fillStyle = p && p.crop ? '#5a6a2a' : '#4a3018';
+      c.fillRect(fx - size, fy - size * 0.5, size * 2, size);
+      if (p && p.crop) {
+        const ready = p.ready;
+        c.strokeStyle = ready ? '#ffd76a' : '#7fdc6a';
+        c.fillStyle = ready ? '#ffd76a' : '#5ad06a';
+        c.lineWidth = 1.5;
+        const sway = Math.sin(t * 2 + i) * 1.5 * spread;
+        c.beginPath(); c.moveTo(fx, fy - size * 0.4); c.lineTo(fx + sway, fy - size * (ready ? 2.2 : 1.5)); c.stroke();
+        c.beginPath(); c.arc(fx + sway, fy - size * (ready ? 2.4 : 1.7), ready ? 4 : 2.6, 0, Math.PI * 2); c.fill();
+      }
+    }
+
+    // 装饰（真实数据）
+    (GameState.decorations || []).slice(0, 6).forEach((d, k) => {
+      c.font = '16px serif'; c.textAlign = 'center';
+      c.fillText(d.icon || '🌷', W * (0.08 + k * 0.16), H * 0.62 + (k % 2) * 18);
+    });
+
+    // 天气叠加
+    const w = (GameState.farmWeather && GameState.farmWeather.state) || GameState.weather;
+    if (w === 'rain' || w === 'heavy_rain' || w === 'storm') {
+      c.strokeStyle = 'rgba(180,200,240,.4)'; c.lineWidth = 1;
+      const drops = w === 'storm' ? 40 : 24;
+      for (let i = 0; i < drops; i++) {
+        const rx = ((i * 97 + t * 180) % W);
+        const ry = ((i * 53 + t * 420) % H);
+        c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx - 3, ry + 9); c.stroke();
+      }
+    } else if (w === 'fog') {
+      c.fillStyle = 'rgba(210,215,220,.18)';
+      c.fillRect(0, H * 0.4, W, H * 0.3);
+    }
+  }
+
+  /* ---------- 刷新数据 chips ---------- */
+  function refreshChips() {
+    const el = document.getElementById('v58HsChips');
+    if (!el) return;
+    const plots = GameState.farmPlots || [];
+    let planted = 0, ready = 0;
+    plots.forEach(pl => { if (pl && pl.crop) { planted++; if (pl.ready) ready++; } });
+    const chip = (t, c) => '<span style="color:' + c + '">' + t + '</span>';
+    el.innerHTML =
+      chip('🌱 种植 ' + planted + '/' + (GameState.unlockedPlots || plots.length), '#cfe6a0') +
+      chip('✨ 成熟 ' + ready, ready > 0 ? '#ffd76a' : '#9aa08c') +
+      chip('🏡 美观 ' + (GameState.farmBeauty || 0), '#e6bd54') +
+      chip('🌦️ ' + ((window.FarmCareSystem && GameState.weather) ? FarmCareSystem.weatherName(GameState.weather) : '晴朗'), '#9fd8ff') +
+      chip('📅 ' + ((window.FarmCareSystem) ? FarmCareSystem.seasonName(GameState.season) : '春季'), '#c8b6e8');
+  }
+
+  /* ---------- 主循环：仅农场可见时绘制 ---------- */
+  (function loop() {
+    if (farmVisible()) {
+      try { ensureCultBed(); ensurePanorama(); drawPanorama(); refreshChips(); } catch (e) {}
+    }
+    requestAnimationFrame(loop);
+  })();
+})();
+

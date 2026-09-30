@@ -35,6 +35,17 @@ const SaveSystem = {
       GameState.lastDailyClaim = typeof data.lastDailyClaim === 'string' ? data.lastDailyClaim : '';
       GameState.dailyStreak = Math.max(0, Number(data.dailyStreak) || 0);
       GameState.lastReliefClaim = typeof data.lastReliefClaim === 'string' ? data.lastReliefClaim : '';
+      // v5.8 卡牌系统新字段（旧存档缺失须容错）
+      GameState.collection = (data.collection && typeof data.collection === 'object') ? {
+        skill: (data.collection.skill && typeof data.collection.skill === 'object') ? data.collection.skill : {},
+        item: (data.collection.item && typeof data.collection.item === 'object') ? data.collection.item : {},
+        seed: (data.collection.seed && typeof data.collection.seed === 'object') ? data.collection.seed : {}
+      } : { skill: {}, item: {}, seed: {} };
+      GameState.ownedBlueprints = Array.isArray(data.ownedBlueprints) ? data.ownedBlueprints.slice() : [];
+      GameState.safeBoxSlots = clamp(Number(data.safeBoxSlots) || 1, 1, 3);
+      GameState.hardcoreFullLoss = !!data.hardcoreFullLoss;
+      GameState.deckPresets = Array.isArray(data.deckPresets) ? data.deckPresets : [];
+      GameState.captureLog = Array.isArray(data.captureLog) ? data.captureLog : [];
 
       if (Array.isArray(data.farmPlots) && data.farmPlots.length === 36) {
         GameState.farmPlots = data.farmPlots.map(plot => ({
@@ -113,6 +124,11 @@ const SaveSystem = {
       if (Array.isArray(data.defenseLoadout)) {
         GameState.defenseLoadout = data.defenseLoadout.filter(id => CONFIG.plants.some(p => p.id === id)).slice(0, 6);
       }
+      // v5.8 一次性守卫：旧 cardInventory / skillLevels 折算进新收藏与精通
+      if (typeof CardV58 !== 'undefined' && !GameState._v58Migrated) {
+        try { CardV58.migrate(); } catch (e) { console.warn('v58 migrate failed', e); }
+        GameState._v58Migrated = true;
+      }
       return true;
     } catch (error) {
       console.warn('读取本地存档失败，将使用新存档。', error);
@@ -182,7 +198,14 @@ const SaveSystem = {
         }
 ,
         defensePlants: GameState.defensePlants || {},
-        defenseLoadout: Array.isArray(GameState.defenseLoadout) ? GameState.defenseLoadout : []
+        defenseLoadout: Array.isArray(GameState.defenseLoadout) ? GameState.defenseLoadout : [],
+        // v5.8 卡牌系统字段
+        collection: GameState.collection || { skill: {}, item: {}, seed: {} },
+        ownedBlueprints: Array.isArray(GameState.ownedBlueprints) ? GameState.ownedBlueprints : [],
+        safeBoxSlots: GameState.safeBoxSlots || 1,
+        hardcoreFullLoss: !!GameState.hardcoreFullLoss,
+        deckPresets: Array.isArray(GameState.deckPresets) ? GameState.deckPresets : [],
+        captureLog: Array.isArray(GameState.captureLog) ? GameState.captureLog : []
       }));
     } catch (error) {
       console.warn('保存本地存档失败。', error);

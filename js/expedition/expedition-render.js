@@ -904,6 +904,22 @@ Object.assign(Expedition.prototype, {
       }
     });
 
+    // v5.8 篝火 / 商人
+    if (this.campfire && this.isWorldVisible(this.campfire.x, this.campfire.y)) {
+      const sx = this.campfire.x - cam.x, sy = this.campfire.y - cam.y;
+      ctx.font = '30px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('🔥', sx, sy + 8);
+      ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx, sy, 22, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (this.merchant && this.isWorldVisible(this.merchant.x, this.merchant.y)) {
+      const sx = this.merchant.x - cam.x, sy = this.merchant.y - cam.y;
+      ctx.font = '30px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('🧑‍🌾', sx, sy + 8);
+      ctx.strokeStyle = '#7fb8ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx, sy, 22, 0, Math.PI * 2); ctx.stroke();
+    }
+
     // 防御塔
     this.towers.forEach(t => {
       if (!this.isWorldVisible(t.x, t.y)) return;
@@ -1159,6 +1175,7 @@ Object.assign(Expedition.prototype, {
     // 粒子
     this.particles.forEach(p => {
       if (window.PixiEffects?.graphics && (!p.type || p.type === 'smoke')) return;
+      if (!isFinite(p.x) || !isFinite(p.y) || !isFinite(p.size)) return;
       const sx = p.x - cam.x, sy = p.y - cam.y;
       const alpha = p.life / p.maxLife;
       if (p.type === 'aoe') {
@@ -1223,6 +1240,7 @@ Object.assign(Expedition.prototype, {
         ctx.restore();
       } else if (p.type === 'impact') {
         const grow = p.size * (1.25 - alpha * .25);
+        if (!isFinite(grow) || grow <= 0) { ctx.restore(); return; }
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, grow);
@@ -1769,6 +1787,12 @@ Object.assign(Expedition.prototype, {
     const cam = this.camera;
     // 检查附近可交互物
     let prompt = null;
+    if (this.campfire && this.isWorldVisible(this.campfire.x, this.campfire.y) && dist(this.player, this.campfire) < 60) {
+      prompt = { x: this.campfire.x, y: this.campfire.y - 40, text: '左键篝火：升级/移除/休息' };
+    }
+    if (!prompt && this.merchant && this.isWorldVisible(this.merchant.x, this.merchant.y) && dist(this.player, this.merchant) < 60) {
+      prompt = { x: this.merchant.x, y: this.merchant.y - 40, text: '左键交易：买/删/升级/补货' };
+    }
     for (const chest of this.chests) {
         if (!chest.opened && this.isWorldVisible(chest.x, chest.y) && dist(this.player, chest) < 60) {
           prompt = { x: chest.x, y: chest.y - 40, text: '左键打开宝箱' };

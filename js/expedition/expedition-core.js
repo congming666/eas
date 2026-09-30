@@ -239,6 +239,16 @@ class Expedition {
     this.wheelOpen = false;
     this.gameOver = false;
     this.result = null;
+    // ===== v5.8 夺卡/篝火/商人/撤离/死亡 运行时状态 =====
+    this.choiceOpen = false;          // 夺卡/篝火/商人浮层打开时暂停世界更新
+    this.nextRoadCaptureAt = 120;     // 每 2 分钟道路节点夺卡
+    this.tempCards = [];               // 局内夺卡/掉落的物理卡副本（待撤离铭记，死亡全丢）
+    this.campfire = null;              // 篝火世界交互物
+    this.merchant = null;              // 商人世界交互物
+    this.merchantStock = [];           // 商人当前在售道具卡 defId
+    this.merchantRestockCost = 60;
+    this.blueprintGiven = [];          // 本局已给过蓝图的 bossId（防重）
+    this.captureLog = [];              // 本局夺卡记录
 
     // v0.7.0 难度系统初始化
     if (typeof DifficultySystem !== 'undefined') {
@@ -266,6 +276,8 @@ class Expedition {
     this.obstaclesByY = [...this.obstacles].sort((a, b) => a.y - b.y);
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
     this.setupMission();
+    this.spawnCardNodes();   // v5.8 篝火 / 商人世界交互物
+    this.buildCardSynergy(); // v5.8 战斗层：按装载缓存协同 mod + 开战叠甲
     this.setupInput();
     this.updateVision();
   }
@@ -467,7 +479,7 @@ class Expedition {
   }
 
   update(dt) {
-    if (this.paused || this.wheelOpen || this.gameOver) return;
+    if (this.paused || this.wheelOpen || this.gameOver || this.choiceOpen) return;
     // 外部子系统 / 植物 / 空间索引 / 自动拾取（保持原有每帧两次 updatePlants 调用）
     this.updateRunSystems(dt);
 
@@ -478,6 +490,12 @@ class Expedition {
       this._timeoutDeath = true;
       this.playerDeath();
       return;
+    }
+    // v5.8 每 2 分钟道路节点三选一夺卡
+    this.nextRoadCaptureAt -= dt;
+    if (this.nextRoadCaptureAt <= 0 && !this.gameOver) {
+      this.nextRoadCaptureAt = 120;
+      this.offerCapture('road');
     }
     // v3.3 受击硬直期间禁止移动，时间整体减速（缩放后的 dt 作用于后续所有分段）
     if (this.player.hitStun > 0) {

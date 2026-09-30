@@ -1,0 +1,99 @@
+/* v5.8 卡牌收藏 / 牌组装载器 / 工坊样式（COLLECTION） */
+
+.v58-header p { margin: 4px 0 0; font-size: 11px; color: #9fb5aa; }
+
+.v58-tabbar { display: flex; gap: 6px; margin: 10px 0 12px; }
+.v58-tab {
+  flex: 1; padding: 8px 10px; cursor: pointer; border-radius: 8px;
+  background: rgba(255,255,255,0.05); color: #cfe0d6; border: 1px solid rgba(255,255,255,0.08);
+  font-size: 13px; font-weight: 700;
+}
+.v58-tab.active { background: #3a6b4f; color: #fff; border-color: #6fd69a; }
+.v58-body { max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+
+/* 总览统计 */
+.v58-summary { display: flex; gap: 8px; margin-bottom: 10px; }
+.v58-stat {
+  flex: 1; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 8px; text-align: center;
+}
+.v58-stat label { display: block; font-size: 10px; color: #9fb5aa; }
+.v58-stat b { display: block; font-size: 20px; color: #ffd680; margin: 2px 0; }
+.v58-stat i { font-style: normal; font-size: 10px; color: #b8c9c0; }
+
+/* 流派标签计数 */
+.v58-tagrow { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 10px; }
+.v58-tag {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 6px; text-align: center;
+}
+.v58-tagname { display: block; font-size: 10px; color: #9fb5aa; }
+.v58-tagcount { display: block; font-size: 18px; font-weight: 800; color: #effff4; }
+.v58-tagms { display: block; font-size: 9px; color: #6fd69a; margin-top: 2px; }
+.v58-tagms.dim { color: #5a6b62; }
+.v58-tag.milestone { border-color: #ffd680; box-shadow: 0 0 8px rgba(255,214,128,0.35); }
+.v58-tag.dominant { outline: 1px solid #6fd69a; }
+
+/* 激活里程碑 */
+.v58-mslist { background: rgba(60,110,80,0.18); border-radius: 8px; padding: 8px; margin-bottom: 10px; }
+.v58-mslist-title { font-size: 11px; color: #6fd69a; font-weight: 700; margin-bottom: 4px; }
+.v58-msitem { font-size: 11px; color: #d6e6dc; padding: 2px 0; }
+.v58-msitem b { color: #ffd680; }
+.v58-nohint { font-size: 11px; color: #8aa095; padding: 8px; background: rgba(0,0,0,0.25); border-radius: 8px; margin-bottom: 10px; }
+
+/* 克制提示 */
+.v58-counter { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px; font-size: 11px; color: #d6e6dc; margin-bottom: 10px; }
+.v58-counter-title { font-weight: 700; color: #ff9a6a; margin-bottom: 4px; }
+.v58-counter b { color: #ffd680; }
+.v58-second { margin-top: 4px; color: #9fc78f; }
+
+/* 技能装备 */
+.v58-panel { margin-bottom: 10px; }
+.v58-panel-title { font-size: 12px; font-weight: 700; color: #cfe6a0; margin-bottom: 6px; }
+.v58-skillgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+.v58-skillcard {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 6px; text-align: center; cursor: pointer;
+}
+.v58-skillcard.equipped { border-color: #6fd69a; box-shadow: 0 0 8px rgba(111,214,154,0.4); }
+.v58-skillcard.locked { opacity: 0.4; cursor: not-allowed; }
+.v58-skillicon { font-size: 22px; }
+.v58-skillname { font-size: 11px; font-weight: 700; color: #effff4; margin-top: 2px; }
+.v58-skillmeta { font-size: 9px; color: #9fb5aa; margin-top: 2px; }
+
+.v58-caprow { display: flex; gap: 14px; font-size: 11px; color: #d6e6dc; background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 8px; }
+.v58-caprow b { color: #ffd680; }
+.v58-capnote { color: #7a8c82; font-size: 10px; }
+
+/* 收藏 */
+.v58-collgroup { margin-bottom: 12px; }
+.v58-collh { font-size: 12px; font-weight: 700; color: #cfe6a0; margin-bottom: 6px; }
+.v58-collgrid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+.v58-collcard {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 6px; text-align: center;
+}
+.v58-collcard.owned-no { opacity: 0.45; }
+.v58-collcard.rarity-rare { border-color: #6fb0ff; }
+.v58-collcard.rarity-epic { border-color: #c07fff; }
+.v58-collcard.rarity-legendary { border-color: #ffd680; box-shadow: 0 0 8px rgba(255,214,128,0.4); }
+.v58-collicon { font-size: 20px; }
+.v58-collname { font-size: 10px; font-weight: 700; color: #effff4; margin-top: 2px; }
+.v58-collrarity { font-size: 9px; color: #9fb5aa; }
+.v58-collmeta { font-size: 9px; color: #ffd680; margin-top: 2px; }
+.v58-collaffix { font-size: 9px; color: #6fd69a; margin-top: 2px; }
+
+/* 工坊工位 */
+.v58-stations { font-size: 13px; font-weight: 700; color: #cfe6a0; margin-bottom: 8px; }
+.v58-station {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 8px; margin-bottom: 8px;
+}
+.v58-station-h { font-size: 12px; font-weight: 700; color: #effff4; margin-bottom: 6px; }
+.v58-station-desc { font-size: 10px; font-weight: 400; color: #9fb5aa; margin-left: 6px; }
+.v58-select {
+  width: 100%; padding: 6px; margin-bottom: 6px; background: #1a2a22;
+  color: #effff4; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 11px;
+}
+.v58-actbtn { margin-right: 6px; }
+.v58-cost { font-size: 10px; color: #ffd680; margin-top: 4px; }

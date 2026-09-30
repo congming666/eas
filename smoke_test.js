@@ -127,23 +127,76 @@ async function main() {
     throw new Error('收获没有增加金币');
   }
 
-  const upgradeTarget = await page.evaluate(() => {
-    const card = CardSystem.createCard(CONFIG.crops.find(c => c.id === 'pea_shooter'));
-    card.rarity = 'legendary';
-    card.power = 3;
-    GameState.cardInventory.push(card);
-    SaveSystem.save();
-    return { skillId: card.skillId, before: GameState.skillLevels[card.skillId] };
+  // ===== v5.8 牌阵觉醒·收藏/装载/工坊 =====
+  // 预置金币/材料，确保印制/附魔可行
+  const workshopSeed = await page.evaluate(() => {
+    GameState.gold = 5000;
+    const m = (GameState.warehouse.materials = GameState.warehouse.materials || {});
+    ['fiber','water','venom','herb','crystal','soul_ash','bossFang'].forEach(k => m[k] = 99);
+    GameState.collection = GameState.collection || { skill: {}, item: {}, seed: {} };
+    const rec = GameState.collection.skill['chili_breath'] = GameState.collection.skill['chili_breath'] || { count: 0, masteryLv: 0, masteryProgress: 0, affixes: [], tags: [] };
+    return { gold: GameState.gold, fiber: m.fiber || 0, count: rec.count, affixes: (rec.affixes || []).length };
   });
   await page.locator('.facility').filter({ hasText: '卡牌工坊' }).click();
   if (!(await page.locator('#cardWorkshopModal').isVisible())) throw new Error('卡牌工坊未打开');
-  if ((await page.locator('.upgrade-card.legendary').count()) < 1) throw new Error('传说强化卡未显示');
-  await page.waitForTimeout(350);
+  if ((await page.locator('#cardWorkshopModal .v58-tab').count()) !== 3) throw new Error('v5.8 三个 Tab（牌组装载/收藏/卡牌工坊）未渲染');
+  if ((await page.locator('#cardWorkshopModal .v58-tab').filter({ hasText: '牌组装载' }).count()) < 1) throw new Error('牌组装载 Tab 缺失');
+
+  // 牌组装载 Tab：平均能耗 / 综合战力 / 8 流派计数
+  await page.evaluate(() => CardSystem.switchTab('loadout'));
+  await page.waitForTimeout(150);
+  const loadoutText = await page.locator('#cardWorkshopModal .v58-body').innerText();
+  if (!loadoutText.includes('平均能耗')) throw new Error('装载页缺少平均能耗');
+  if (!loadoutText.includes('综合战力')) throw new Error('装载页缺少综合战力');
+  if ((await page.locator('#cardWorkshopModal .v58-tag').count()) !== 8) throw new Error('装载页应渲染 8 流派标签，实际 ' + await page.locator('#cardWorkshopModal .v58-tag').count());
+
+  // 收藏 Tab：16 技能 + 27 道具 + 24 种子 = 67 张卡
+  await page.evaluate(() => CardSystem.switchTab('collection'));
+  await page.waitForTimeout(150);
+  const collCount = await page.locator('#cardWorkshopModal .v58-collcard').count();
+  if (collCount < 67) throw new Error('收藏卡片数量不足 67，实际 ' + collCount);
+
+  // 工坊 Tab：四工位（印制/附魔/融合/铭记研究）
+  await page.evaluate(() => CardSystem.switchTab('workshop'));
+  await page.waitForTimeout(150);
+  if ((await page.locator('#cardWorkshopModal .v58-station').count()) !== 4) throw new Error('工坊四工位未渲染，实际 ' + await page.locator('#cardWorkshopModal .v58-station').count());
+
+  // ① 印制 chili_breath（技能·稀有）：真实扣金币/材料，收藏计数 +1
+  await page.evaluate(() => {
+    const sel = document.querySelector('#cardWorkshopModal .v58-station select');
+    sel.value = 'skill|chili_breath';
+    sel.dispatchEvent(new Event('change'));
+  });
+  await page.evaluate(() => document.querySelectorAll('#cardWorkshopModal .v58-actbtn')[0].click());
+  await page.waitForTimeout(200);
+  const afterPrint = await page.evaluate(() => ({
+    gold: GameState.gold,
+    fiber: (GameState.warehouse.materials.fiber) || 0,
+    count: ((GameState.collection.skill['chili_breath'] || {}).count) || 0,
+  }));
+  if (afterPrint.count !== workshopSeed.count + 1) throw new Error('印制后收藏计数未+1：' + workshopSeed.count + '->' + afterPrint.count);
+  if (afterPrint.gold >= workshopSeed.gold) throw new Error('印制未扣金币');
+  if (afterPrint.fiber >= workshopSeed.fiber) throw new Error('印制未扣材料');
+
+  // ② 附魔 chili_breath：追加一条后缀词条
+  await page.evaluate(() => {
+    const sels = document.querySelectorAll('#cardWorkshopModal .v58-station select');
+    sels[1].value = 'chili_breath';
+  });
+  await page.evaluate(() => document.querySelectorAll('#cardWorkshopModal .v58-actbtn')[1].click());
+  await page.waitForTimeout(200);
+  const afterEnchant = await page.evaluate(() => ({
+    affixes: ((GameState.collection.skill['chili_breath'] || {}).affixes || []).length,
+  }));
+  if (afterEnchant.affixes <= workshopSeed.affixes) throw new Error('附魔未追加词条：' + workshopSeed.affixes + '->' + afterEnchant.affixes);
+
   await page.screenshot({ path: shot('workshop-test.png'), fullPage: true });
-  await page.locator('.upgrade-card.legendary').first().click();
-  const upgradedLevel = await page.evaluate(skillId => GameState.skillLevels[skillId], upgradeTarget.skillId);
-  if (upgradedLevel <= upgradeTarget.before) throw new Error('强化卡没有提升基础技能');
   await page.getByRole('button', { name: '关闭' }).click();
+
+  // 用于 reload 后持久化断言的新模型字段
+  const persistedSkillId = 'chili_breath';
+  const persistedCount = afterPrint.count;
+  const persistedAffix = afterEnchant.affixes;
 
   // ===== v4.2 仓库扩容与远征产出覆盖回归 =====
   await page.evaluate(() => {
@@ -202,12 +255,7 @@ async function main() {
 
   await page.evaluate(() => {
     GameState.gold = 2500;
-    for (let i = 0; i < 4; i++) {
-      const card = CardSystem.createCard(CONFIG.crops[i]);
-      card.id = `loadout-test-${i}`;
-      GameState.cardInventory.push(card);
-    }
-    // v5.1 解锁并装备 4 个技能（模拟玩家修行进度：Lv60 有 4 卡槽），准备大厅只显示已装备技能
+    // v5.8 不再依赖旧 cardInventory boost 卡；直接解锁并装备前 4 个技能（Lv60 有 4 卡槽），准备大厅只显示已装备技能
     GameState.level = 60;
     const s4 = CONFIG.skills.slice(0, 4).map(s => s.id);
     GameState.unlockedSkills = s4.slice();
@@ -373,7 +421,8 @@ async function main() {
   if (Number(await page.locator('#goldDisplay').innerText()) !== savedGold) throw new Error('金币存档未恢复');
   if ((await page.locator('.crop-choice').count()) < 2) throw new Error('作物解锁存档未恢复');
   if ((await page.evaluate(() => GameState.unlockedPlots)) !== 9) throw new Error('农田解锁进度未恢复');
-  if ((await page.evaluate(skillId => GameState.skillLevels[skillId], upgradeTarget.skillId)) !== upgradedLevel) throw new Error('技能强化进度未恢复');
+  if ((await page.evaluate(id => ((GameState.collection.skill[id] || {}).count) || 0, persistedSkillId)) !== persistedCount) throw new Error('印制收藏计数存档未恢复');
+  if ((await page.evaluate(id => ((GameState.collection.skill[id] || {}).affixes || []).length, persistedSkillId)) !== persistedAffix) throw new Error('附魔词条存档未恢复');
   if ((await page.evaluate(() => GameState.lastDailyClaim)) !== (await page.evaluate(() => RewardSystem.dateKey()))) throw new Error('每日奖励领取记录未恢复');
   if ((await page.evaluate(() => GameState.lastReliefClaim)) !== (await page.evaluate(() => RewardSystem.dateKey()))) throw new Error('开荒保障领取记录未恢复');
 
