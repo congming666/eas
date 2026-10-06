@@ -42,6 +42,15 @@ class Expedition {
       this.player.baseAtk = 12; this.player.def = 0; this.player.energyRegen = 15; this.player.ocRegen = 0;
       this.equippedSkills = CONFIG.skills.slice(0, 4).map(s => s.id);
     }
+    // v5.8 接线：科技树 surv 节点（最大生命加成）
+    if (window.TechSystem) {
+      let hpBonus = 0;
+      ['surv_1', 'surv_2', 'surv_3', 'surv_4'].forEach(id => { hpBonus += TechSystem.getTechBonus(id); });
+      if (hpBonus) {
+        this.player.maxHp = Math.round(this.player.maxHp * (1 + hpBonus));
+        this.player.hp = this.player.maxHp;
+      }
+    }
     this.skillCooldowns = this.equippedSkills.map(() => 0);
     this.skillFlashes = this.equippedSkills.map(() => 0);
     this.attackAnim = 0;
@@ -159,7 +168,7 @@ class Expedition {
     this.eventModifiers = { enemySpeed: 1, enemyDamage: 1, loot: 1, vision: 1 };
     this.beastWave = {
       wave: 0,
-      nextIn: 20,          // 首波固定 20 秒
+      nextIn: (this.map && this.map.tier === 1) ? 45 : 20, // T1 教学图首波推迟到 45 秒
       interval: 40,        // 之后每 40 秒一波（固定节奏）
       active: false,
       remaining: 0,
@@ -211,6 +220,18 @@ class Expedition {
       this.monsterSprites[type].hit = img;
       this.monsterSprites[type].death = img;
     }
+    // v5.2 有 4 状态独立贴图的怪物（像素风，与玩家走路序列统一风格）
+    // boar 的 attack/hit 是双足野猪人，与 idle 四足野猪形态不一致，attack/hit 用 idle 图 + 程序化变形
+    const STATEFUL_MOBS = ['bat', 'boar', 'spider'];
+    for (const _t of STATEFUL_MOBS) {
+      this.monsterSprites[_t] = this.monsterSprites[_t] || {};
+      for (const _st of ['idle', 'attack', 'hit', 'death']) {
+        const _use = (_t === 'boar' && (_st === 'attack' || _st === 'hit')) ? 'idle' : _st;
+        const _img = new Image();
+        _img.src = `assets/monsters/${_t}-${_use}.webp`;
+        this.monsterSprites[_t][_st] = _img;
+      }
+    }
     this.fxSprites = { slash: new Image(), hit: new Image(), treant: new Image(), gargoyle: new Image(), shadow: new Image(), boar: new Image() };
     this.fxSprites.slash.src = 'docs/art/effects/fire_slash.png';
     this.fxSprites.hit.src = 'docs/art/effects/hit_spark.png';
@@ -221,6 +242,7 @@ class Expedition {
     this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
     this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
     this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
+    this.playerWalkSheet = new Image(); this.playerWalkSheet.src = 'docs/art/v2/player_walk.png';
     this.weaponSheet = new Image(); this.weaponSheet.src = 'assets/weapons/weapon_sheet_t.png'; this.weaponSheetPrekeyed = true;
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
@@ -258,7 +280,7 @@ class Expedition {
       // v3.4 地图词条：视野修正
       if (this.map.visibilityBonus) this.visionRadius *= (1 + this.map.visibilityBonus);
       if (this.map.visionPenalty) this.visionRadius *= (1 - this.map.visionPenalty);
-      this.beastWave.nextIn = 20; // v4.1 首波固定 20 秒
+      this.beastWave.nextIn = (this.map && this.map.tier === 1) ? 45 : 20; // v4.1 首波固定；T1 教学图推迟到 45 秒
       // v5.4 修复：难度/Heat 在此时才真正应用，必须重算 balance 快照，否则怪血/伤害恒为普通难度
       this.balance = this.getBalanceProfile();
     }

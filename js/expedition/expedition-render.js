@@ -43,14 +43,36 @@ Object.assign(Expedition.prototype, {
     const lift = monster.visualZ || 0;
     this.renderCastShadow(ctx, monster.x, monster.y, 28 * scale, 28 * scale, 0.38, lift);
     ctx.translate(sx + (monster.knockX || 0), sy - lift + (monster.knockY || 0) * 0.45);
+    // v5.2 全角色程序化动画：呼吸/颠簸/攻击前冲/受击闪白/死亡倒下
+    const _at = monster.animTime || 0;
+    const _moving = monster.state === 'move' || monster.state === 'chase' || monster.state === 'patrol';
     if (monster.state === 'death') {
-      ctx.globalAlpha = clamp((monster.deathTimer || 0) / .42, 0, 1);
-      ctx.rotate((1 - ctx.globalAlpha) * .85);
-      ctx.scale(1, .65 + ctx.globalAlpha * .35);
-    } else if (monster.state === 'hit') {
-      ctx.translate(-3, 0);
-    } else if (monster.state === 'attack') {
-      ctx.translate(5, 0);
+      const _dt = monster.deathTimer || 0;
+      const _prog = Math.min(1, Math.max(0, 1 - _dt / .42));
+      ctx.globalAlpha = Math.max(0, _dt / .42);
+      ctx.rotate(_prog * .85);
+      ctx.scale(1 - _prog * .12, .65 + _dt / .42 * .35);
+      ctx.translate(0, _prog * 8);
+    } else if (monster.hitFlash > 0) {
+      const _hk = Math.min(1, monster.hitFlash / .14);
+      ctx.translate(-4 * _hk, Math.sin(_at * 40) * 1.5 * _hk);
+      ctx.globalAlpha = .82 + _hk * .18;
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 14 * _hk;
+    } else if (monster.attackAnim > 0 || monster.state === 'attack') {
+      const _ak = Math.sin(Math.min(1, (monster.attackAnim || .15) / .3) * Math.PI);
+      ctx.translate(6 * _ak, 0);
+      ctx.scale(1 + .1 * _ak, 1 - .04 * _ak);
+      ctx.rotate(.06 * _ak);
+    } else if (monster.state === 'windup') {
+      ctx.scale(.94, 1.06);
+      ctx.translate(Math.sin(_at * 30) * 1.2, 0);
+    } else if (_moving) {
+      ctx.translate(0, Math.sin(_at * 10) * 2);
+      ctx.scale(1 + Math.sin(_at * 10) * .02, 1 - Math.sin(_at * 10) * .01);
+    } else {
+      ctx.translate(0, Math.sin(_at * 2.5) * 1.2);
+      ctx.scale(1, 1 + Math.sin(_at * 2.5) * .01);
     }
 
     // v5.0 12 Boss 写实透明立绘（CropArt，局部坐标系绘制）
@@ -347,9 +369,24 @@ Object.assign(Expedition.prototype, {
     }
     ctx.scale(0.6 * depthScale, 0.6 * depthScale);
     if (facingLeft) ctx.scale(-1, 1);
-    // v2.7 Seedream 主角贴图
-    if (this.playerSprite && this.playerSprite.naturalWidth) {
-      const psz = 150;
+    // v5.2 玩家攻击前倾 + 静止呼吸缩放
+    if (this.attackAnim > 0) {
+      const _pak = Math.sin(Math.min(1, this.attackAnim / 0.24) * Math.PI);
+      ctx.translate(10 * _pak, 0);
+      ctx.scale(1 + 0.09 * _pak, 1 - 0.04 * _pak);
+    } else if (!moving) {
+      const _pbr = Math.sin(this.elapsed * 3);
+      ctx.scale(1 + _pbr * 0.008, 1 - _pbr * 0.008);
+    }
+    // v5.2 玩家 4 帧走路动画（移动时播放序列，静止用 idle 图）
+    const psz = 150;
+    if (moving && this.playerWalkSheet && this.playerWalkSheet.naturalWidth) {
+      const fw = this.playerWalkSheet.naturalWidth / 4;
+      const fh = this.playerWalkSheet.naturalHeight;
+      const frame = Math.floor(this.elapsed * 10) % 4;
+      const pdraw = psz * fh / fw;
+      ctx.drawImage(this.playerWalkSheet, frame * fw, 0, fw, fh, -psz/2, -pdraw*0.82, psz, pdraw);
+    } else if (this.playerSprite && this.playerSprite.naturalWidth) {
       const pdraw = psz * this.playerSprite.naturalHeight / this.playerSprite.naturalWidth;
       ctx.drawImage(this.playerSprite, -psz/2, -pdraw*0.82, psz, pdraw);
     } else {
