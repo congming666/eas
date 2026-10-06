@@ -36,8 +36,8 @@
   .nebula-title { font-size: 56px !important; letter-spacing: 10px !important; }
 }
 
-/* 5) 隐藏 DOM 渐变字形，保留布局盒用于粒子采样；
- *    「荒野远征」由 canvas 粒子汇聚/流动构成。 */
+/* 5) 隐藏 DOM 字形，完全由 canvas 粒子汇聚构成；
+ *    粒子加量加亮，确保字形醒目。 */
 #mainMenu .nebula-title.nebula-glow {
   background: none !important;
   -webkit-background-clip: border-box !important;

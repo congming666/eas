@@ -14,11 +14,11 @@
 
   var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   var DPR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 1.75);
-  var TITLE_BUDGET = IS_MOBILE ? 700 : 1300;   // 字形粒子上限（性能保护）
+  var TITLE_BUDGET = IS_MOBILE ? 1000 : 2200;   // 字形粒子上限（性能保护）
   var AMBIENT_BUDGET = IS_MOBILE ? 180 : 300;  // 环境粒子上限
 
-  // 低饱和柔光调色板（青 / 浅紫 / 冰蓝）
-  var PALETTE = ['#8fe6e0', '#c9b8f7', '#a9d6ff', '#bff0e6', '#dcd2ff'];
+  // 高亮调色板（亮白 / 青 / 浅紫 / 冰蓝），粒子更亮更醒目
+  var PALETTE = ['#ffffff', '#e8f8ff', '#8fe6e0', '#c9b8f7', '#a9d6ff', '#bff0e6', '#dcd2ff'];
 
   var canvas = null, ctx = null;
   var raf = 0;
@@ -102,7 +102,7 @@
             p.tx = px; p.ty = py;
             p.x = px + rand(-startSpread, startSpread);       // 初始散开 → 汇聚成字
             p.y = py + rand(-startSpread * 0.7, startSpread * 0.7);
-            p.size = rand(1.2, 2.4);
+            p.size = rand(1.6, 3.0);
             p.color = PALETTE[(Math.random() * PALETTE.length) | 0];
             p.phase = Math.random() * 6.283;
             p.speed = rand(0.5, 1.2);
@@ -163,8 +163,8 @@
 
       // 悬停时归位力轻微松脱（轻微散开），离开后恢复归位（再聚合）
       effPull = p.pull * (1 - infl * 0.35);
-      p.x += (p.tx - p.x) * effPull + Math.sin(t * p.speed + p.phase) * 0.12;
-      p.y += (p.ty - p.y) * effPull + Math.cos(t * p.speed * 0.85 + p.phase * 1.6) * 0.12;
+      p.x += (p.tx - p.x) * effPull + Math.sin(t * p.speed + p.phase) * 0.08;
+      p.y += (p.ty - p.y) * effPull + Math.cos(t * p.speed * 0.85 + p.phase * 1.6) * 0.08;
       // 向鼠标轻微牵引
       if (infl > 0.01 && d > 0.001) {
         p.x += (dx / d) * infl * 0.10;
@@ -173,12 +173,12 @@
 
       // 缓慢呼吸（低幅，不闪）
       flick = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(t * 0.9 + p.phase * 2.7));
-      gr = p.size * 2.0 * (1 + infl * 0.4);   // 外层柔光晕
-      ctx.globalAlpha = flick * 0.14 * (1 + infl * 0.4);
+      gr = p.size * 1.8 * (1 + infl * 0.4);   // 外层柔光晕（更亮更醒目）
+      ctx.globalAlpha = flick * 0.12 * (1 + infl * 0.4);
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, 6.283); ctx.fill();
       cr = p.size * p.grow;                    // 内层亮核
-      ctx.globalAlpha = flick * (0.58 + infl * 0.20);
+      ctx.globalAlpha = flick * (0.95 + infl * 0.05);
       ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, 6.283); ctx.fill();
     }
 
