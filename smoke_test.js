@@ -64,8 +64,8 @@ async function main() {
   await page.locator('#musicToggle').click();
   if (!(await page.locator('#musicToggle').innerText()).includes('开')) throw new Error('音乐开启按钮无效');
   if ((await page.locator('.farm-cell').count()) !== 48) throw new Error('农田格子数量不正确（v5.1 应为48格）');
-  if ((await page.locator('.farm-cell.locked').count()) !== 40) throw new Error('初始锁定农田数量不正确（v5.1 应为40）');
-  if ((await page.locator('.farm-cell:not(.locked)').count()) !== 8) throw new Error('初始开放农田数量不正确');
+  if ((await page.locator('.farm-cell.locked').count()) !== 32) throw new Error('初始锁定农田数量不正确（应为32）');
+  if ((await page.locator('.farm-cell:not(.locked)').count()) !== 16) throw new Error('初始开放农田数量不正确');
   if ((await page.locator('#cropDetailPanel').count()) !== 1) throw new Error('作物产出详情卡未渲染');
   if (!(await page.locator('#cropDetailPanel').innerText()).includes('打造材料')) throw new Error('作物详情卡缺少材料产出标注');
   if (await page.locator('#expeditionPrepScreen').isVisible()) throw new Error('远征准备界面不应与农场同时显示');
@@ -90,9 +90,10 @@ async function main() {
   if (reliefAfter.gold !== 120 || reliefAfter.seeds !== 3 || !reliefAfter.claim) throw new Error('开荒保障没有补足基础资源');
   if (!(await page.locator('#reliefRewardButton').isDisabled())) throw new Error('开荒保障可以重复领取');
 
+  await page.evaluate(() => { GameState.gold = 600; ResourceSystem.add('fiber', 2); Farm.render(); });
   const goldBeforeUnlock = Number(await page.locator('#goldDisplay').innerText());
   await page.locator('.farm-cell.locked.next-unlock').click();
-  if ((await page.evaluate(() => GameState.unlockedPlots)) !== 9) throw new Error('农田资源解锁失败');
+  if ((await page.evaluate(() => GameState.unlockedPlots)) !== 17) throw new Error('农田资源解锁失败');
   if (Number(await page.locator('#goldDisplay').innerText()) >= goldBeforeUnlock) throw new Error('农田解锁没有消耗金币');
 
   await page.evaluate(() => {
@@ -107,7 +108,7 @@ async function main() {
   const seedsBefore = Number(await page.locator('#seedDisplay').innerText());
   await page.locator('.farm-cell:not(.locked):not(.planted):not(.ready)').first().click();
   // v4.2 起空地点击先弹作物选择器，需在弹窗内确认种植
-  await page.locator('#cropPickerOverlay > div > div').filter({ hasText: '小麦' }).locator('button').click();
+  await page.locator('#cropPickerOverlay .crop-picker-row').filter({ hasText: '小麦' }).locator('button').click();
   if (Number(await page.locator('#seedDisplay').innerText()) !== seedsBefore - 1) {
     throw new Error('播种没有消耗种子');
   }
@@ -223,7 +224,7 @@ async function main() {
       if (!isCrop && !(CONFIG.warehouseItems && CONFIG.warehouseItems[w.givesSeed])) {
         throw new Error('野生种子既无作物也无物品定义: ' + w.givesSeed);
       }
-      if (!CONFIG.warehouseItems[w.givesSeed]) throw new Error('野生作物无仓库定义: ' + w.givesSeed);
+      if (isCrop?.rewardType !== 'cultivation' && !CONFIG.warehouseItems[w.givesSeed]) throw new Error('野生作物无仓库定义: ' + w.givesSeed);
     }
     // 远征/温室/工坊全部现行产出 id 均有仓库定义
     const mustHave = ['herb','flour','bread','oil','torch','juice','feed','egg','pumpkin_lantern','insecticide',
@@ -266,7 +267,8 @@ async function main() {
   await page.getByRole('button', { name: /进入远征准备大厅/ }).click();
   if (!(await page.locator('#expeditionPrepScreen').isVisible())) throw new Error('远征准备大厅未显示');
   if (await page.locator('#farmScreen').isVisible()) throw new Error('农场与远征准备界面同时显示');
-  if ((await page.locator('.map-option').count()) !== (await page.evaluate(() => CONFIG.maps.length + 1))) throw new Error('地图数量不正确');
+  if ((await page.locator('.map-option').count()) !== (await page.evaluate(() => CONFIG.maps.filter(m => m.tier === Farm._mapTierFilter).length + 1))) throw new Error('地图数量不正确');
+  await page.evaluate(() => { Farm.showUnavailableSupplies = true; Farm.renderLoadout(); });
   if ((await page.locator('#loadoutGrid .loadout-slot').count()) !== (await page.evaluate(() => CONFIG.consumables.length))) throw new Error('消耗品槽位数量不正确');
   if ((await page.locator('.prep-skill').count()) !== 4) throw new Error('准备大厅技能信息不完整');
 
@@ -299,7 +301,8 @@ async function main() {
   if ((await page.locator('.prep-skill').count()) !== 3) throw new Error('修行台卸下技能后准备大厅仍显示该技能');
   await page.evaluate(() => { CharacterSystem.equip(CONFIG.skills[3].id); Farm.renderSkillPreview(); });
 
-  await page.locator('.map-option').nth(13).click();
+  await page.locator('#mapSelect button').filter({ hasText: /^T3$/ }).click();
+  await page.locator('.map-option:not(.map-random)').first().click();
   await page.screenshot({ path: shot('prep-test.png'), fullPage: true });
 
   // v4.2 出发强制校验：至少携带一把武器（新存档默认有 w_001 收割镰）
@@ -312,8 +315,8 @@ async function main() {
   if ((await page.evaluate(() => Game.expedition.map.tier)) !== 3) throw new Error('高等级地图选择失败');
   if (!(await page.evaluate(() => Game.expedition.map.bgImage.endsWith('t3_1_blighted.jpg')))) throw new Error('T3 专属背景路径不正确');
   if (!(await page.evaluate(() => Game.expedition.mapBgImg && Game.expedition.mapBgImg.complete && Game.expedition.mapBgImg.naturalWidth > 0))) throw new Error('远征背景图片未完成加载');
-  if ((await page.evaluate(() => Game.expedition.terrainPatches.length)) < 18) throw new Error('地形色块生成不足');
-  if ((await page.evaluate(() => Game.expedition.terrainFields.length)) < 7) throw new Error('农田地形生成不足');
+  if (!(await page.evaluate(() => ['water','mud','forest','ruins','highland'].every(t => Game.expedition.terrainRegions.some(r => r.type === t))))) throw new Error('实体地形区域生成不完整');
+  if (!(await page.evaluate(() => Game.expedition.terrainRegions.every(r => { const t = Game.expedition.getTerrainAt(r.x, r.y); return t && Number.isFinite(t.moveMul); })))) throw new Error('地形移动效果未接入');
   if ((await page.evaluate(() => Game.expedition.obstacles.length)) < 30) throw new Error('立体障碍物生成不足');
   if ((await page.evaluate(() => Game.expedition.traps.length)) < 10) throw new Error('环境陷阱生成不足');
   if ((await page.locator('.skill-meta').count()) < 7) throw new Error('技能数值信息未显示');
@@ -321,7 +324,7 @@ async function main() {
   // v5.6 消耗品 HUD：固定 R 道具转盘入口 + 未携带时回退显示 3 个核心道具（草药/信号弹/荆棘）
   if ((await page.locator('#consumableBar .cons-wheel-chip').count()) !== 1) throw new Error('R 道具转盘入口未显示');
   if ((await page.locator('#consumableBar .skill-slot.consumable:not(.cons-more):not(.cons-wheel-chip)').count()) !== 3) throw new Error('消耗品核心栏没有独立显示');
-  if (!(await page.locator('#musicToggle').isVisible())) throw new Error('音乐控制器未显示');
+  if (await page.locator('#audioControl').isVisible()) throw new Error('远征中首页音乐面板不应遮挡HUD');
   await page.evaluate(() => {
     const expedition = Game.expedition;
     const showcase = expedition.obstacles.find(obstacle =>
@@ -420,7 +423,7 @@ async function main() {
   );
   if (Number(await page.locator('#goldDisplay').innerText()) !== savedGold) throw new Error('金币存档未恢复');
   if ((await page.locator('.crop-choice').count()) < 2) throw new Error('作物解锁存档未恢复');
-  if ((await page.evaluate(() => GameState.unlockedPlots)) !== 9) throw new Error('农田解锁进度未恢复');
+  if ((await page.evaluate(() => GameState.unlockedPlots)) !== 17) throw new Error('农田解锁进度未恢复');
   if ((await page.evaluate(id => ((GameState.collection.skill[id] || {}).count) || 0, persistedSkillId)) !== persistedCount) throw new Error('印制收藏计数存档未恢复');
   if ((await page.evaluate(id => ((GameState.collection.skill[id] || {}).affixes || []).length, persistedSkillId)) !== persistedAffix) throw new Error('附魔词条存档未恢复');
   if ((await page.evaluate(() => GameState.lastDailyClaim)) !== (await page.evaluate(() => RewardSystem.dateKey()))) throw new Error('每日奖励领取记录未恢复');

@@ -303,7 +303,7 @@ const Warehouse = {
           const stats = (typeof LoadoutSystem !== 'undefined') ? LoadoutSystem.getInstanceStats(inst.uid) : wpn;
           html += `
             <div class="wh-cell">
-              <div class="wh-ic">${wpn.icon || '⚔️'}</div>
+              <div class="wh-ic wh-weapon-icon">${wpn.img ? `<img src="${wpn.img}" alt="${wpn.name}" width="80" height="80" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${wpn.icon || '⚔️'}</span>` : (wpn.icon || '⚔️')}</div>
               <div class="wh-nm">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
               <div class="wh-src">伤害 ${stats?stats.damage:wpn.damage}</div>
               <div class="wh-src">去锻造台升级</div>

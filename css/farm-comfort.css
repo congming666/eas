@@ -1,0 +1,52 @@
+﻿/* 家园设施统一可读性与弹窗布局 */
+#cropPickerOverlay .crop-picker-dialog{width:min(760px,100%);max-height:86dvh;display:flex;flex-direction:column;padding:0;background:#14241e;border:1px solid #60765a;border-radius:18px;box-shadow:0 25px 100px #0009;overflow:hidden;}
+#cropPickerOverlay .crop-picker-header{display:flex;align-items:center;gap:18px;padding:22px 24px;border-bottom:1px solid #79947130;flex-shrink:0;}
+#cropPickerOverlay h3{width:auto!important;margin:0;text-align:left;font-size:23px;color:#ead59c;}
+#cropPickerOverlay p{width:auto!important;margin:6px 0 0;text-align:left;font-size:12px;color:#a0b5a7;}
+.crop-seed-count{margin-left:auto;white-space:nowrap;font-size:13px;color:#b4c7b9;}.crop-seed-count b{color:#f1d48a;margin-left:6px;}
+.crop-picker-close{background:transparent;border:0;color:#bdd1c1;font-size:26px;cursor:pointer;width:36px;height:36px;flex-shrink:0;}
+.crop-picker-list{overflow:auto;padding:12px 18px 18px;overscroll-behavior:contain;}
+.crop-picker-row{display:grid;grid-template-columns:42px minmax(0,1fr) 84px;gap:14px;align-items:center;padding:15px 12px;border-bottom:1px solid #b5caaa18;border-radius:9px;}
+.crop-picker-row:hover{background:#b4d69d09;}.crop-picker-icon{font-size:28px;text-align:center;}.crop-picker-info{min-width:0;}.crop-picker-info strong{font-size:16px;color:#e1e8d8;word-break:keep-all;}.crop-picker-meta{font-size:12px;color:#d3bd83;margin-top:5px;line-height:1.6;}.crop-picker-yield{font-size:12px;color:#94ae9b;margin-top:4px;line-height:1.65;overflow-wrap:anywhere;}
+#cropPickerOverlay .crop-plant-action{width:84px!important;min-width:0!important;margin:0;padding:10px 8px;white-space:nowrap;font-size:13px;}
+button:disabled{cursor:not-allowed;opacity:.45;}
+#farmScreen .facility-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+#farmScreen .facility{min-width:0;padding:15px 12px;border-radius:12px;transition:background .15s,border-color .15s;}
+#farmScreen .facility-name{font-size:14px;line-height:1.5;}.facility-state{font-size:11px;line-height:1.6;}
+#farmScreen .panel{padding:16px!important;}#farmScreen .panel-title{margin-bottom:14px;font-size:16px;}
+#farmHomestead canvas#v58Panorama{height:300px;}#farmHomestead .hs-titlebar{padding:14px 16px;}#farmHomestead .hs-chips{padding:12px 16px;}
+.modal-window,.warehouse-modal,.greenhouse-modal,#v5Modal,.v58-modal,.modal-overlay>div:first-child{box-sizing:border-box;max-width:calc(100vw - 32px)!important;max-height:88dvh!important;line-height:1.6;scrollbar-width:thin;scrollbar-color:#687d68 #15221b;}
+.modal-window,.warehouse-modal,.greenhouse-modal,#v5Modal{border-radius:16px!important;border-color:#6d806344!important;box-shadow:0 24px 80px #0008!important;}
+.modal-header,.warehouse-modal-header,.greenhouse-modal-header{padding:17px 22px!important;gap:14px;}
+.modal-header span,.warehouse-modal-header h2,.greenhouse-modal-header h2{font-size:18px!important;}
+.recipe-row{padding:16px!important;gap:14px;align-items:center;border-bottom:1px solid #8ba78125;flex-wrap:wrap;}
+.recipe-info{flex:1 1 260px;min-width:0;line-height:1.75;}.recipe-btn{min-height:38px;white-space:nowrap;padding:8px 14px!important;}
+#processingQueue{padding:14px;background:#1a3329;border-radius:10px;line-height:1.8;position:sticky;top:0;z-index:1;}
+#v5Modal .v5-close{position:sticky;display:block;bottom:0;margin:16px 0 0 auto;width:max-content;background:#253c30;padding:8px 18px;border-radius:8px;}
+#warehouseContent,.greenhouse-content{padding:18px!important;gap:20px;}.greenhouse-left,.greenhouse-right{min-width:0;}
+#recipeList,.npc-list,.building-list,.tech-tree-container{overscroll-behavior:contain;}
+@media(max-width:600px){#cropPickerOverlay{padding:10px!important;}.crop-picker-header{padding:16px!important;gap:8px!important;}#cropPickerOverlay h3{font-size:19px;}.crop-seed-count{font-size:11px;}.crop-picker-list{padding:6px 8px 12px;}.crop-picker-row{grid-template-columns:30px minmax(0,1fr) 65px;gap:9px;padding:13px 6px;}#cropPickerOverlay .crop-plant-action{width:65px!important;}.crop-picker-info strong{font-size:15px;}#farmScreen .facility-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.greenhouse-content,.npc-modal-body,.tech-modal-body{display:flex!important;flex-direction:column!important;}.modal-window,.warehouse-modal,.greenhouse-modal,#v5Modal{width:calc(100vw - 24px)!important;}.recipe-info{flex-basis:100%;}#farmHomestead canvas#v58Panorama{height:230px;}}
+
+/* 横向景观保持原始比例，避免房屋与树木被拉长。 */
+#farmHomestead canvas#v58Panorama{height:auto!important;aspect-ratio:3/1;min-height:0;width:100%;display:block;}
+body:has(#farmScreen:not(.hidden)) .modal-overlay>div:first-child{overflow-y:auto;}
+#farmScreen .facility:focus-visible{outline:2px solid #e1c681;outline-offset:3px;}
+#warehouseModal .warehouse-modal{overflow-y:auto;}
+@media(prefers-reduced-motion:reduce){#farmScreen *{scroll-behavior:auto!important;transition:none!important;}}
+
+#greenhouseModal,#warehouseModal{background:#06100edb!important;backdrop-filter:blur(8px);}
+#greenhouseModal .greenhouse-modal,#cardWorkshopModal .workshop-window{background:#14231f!important;}
+#greenhouseModal .greenhouse-modal-header,#cardWorkshopModal .workshop-header{background:#1b3027!important;}
+#processingModal>div,#collectionModal>div,#decorationModal>div{background:#14231f!important;}
+#v5Modal .v5-card{padding:16px!important;}#v5Modal .v5-card .d{font-size:13px;line-height:1.7;}
+#npcModal .npc-card,#techModal .building-card{padding:14px;gap:12px;}
+#npcModal .npc-desc,#techModal .building-desc,#techModal .building-effect{font-size:12px;line-height:1.7;}
+#greenhouseModal button,#npcModal button,#techModal button{min-height:36px;}
+@media(max-width:600px){#greenhouseModal .greenhouse-modal-header{flex-wrap:wrap;}#npcModal .npc-body{flex-direction:column;}#v5Modal .v5-grid{grid-template-columns:1fr;}}
+
+#greenhouseModal:not(.hidden){z-index:1000;}
+
+/* 武器使用配置中的原画，加载失败时才显示文字占位。 */
+.wh-cell .wh-weapon-icon{height:80px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;}
+.wh-weapon-icon img{display:block;width:80px;height:80px;object-fit:contain;border-radius:9px;}
+.wh-weapon-icon img[hidden],.wh-weapon-icon span[hidden]{display:none;}

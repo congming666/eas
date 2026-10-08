@@ -5,17 +5,17 @@
   // ===== 建筑定义 =====
   const BUILDINGS = {
     workshop: {
-      id: 'workshop', name: '工坊', icon: '🔨',
-      description: '加工作物为高价值产品',
+      id: 'workshop', name: '加工研究所', icon: '🔨',
+      description: '每级提升加工速度10%；配方等级在加工工坊升级',
       maxLevel: 5,
       baseCost: { gold: 200, materials: 10 },
       costMultiplier: 1.8,
       effects: [
-        { level: 1, desc: '解锁基础加工（小麦→面粉）' },
-        { level: 2, desc: '加工速度+20%' },
-        { level: 3, desc: '解锁高级加工（向日葵→油）' },
-        { level: 4, desc: '加工产量+30%' },
-        { level: 5, desc: '解锁终极加工（传说产品）' }
+        { level: 1, desc: '加工速度 +10%' },
+        { level: 2, desc: '加工速度 +20%' },
+        { level: 3, desc: '加工速度 +30%' },
+        { level: 4, desc: '加工速度 +40%' },
+        { level: 5, desc: '加工速度 +50%' }
       ]
     },
     greenhouse: {

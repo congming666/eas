@@ -10,15 +10,16 @@
   'use strict';
 
   var TITLE_SEL = '.nebula-title';
-  var AMBIENT_SELS = ['.nebula-eyebrow', '.nebula-sub'];
+  var AMBIENT_SELS = [];
+  var sampledAt = 0;
 
   var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   var DPR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 1.75);
-  var TITLE_BUDGET = IS_MOBILE ? 1000 : 2200;   // 字形粒子上限（性能保护）
+  var TITLE_BUDGET = IS_MOBILE ? 100 : 220;   // 字形粒子上限（性能保护）
   var AMBIENT_BUDGET = IS_MOBILE ? 180 : 300;  // 环境粒子上限
 
   // 高亮调色板（亮白 / 青 / 浅紫 / 冰蓝），粒子更亮更醒目
-  var PALETTE = ['#ffffff', '#e8f8ff', '#8fe6e0', '#c9b8f7', '#a9d6ff', '#bff0e6', '#dcd2ff'];
+  var PALETTE = ['#ead8a5', '#b6cdb8', '#d9c58e'];
 
   var canvas = null, ctx = null;
   var raf = 0;
@@ -102,7 +103,7 @@
             p.tx = px; p.ty = py;
             p.x = px + rand(-startSpread, startSpread);       // 初始散开 → 汇聚成字
             p.y = py + rand(-startSpread * 0.7, startSpread * 0.7);
-            p.size = rand(1.6, 3.0);
+            p.size = rand(0.6, 1.2);
             p.color = PALETTE[(Math.random() * PALETTE.length) | 0];
             p.phase = Math.random() * 6.283;
             p.speed = rand(0.5, 1.2);
@@ -119,12 +120,13 @@
   }
 
   function resample() {
+    sampledAt = performance.now();
     releaseAll(titleParts);
     releaseAll(ambientParts);
     var titleEl = document.querySelector(TITLE_SEL);
     if (titleEl) {
       titleRect = titleEl.getBoundingClientRect();
-      sampleElement(titleEl, titleParts, TITLE_BUDGET, 150);
+      sampleElement(titleEl, titleParts, TITLE_BUDGET, 55);
     } else {
       titleRect = null;
     }
@@ -139,7 +141,7 @@
 
   function render() {
     ctx.clearRect(0, 0, W, H);
-    if (menuHidden() || document.hidden) return;
+    if (menuHidden() || document.hidden || document.body.classList.contains('title-reduced-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     // 悬停判定：鼠标进入标题矩形（含外扩边）
     var hovering = false;
@@ -152,11 +154,13 @@
 
     ctx.globalCompositeOperation = 'lighter';
     var t = performance.now() / 1000;
+    var intro = Math.max(0, 1 - (performance.now() - sampledAt) / 1800);
     var i, p, dx, dy, d, infl, effPull, flick, gr, cr;
 
     // ---- 标题粒子：汇聚字形 + 悬停牵引 / 散开 / 增辉 ----
     for (i = 0; i < titleParts.length; i++) {
       p = titleParts[i];
+      if (intro === 0 && i % 12 !== 0) continue;
       dx = mouseX - p.x; dy = mouseY - p.y;
       d = Math.sqrt(dx * dx + dy * dy);
       infl = (d < ATTRACT_R ? (1 - d / ATTRACT_R) : 0) * hoverLevel;
@@ -174,11 +178,11 @@
       // 缓慢呼吸（低幅，不闪）
       flick = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(t * 0.9 + p.phase * 2.7));
       gr = p.size * 1.8 * (1 + infl * 0.4);   // 外层柔光晕（更亮更醒目）
-      ctx.globalAlpha = flick * 0.12 * (1 + infl * 0.4);
+      ctx.globalAlpha = flick * (0.02 + intro * 0.08);
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, 6.283); ctx.fill();
       cr = p.size * p.grow;                    // 内层亮核
-      ctx.globalAlpha = flick * (0.95 + infl * 0.05);
+      ctx.globalAlpha = flick * (0.12 + intro * 0.35);
       ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, 6.283); ctx.fill();
     }
 
@@ -203,6 +207,18 @@
   }
 
   function init() {
+    var version = document.getElementById('titleVersion');
+    if (version) version.textContent = 'v' + (window.CONFIG?.version || '5.8.0');
+    var reduce = document.getElementById('titleReduceMotion');
+    if (reduce) {
+      try { reduce.checked = localStorage.getItem('fce-title-reduced-motion') === '1'; } catch (_) {}
+      document.body.classList.toggle('title-reduced-motion', reduce.checked);
+      reduce.addEventListener('change', function () {
+        document.body.classList.toggle('title-reduced-motion', reduce.checked);
+        try { localStorage.setItem('fce-title-reduced-motion', reduce.checked ? '1' : '0'); } catch (_) {}
+      });
+    }
+
     if (document.getElementById('nebulaTextFx')) return;
     canvas = document.createElement('canvas');
     canvas.id = 'nebulaTextFx';

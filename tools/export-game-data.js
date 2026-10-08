@@ -25,13 +25,20 @@ async function main() {
   await page.waitForSelector('#farmScreen');
 
   const data = await page.evaluate(() => {
-    const pick = (obj) => JSON.parse(JSON.stringify(obj || null));
+    const pick = (obj) => JSON.parse(JSON.stringify(obj ?? null));
+    if (typeof Greenhouse !== 'undefined') Greenhouse.init();
     return {
       version: CONFIG.GAME_VERSION || CONFIG.version,
+      exportedAt: new Date().toISOString(),
+      allConfig: pick(CONFIG),
+      cardData: pick(window.CARD_DATA),
+      systemData: Object.fromEntries(['DifficultySystem','TechSystem','BuildingSystem','FarmRecipes','FarmDecorationSystem','AchievementSystem','NpcSystem','WeatherSystem','CardV58','LoadoutSystem'].map(name => {
+        const value = name === 'LoadoutSystem' ? LoadoutSystem : name === 'AchievementSystem' ? AchievementSystem : window[name];
+        return [name, value ? pick(value) : null];
+      })),
       crops: pick(CONFIG.crops),
       cropMaterials: pick(CONFIG.cropMaterials),
       resources: pick(CONFIG.resources),
-      materialsLegacy: pick(CONFIG.materials),
       weapons: pick(CONFIG.weapons),
       bosses: pick(CONFIG.bosses),
       skills: pick(CONFIG.skills),
@@ -90,6 +97,7 @@ async function main() {
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(data, null, 2), 'utf8');
   console.log('exported:', out);
+  console.log('source-of-truth: runtime JS config -> docs/game_data.json');
   console.log('counts:', JSON.stringify({
     crops: data.crops && data.crops.length,
     cropMaterials: data.cropMaterials && Object.keys(data.cropMaterials).length,

@@ -28,13 +28,6 @@ const CONFIG = {
     { id: 'flame_bow', name: '烈焰长弓', shortName: '火弓', icon: '弓', img: 'docs/art/weapons/flame_bow.png', mode: 'ranged', blueprint: true,
       damage: 32, range: 600, cooldown: 0.85, projectileSpeed: 550, color: '#ff6b35', description: '火焰箭矢，命中爆炸AOE' }
   ],
-  materials: {
-    iron: { name: '铁块', icon: '⛓️', desc: '武器锻造基础材料' },
-    crystal: { name: '灵晶', icon: '💎', desc: '高级材料，法杖附魔用' },
-    bossFang: { name: 'Boss獠牙', icon: '🦷', desc: 'Boss掉落，顶级升级用' },
-    wood: { name: '硬木', icon: '🪵', desc: '基础材料' },
-    herb: { name: '草药', icon: '🌿', desc: '消耗品材料' }
-  },
   expedition: {
     duration: 720,
     demoDuration: 720, // v1.3 统一对局时限：12分钟
@@ -45,42 +38,42 @@ const CONFIG = {
   maps: [
     // ===== T1 荒野（50金） =====
     { id: 't1_1', name: '荒废野田', tier: 1, entryFee: 50, danger: '低危', modifier: '标准',
-      monsterCount: 12, chestCount: 5, raiderCount: 0,
+      monsterCount: 8, chestCount: 5, raiderCount: 0,
       rareSeedChance: 0.02, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_1_wild_field.jpg',
       bgColor: '#4d6848', accentColor: '#8eae70',
       gridSize: 48, gridColor: '#526d55', majorGridColor: '#6f8d70',
       terrain: { ground: '#384a35', soil: '#5b4934', path: '#807459', water: '#385a5c', glow: '#6f875b', decor: ['🌾','🌿','🪨','🌳','🪵'] } },
     { id: 't1_2', name: '风车平原', tier: 1, entryFee: 50, danger: '低危', modifier: '开阔：视野+20%',
-      monsterCount: 10, chestCount: 5, raiderCount: 0,
+      monsterCount: 7, chestCount: 5, raiderCount: 0,
       rareSeedChance: 0.02, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_2_windmill.jpg',
       bgColor: '#5a7a48', accentColor: '#a8cf7a', visibilityBonus: 0.2,
       gridSize: 48, gridColor: '#5d7a55', majorGridColor: '#7e9a6c',
       terrain: { ground: '#466038', soil: '#6b5538', path: '#8a7d5e', water: '#3f6668', glow: '#7c9a66', decor: ['🌾','🌿','🪨','🌼','🪵'] } },
     { id: 't1_3', name: '青草坡', tier: 1, entryFee: 50, danger: '低危', modifier: '多草：怪少2只',
-      monsterCount: 10, chestCount: 5, raiderCount: 0,
+      monsterCount: 7, chestCount: 5, raiderCount: 0,
       rareSeedChance: 0.02, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_3_grassland.jpg',
       bgColor: '#4e7040', accentColor: '#9ecf6e',
       gridSize: 48, gridColor: '#557048', majorGridColor: '#769660',
       terrain: { ground: '#3f5a32', soil: '#645033', path: '#7e7350', water: '#3a6062', glow: '#7a9a5a', decor: ['🌿','🌱','🌼','🦋','🌾'] } },
     { id: 't1_4', name: '旧采石场', tier: 1, entryFee: 50, danger: '低危', modifier: '多石：障碍多',
-      monsterCount: 14, chestCount: 6, raiderCount: 0,
+      monsterCount: 9, chestCount: 6, raiderCount: 0,
       rareSeedChance: 0.03, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_4_quarry.jpg',
       bgColor: '#5c5a55', accentColor: '#a8a49a',
       gridSize: 48, gridColor: '#605e58', majorGridColor: '#828078',
       terrain: { ground: '#4a4842', soil: '#6a5e4c', path: '#8a8070', water: '#3d5558', glow: '#8a847a', decor: ['🪨','⛰️','🪵','🦴','⚙️'] } },
     { id: 't1_5', name: '河湾浅滩', tier: 1, entryFee: 50, danger: '低危', modifier: '多水：减速区多',
-      monsterCount: 12, chestCount: 5, raiderCount: 0,
+      monsterCount: 8, chestCount: 5, raiderCount: 0,
       rareSeedChance: 0.02, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_5_river.jpg',
       bgColor: '#4a7a78', accentColor: '#7ec8c4', waterHeavy: true,
       gridSize: 48, gridColor: '#4e7573', majorGridColor: '#709a96',
       terrain: { ground: '#3a5a58', soil: '#5b5540', path: '#7a7a60', water: '#2e6a80', glow: '#6ab0ac', decor: ['🌿','💧','🐸','🪨','🌾'] } },
     { id: 't1_6', name: '牧道交叉口', tier: 1, entryFee: 50, danger: '低危', modifier: '三岔路：撤离点随机',
-      monsterCount: 12, chestCount: 6, raiderCount: 0,
+      monsterCount: 8, chestCount: 6, raiderCount: 0,
       rareSeedChance: 0.02, legendarySeedChance: 0,
       bgImage: 'assets/maps/t1_6_crossroad.jpg',
       bgColor: '#6b6040', accentColor: '#c9a860',
@@ -332,10 +325,10 @@ const CONFIG = {
     { id: 'watermelon', name: '西瓜', icon: '🍉', growTime: 36, sellPrice: 20, seedPrice: 15, rarity: 'rare', cardChance: 1, upgradeSkill: 'all', rewardType: 'consumable_skill_card', rewardLabel: '一次性技能卡', trait: 'giant' },
     { id: 'cabbage', name: '卷心菜', icon: '🥬', growTime: 28, sellPrice: 18, seedPrice: 10, rarity: 'common', cardChance: 0, upgradeSkill: 'earth_dash', rewardType: 'healing', rewardLabel: '草药包扎包', trait: 'hardy' },
     { id: 'wheat', name: '小麦', icon: '🌾', growTime: 15, sellPrice: 15, seedPrice: 5, rarity: 'common', cardChance: 0, upgradeSkill: null, rewardType: 'gold', rewardLabel: '金币', trait: 'monoculture' },
-    { id: 'carrot', name: '胡萝卜', icon: '🥕', growTime: 20, sellPrice: 25, seedPrice: 10, rarity: 'common', cardChance: 0.14, upgradeSkill: 'earth_dash', trait: 'mutate' },
-    { id: 'corn', name: '玉米', icon: '🌽', growTime: 30, sellPrice: 45, seedPrice: 15, rarity: 'rare', cardChance: 0.20, upgradeSkill: 'vine_bind', trait: 'beast' },
-    { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen', trait: 'carve' },
-    { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary' },
+    { id: 'carrot', name: '胡萝卜', icon: '🥕', growTime: 20, sellPrice: 25, seedPrice: 10, rarity: 'common', cardChance: 0.14, upgradeSkill: 'earth_dash', trait: 'mutate', rewardType: 'consumable', consumableId: 'rage_tonic', rewardLabel: '狂暴药剂（8秒伤害+50%）' },
+    { id: 'corn', name: '玉米', icon: '🌽', growTime: 30, sellPrice: 45, seedPrice: 15, rarity: 'rare', cardChance: 0.20, upgradeSkill: 'vine_bind', trait: 'beast', rewardType: 'consumable', consumableId: 'scout_eagle', rewardLabel: '侦察鹰（8秒视野扩大）' },
+    { id: 'pumpkin', name: '南瓜', icon: '🎃', growTime: 45, sellPrice: 80, seedPrice: 25, rarity: 'rare', cardChance: 0.30, upgradeSkill: 'smoke_screen', trait: 'carve', rewardType: 'consumable', consumableId: 'flame_elixir', rewardLabel: '赤炎药剂（12秒攻击+20%）' },
+    { id: 'moon_rice', name: '月光稻', icon: '✨', growTime: 60, sellPrice: 200, seedPrice: 0, rarity: 'legendary', cardChance: 0.58, upgradeSkill: 'all', rare: true, trait: 'legendary', rewardType: 'consumable', consumableId: 'wraith_draft', rewardLabel: '幽魂秘药（隐身5秒）' },
     { id: 'tinder_grass', name: '火绒草', icon: '🔥', growTime: 22, sellPrice: 14, seedPrice: 6, rarity: 'common', cardChance: 0, upgradeSkill: null, rewardType: 'torch', rewardLabel: '火把 ×2', torchQty: 2, trait: null }
   ],
   // v1.6 战场种植：可带进远征种下去的植物
@@ -374,6 +367,16 @@ const CONFIG = {
   },
   // 远征地图野生植物（采摘带回种子）
   wildPlants: [
+    { id: 'wild_garlic', icon: '🧄', name: '野生大蒜', givesSeed: 'garlic', tier: 1 },
+    { id: 'wild_rice', icon: '🌾', name: '野生水稻', givesSeed: 'rice', tier: 1 },
+    { id: 'wild_tomato', icon: '🍅', name: '野生番茄', givesSeed: 'tomato', tier: 1 },
+    { id: 'wild_rosemary', icon: '🌿', name: '野生迷迭香', givesSeed: 'rosemary', tier: 2 },
+    { id: 'wild_carrot', icon: '🥕', name: '野生胡萝卜', givesSeed: 'carrot', tier: 1 },
+    { id: 'wild_corn', icon: '🌽', name: '野生玉米', givesSeed: 'corn', tier: 1 },
+    { id: 'wild_pumpkin', icon: '🎃', name: '野生南瓜', givesSeed: 'pumpkin', tier: 1 },
+    { id: 'wild_lingsui', icon: '🌾', name: '野生灵穗麦', givesSeed: 'lingsui_wheat', tier: 2 },
+    { id: 'wild_cactus', icon: '🌵', name: '野生仙人掌', givesSeed: 'cactus', tier: 1 },
+    { id: 'wild_ginseng', icon: '🫚', name: '野生人参', givesSeed: 'ginseng', tier: 3 },
     { id: 'wild_chili', icon: '🌶️', name: '野生辣椒', givesSeed: 'chili', tier: 1 },
     { id: 'wild_mint', icon: '🌿', name: '野生薄荷', givesSeed: 'mint', tier: 1 },
     { id: 'wild_sun', icon: '🌻', name: '野生向日葵', givesSeed: 'sunflower', tier: 1 },
@@ -503,26 +506,26 @@ const CONFIG = {
     big_gold_card: { name: '大金币卡', icon: '💎', desc: '使用获得2000金币', value: 2000, category: 'consumable', sellPrice: 800 },
     transform_card: { name: '作物转化卡', icon: '🔄', desc: '将一块普通作物转化为随机稀有作物', category: 'consumable', sellPrice: 150 },
     rare_seed_pack: { name: '稀有种子包', icon: '🌱', desc: '随机获得一种稀有植物种子', category: 'consumable', sellPrice: 100 },
-    exp_boost_card: { name: '经验加成卡', icon: '📈', desc: '下次远征击杀经验+50%', category: 'consumable', sellPrice: 120 },
-    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', desc: '永久提升当前武器伤害10%', category: 'consumable', sellPrice: 300 }
+    exp_boost_card: { name: '经验加成卡', icon: '📈', desc: '下次成功撤离修为+50%（失败保留）', category: 'consumable', sellPrice: 120 },
+    weapon_upgrade_stone: { name: '武器强化石', icon: '⚔️', desc: '永久提升所有武器伤害10%', category: 'consumable', sellPrice: 300 }
   }
 };
 
 // ==================== 游戏状态 ====================
 const GameState = {
   screen: 'menu', // menu, farm, expedition, result
-  gold: 100000,
+  gold: 500,
   volume: 0.8, // v1.4 全局音量
   seeds: 3,
   materials: 0,
-  farmPlots: [], // 6x6 = 36格
-  unlockedPlots: 8,
+  farmPlots: [], // 8x6 = 48格
+  unlockedPlots: 16,
   selectedCrop: 'wheat',
   unlockedCrops: ['pea_shooter', 'sunflower', 'watermelon', 'cabbage', 'wheat', 'ningqi_grass', 'tinder_grass'],
   skillLevels: { straw_smash: 1, vine_bind: 1, earth_dash: 1, smoke_screen: 1 },
   cardInventory: [],
   selectedBoostCards: [],
-  selectedMap: 't1',
+  selectedMap: 't1_1',
   selectedWeapon: 'harvest_sickle',
   loadoutWeaponUids: [], // v1.4 本次出征带入的武器uid数组（最多2把）
   carriedSeeds: [], // v1.6 携带的战场植物种子 [{type, count}]
@@ -538,7 +541,7 @@ const GameState = {
   buildings: null, techPoints: 0, unlockedTech: [], labUnlocked: false,
   // v0.9.0 作物系统
   cropBuffs: [],
-  loadout: { herb_kit: 2, thorn_storm: 1, signal_flare: 0 },
+  loadout: {},
   farmItems: { growth_catalyst: 0 },
   warehouse: { capacity: 50, items: {} },
   greenhouse: {
@@ -570,3 +573,6 @@ if (typeof document !== 'undefined') {
   const _versionMeta = document.querySelector('meta[name="game-version"]');
   if (_versionMeta) _versionMeta.setAttribute('content', GAME_VERSION);
 }
+
+CONFIG.crops.push({id:'oil_sedge',name:'油莎草',icon:'🌿',growTime:40,sellPrice:12,seedPrice:10,rarity:'common',rewardType:'oil',oilQty:2,rewardLabel:'植物油 ×2',description:'收获直接获得植物油；2份植物油可在一级加工工坊制作1支火把。'});
+CONFIG.warehouseItems.oil_sedge={name:'油莎草',icon:'🌿',category:'crop',sellPrice:12};

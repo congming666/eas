@@ -248,6 +248,7 @@
     _mountUI() {
       if (this._uiReady || typeof document === 'undefined') return;
       this._uiReady = true;
+      if (new URLSearchParams(location.search).get('debug') !== '1') return;
       const btn = document.createElement('div');
       btn.id = 'telemetryFab';
       btn.title = '对局数据看板';

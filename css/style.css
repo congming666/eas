@@ -629,6 +629,47 @@
     color: #aaa;
     line-height: 1.8;
   }
+
+  /* v5.8.6 远征界面：战斗区优先，信息按层级分布 */
+  #expeditionHUD { font-family: "Microsoft YaHei", sans-serif; }
+  #expeditionHUD .hud-top { top: 14px; left: 16px; right: 16px; display:grid; grid-template-columns: minmax(220px, 280px) minmax(180px, 240px) minmax(220px, 300px) 150px; gap:12px; align-items:start; }
+  #expeditionHUD .hud-panel, #expeditionHUD .bag-item, #expeditionHUD .minimap { background:rgba(8,18,16,.82); border:1px solid rgba(146,204,169,.28); box-shadow:0 8px 24px rgba(0,0,0,.3); backdrop-filter:blur(8px); }
+  #expeditionHUD .hud-panel { min-height:58px; }
+  #expeditionHUD .player-stats { min-width:0; }
+  .hud-target { min-width:0; text-align:center; padding:9px 14px; }
+  .target-label { color:#9cb8a5; font-size:10px; letter-spacing:2px; }
+  .target-name { color:#f1d78b; font-weight:800; font-size:14px; margin:4px 0; }
+  .target-progress { height:6px; background:#1b2922; border-radius:4px; overflow:hidden; }
+  .target-progress i { display:block; height:100%; background:linear-gradient(90deg,#d8664b,#e9bd63); border-radius:4px; }
+  .target-meta { color:#a4b9ad; font-size:10px; margin-top:4px; }
+  #expeditionHUD .bag-display { top:14px; right:16px; position:static; align-items:stretch; }
+  #expeditionHUD .minimap { top:86px; right:16px; bottom:auto; width:170px; height:170px; border-radius:12px; }
+  #expeditionHUD .mission-hud, #missionHud { left:16px; top:112px; }
+  #expeditionHUD .hud-bottom { bottom:18px; gap:8px; padding:8px 12px; background:rgba(5,13,12,.72); border:1px solid rgba(146,204,169,.22); border-radius:16px; backdrop-filter:blur(7px); }
+  #expeditionHUD .consumable-bar { bottom:18px; right:190px; left:auto; }
+  #expeditionHUD .defense-bar { bottom:92px; left:50%; transform:translateX(-50%); }
+  #expeditionHUD .weapon-controls-tip { bottom:4px; left:50%; transform:translateX(-50%); opacity:.78; }
+  #expeditionHUD .controls-hint { left:16px; right:auto; bottom:18px; width:190px; text-align:left; opacity:.72; }
+  #resultScreen .result-card { width:min(720px,92vw); min-width:0; padding:30px 34px; }
+  #resultScreen .result-stats, #resultScreen .loot-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; text-align:left; }
+  @media (max-width: 900px) {
+    #expeditionHUD .hud-top { grid-template-columns:1fr 1fr; }
+    #expeditionHUD .hud-target { grid-column:1/-1; grid-row:1; }
+    #expeditionHUD .bag-display { grid-column:2; grid-row:2; }
+    #expeditionHUD .minimap { width:126px; height:126px; top:112px; right:10px; }
+    #expeditionHUD .controls-hint { display:none; }
+    #expeditionHUD .consumable-bar { right:10px; bottom:100px; }
+    #expeditionHUD .defense-bar { display:none; }
+    #expeditionHUD .skill-slot { width:52px; height:52px; }
+  }
+  @media (max-width: 620px) {
+    #expeditionHUD .hud-top { left:8px; right:8px; gap:6px; }
+    #expeditionHUD .hud-panel { padding:7px 9px; }
+    #expeditionHUD .minimap { display:none; }
+    #expeditionHUD .hud-bottom { left:8px; right:8px; transform:none; justify-content:center; overflow:auto; }
+    #expeditionHUD .weapon-controls-tip { display:none; }
+    #resultScreen .result-stats, #resultScreen .loot-list { grid-template-columns:1fr; }
+  }
   .controls-hint kbd {
     background: #333;
     padding: 1px 6px;
@@ -993,6 +1034,15 @@
     scrollbar-width: thin;
     scrollbar-color: #6eb88e rgba(5,14,12,.55);
   }
+  /* 准备大厅：当前页面实际是两栏，地图/技能与携带/风险铺满宽度 */
+  #expeditionPrepScreen .prep-content { grid-template-columns: minmax(330px, .95fr) minmax(480px, 1.35fr); gap:14px; }
+  #expeditionPrepScreen .prep-column:nth-child(1) { grid-column:1; }
+  #expeditionPrepScreen .prep-column:nth-child(2) { grid-column:2; }
+  #expeditionPrepScreen .prep-panel { min-width:0; }
+  #expeditionPrepScreen .prep-actions { position:sticky; bottom:0; flex-direction:column; }
+  #expeditionPrepScreen .prep-actions .start-expedition-btn, #expeditionPrepScreen .prep-actions .secondary-btn { width:100%; }
+  @media (max-width: 1050px) { #expeditionPrepScreen .prep-content { grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr); } }
+  @media (max-width: 680px) { #expeditionPrepScreen .prep-content { grid-template-columns:1fr; } #expeditionPrepScreen .prep-column:nth-child(n) { grid-column:1; } }
   .prep-content::-webkit-scrollbar { width: 10px; }
   .prep-content::-webkit-scrollbar-track {
     background: rgba(5,14,12,.55);
@@ -1049,9 +1099,14 @@
   .boost-card .boost-check { position:absolute; top:4px; right:5px; color:#83f2b2; font-size:12px; }
   .boost-count { color:#f1cf79; font-size:12px; font-weight:800; }
   .prep-actions {
+    position: sticky;
+    bottom: 0;
     display: flex;
     gap: 10px;
-    padding: 0 0 4px;
+    padding: 12px 8px 10px;
+    margin: 4px -2px 0;
+    background: linear-gradient(rgba(8,20,17,0) 0%, rgba(8,20,17,.94) 34%);
+    z-index: 6;
   }
   .prep-actions .start-expedition-btn { flex: 1; }
   .secondary-btn {

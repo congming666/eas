@@ -265,5 +265,10 @@ Object.assign(Expedition.prototype, {
       }
       arr.length = w;
     }
+    if (this.combatFeedback) {
+      let w = 0;
+      for (const f of this.combatFeedback) { f.life -= dt; f.y -= 22 * dt; if (f.life > 0) this.combatFeedback[w++] = f; }
+      this.combatFeedback.length = w;
+    }
   },
 });

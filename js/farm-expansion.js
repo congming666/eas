@@ -191,7 +191,7 @@
     { id:'flour', name:'面粉', icon:'🌾', inputCrop:'wheat', inputQty:3, outputId:'flour', outputName:'面粉', outputIcon:'🥛', outputQty:1, time:20, workshopLevel:1, desc:'小麦→面粉，可做面包' },
     { id:'bread', name:'面包', icon:'🍞', inputCrop:'flour', inputQty:2, outputId:'bread', outputName:'面包', outputIcon:'🍞', outputQty:1, time:30, workshopLevel:2, desc:'面粉→面包，远征回血+80' },
     { id:'oil', name:'植物油', icon:'🌻', inputCrop:'sunflower', inputQty:3, outputId:'oil', outputName:'植物油', outputIcon:'🫒', outputQty:1, time:25, workshopLevel:1, desc:'向日葵→植物油' },
-    { id:'torch', name:'火把', icon:'🔥', inputCrop:'oil', inputQty:2, outputId:'torch', outputName:'火把', outputIcon:'🔥', outputQty:1, time:25, workshopLevel:2, desc:'植物油→火把，远征迷雾视野+' },
+    { id:'torch', name:'火把', icon:'🔥', inputCrop:'oil', inputQty:2, outputId:'torch', outputName:'火把', outputIcon:'🔥', outputQty:1, time:25, workshopLevel:1, desc:'油莎草收获植物油；2份植物油制作1支火把' },
     { id:'juice', name:'西瓜汁', icon:'🧃', inputCrop:'watermelon', inputQty:2, outputId:'juice', outputName:'西瓜汁', outputIcon:'🧃', outputQty:1, time:15, workshopLevel:1, desc:'西瓜→果汁，远征能量上限+' },
     { id:'feed', name:'饲料', icon:'🌽', inputCrop:'corn', inputQty:3, outputId:'feed', outputName:'饲料', outputIcon:'🥣', outputQty:1, time:20, workshopLevel:1, desc:'玉米→饲料，养鸡下蛋' },
     { id:'egg', name:'鸡蛋', icon:'🥚', inputCrop:'feed', inputQty:2, outputId:'egg', outputName:'鸡蛋', outputIcon:'🥚', outputQty:2, time:40, workshopLevel:2, desc:'饲料→鸡蛋，远征buff食物' },
@@ -201,6 +201,8 @@
   const FarmProcessingSystem = {
     getRecipe(id) { return Recipes.find(r => r.id === id); },
     startProcessing(recipeId, qty=1) {
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) return false;
+      if (GameState.processingQueue.length >= 6) { showToast('加工队列已满（6项）', 'warning'); return false; }
       const recipe = this.getRecipe(recipeId);
       if (!recipe) return false;
       if (recipe.workshopLevel > GameState.workshopLevel) { showToast('需要工坊等级 ' + recipe.workshopLevel, 'warning'); return false; }
@@ -217,7 +219,7 @@
         }
       } else {
         const have = Warehouse.getCount(recipe.inputCrop);
-        if (have < recipe.inputQty * qty) { showToast('原料不足：需要 ' + (recipe.inputQty*qty) + ' ' + recipe.inputCrop, 'warning'); return false; }
+        if (have < recipe.inputQty * qty) { showToast('原料不足：需要 ' + (recipe.inputQty*qty) + ' ' + (CONFIG.warehouseItems[recipe.inputCrop]?.name || recipe.inputCrop), 'warning'); return false; }
         Warehouse.removeItem(recipe.inputCrop, recipe.inputQty * qty);
       }
       GameState.processingQueue.push({ recipeId, remaining: recipe.time, total: recipe.time, qty });
@@ -228,14 +230,17 @@
     tick(dt) {
       for (let i = GameState.processingQueue.length-1; i >= 0; i--) {
         const job = GameState.processingQueue[i];
-        job.remaining -= dt;
+        job.remaining -= dt * (1 + Math.min(5, Math.max(0, GameState.buildings?.workshop?.level || 0)) * 0.1);
         if (job.remaining <= 0) {
           const recipe = this.getRecipe(job.recipeId);
           if (recipe) {
             const outN = recipe.outputQty * job.qty;
+            const resourceOutput = window.CONFIG?.resources?.[recipe.outputId];
+            if (!resourceOutput && Warehouse.getFreeCapacity() < outN) { job.remaining = 0; job.awaitingSpace = true; continue; }
+            job.awaitingSpace = false;
             if (window.ResourceSystem && window.CONFIG && CONFIG.resources && CONFIG.resources[recipe.outputId]) ResourceSystem.add(recipe.outputId, outN);
             else Warehouse.addItem(recipe.outputId, outN);
-            if (recipe.outputId === 'pumpkin_lantern') GameState.farmBeauty += 5;
+            if (recipe.outputId === 'pumpkin_lantern') GameState.farmBeauty += 5 * job.qty;
             if (window.Telemetry) Telemetry.track('workshop_craft', { recipeId: job.recipeId, qty: job.qty });
             showToast('加工完成：' + recipe.outputName + ' ×' + (recipe.outputQty*job.qty), 'gold');
           }

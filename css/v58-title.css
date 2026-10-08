@@ -1,49 +1,47 @@
-/* =========================================================================
- * v5.8 标题 / 启动界面改造（TITLE 代理专属）
- * 只做：删除三行提示文字、放大中央标题主视觉、隐藏 DOM 渐变字形
- * （「荒野远征」改由 js/nebula-text.js 的粒子汇聚构成）。
- * 不改动 index.html 与 style.css。
- * ========================================================================= */
-
-/* 1) 删除顶栏副标：星云序章 · 拖拽旋转 · 悬浮聚光 */
-.nebula-topbar .nebula-brand-meta {
-  display: none !important;
-}
-
-/* 2) 删除整行 v5.7 天气副标题 */
-.nebula-card .nebula-ver {
-  display: none !important;
-}
-
-/* 3) 删除最底部操作提示 */
-#mainMenu .nebula-hint {
-  display: none !important;
-}
-
-/* 4) 中央主视觉更大更聚焦 */
-.nebula-card {
-  width: min(620px, 92%) !important;
-  padding: 58px 64px 44px !important;
-}
-.nebula-title {
-  font-size: 96px !important;
-  letter-spacing: 18px !important;
-  line-height: 1.04 !important;
-  margin-bottom: 12px !important;
-}
-@media (max-width: 760px) {
-  .nebula-card { padding: 40px 26px 30px !important; }
-  .nebula-title { font-size: 56px !important; letter-spacing: 10px !important; }
-}
-
-/* 5) 隐藏 DOM 字形，完全由 canvas 粒子汇聚构成；
- *    粒子加量加亮，确保字形醒目。 */
-#mainMenu .nebula-title.nebula-glow {
-  background: none !important;
-  -webkit-background-clip: border-box !important;
-  background-clip: border-box !important;
-  color: transparent !important;
-  -webkit-text-fill-color: transparent !important;
-  text-shadow: none !important;
-  filter: none !important;
-}
+/* 首页：稳定实字、无框构图、麦金主按钮。 */
+#mainMenu { background:radial-gradient(ellipse at 50% 46%,rgba(4,14,19,.82),rgba(5,17,20,.22) 60%,rgba(4,13,17,.5)) !important; isolation:isolate; }
+#nebulaBg { background:radial-gradient(ellipse at 16% 76%,#173c2e 0%,transparent 60%),radial-gradient(ellipse at 78% 22%,#142a40 0%,#07151c 70%); }
+#gameContainer:has(#mainMenu:not(.hidden)) #nebulaCanvas { opacity:.38; }
+#mainMenu .nebula-card { width:min(690px,94%);padding:42px 30px;background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0; }
+#mainMenu .nebula-topbar { background:none;border:0;backdrop-filter:none;padding:26px 32px; }
+#mainMenu .nebula-brand { color:#bac7bb;font-size:13px;letter-spacing:2px;text-shadow:none;font-weight:500; }
+.nebula-brand span { color:#9e8755;padding:0 9px; }
+#mainMenu .nebula-brand-meta,#mainMenu .nebula-hint { display:none; }
+#mainMenu .nebula-eyebrow { background:none;color:#9bafac;-webkit-text-fill-color:#9bafac;filter:none;font-size:10px;letter-spacing:5px;margin-bottom:18px; }
+#mainMenu .nebula-title.nebula-glow { background:none;color:#f3ecd7;-webkit-text-fill-color:#f3ecd7;filter:none;text-shadow:0 3px 18px rgba(0,0,0,.45),0 0 35px rgba(220,185,107,.12);font-family:"Noto Serif SC","Songti SC","SimSun",serif;font-weight:700;font-size:clamp(42px,7.5vw,88px);letter-spacing:.12em;line-height:1.2;margin:0 0 22px;padding-left:.12em;white-space:nowrap; }
+#mainMenu .nebula-sub { color:#a9bbb3;font-size:13px;letter-spacing:3px;text-shadow:none;margin-bottom:36px; }
+#mainMenu .nebula-btn { width:286px;min-height:52px;border-radius:8px;letter-spacing:4px;font-size:16px;backdrop-filter:none;transition:background .2s,transform .2s,box-shadow .2s; }
+#mainMenu .nebula-btn .nebula-glow { background:none;color:inherit;-webkit-text-fill-color:currentColor;filter:none;text-shadow:none; }
+#mainMenu .title-primary { background:linear-gradient(110deg,#e4cb8b,#bd9a53);color:#202b22;border:1px solid #ecd8a1;box-shadow:0 6px 28px #0005,0 0 28px #ceae5820; }
+#mainMenu .title-primary:hover { background:linear-gradient(110deg,#f1dda7,#d0ae67);color:#18231d;border-color:#f4e3b7;box-shadow:0 8px 30px #caaa5330;transform:translateY(-2px); }
+#mainMenu .title-secondary { background:transparent;border:1px solid #93aa9c33;color:#b5c7bc;box-shadow:none;font-size:13px;margin-top:12px; }
+#mainMenu .title-secondary:hover { background:#9ab69e10;color:#f0e8d3;border-color:#a6b79977;box-shadow:none;transform:translateY(-1px); }
+#mainMenu button:focus-visible,#audioControl summary:focus-visible,#audioControl button:focus-visible { outline:2px solid #edd79d;outline-offset:5px; }
+.title-version { position:absolute;right:25px;bottom:23px;font-size:11px;color:#90a39e;letter-spacing:2px; }
+.title-homestead { position:absolute;right:1%;bottom:2%;width:min(38%,390px);pointer-events:none;opacity:.7; }
+.title-window { filter:drop-shadow(0 0 7px #eea14a); }
+#gameContainer:has(#mainMenu:not(.hidden)) #audioControl { left:24px;bottom:18px;background:#07161480;border:1px solid #abc1ab24;box-shadow:none;gap:16px;border-radius:7px; }
+#gameContainer:has(#mainMenu:not(.hidden)) #musicToggle { color:#afc1b5;text-shadow:none;font-size:12px; }
+.title-settings { position:relative;font-size:12px;color:#afc1b5; }
+.title-settings summary { cursor:pointer;list-style:none;padding:5px 0; }
+.title-settings summary::-webkit-details-marker { display:none; }
+.title-settings-panel { position:absolute;bottom:36px;left:-90px;width:205px;display:grid;gap:14px;padding:18px;background:#10251f;border:1px solid #637967;border-radius:10px;box-shadow:0 12px 36px #0007; }
+.title-settings-panel input[type=range] { width:100%;accent-color:#d8ba76; }
+.title-motion-option { display:flex;align-items:center;gap:8px; }
+.title-motion-option input { accent-color:#d8ba76; }
+body.title-reduced-motion #nebulaTextFx,body.title-reduced-motion #gameContainer:has(#mainMenu:not(.hidden)) #nebulaCanvas { display:none !important; }
+@media(max-width:600px) { #mainMenu .nebula-card {padding:65px 12px 75px;} #mainMenu .nebula-topbar {padding:18px;} #mainMenu .nebula-brand {font-size:11px;} #mainMenu .nebula-eyebrow {font-size:9px;letter-spacing:3px;} #mainMenu .nebula-sub {font-size:11px;letter-spacing:1px;} #mainMenu .nebula-btn {width:min(260px,84vw);} .title-homestead {width:52%;bottom:6%;opacity:.5;} .title-version {right:16px;bottom:23px;} #gameContainer:has(#mainMenu:not(.hidden)) #audioControl {left:14px;gap:10px;} }
+@media(max-height:520px) { #mainMenu .nebula-card {padding:48px 16px;} #mainMenu .nebula-title.nebula-glow {font-size:44px;margin-bottom:10px;} #mainMenu .nebula-sub {margin-bottom:14px;} #mainMenu .nebula-btn {min-height:40px;padding:8px 20px;margin:4px 0;} #mainMenu .nebula-eyebrow {margin-bottom:8px;} }
+@media(prefers-reduced-motion:reduce) { #nebulaTextFx {display:none;} #gameContainer:has(#mainMenu:not(.hidden)) #nebulaCanvas {display:none;} #mainMenu .nebula-btn {transition:none;} }
+/* 首页入口优先于全局玻璃按钮主题。 */
+#mainMenu .title-primary { background:linear-gradient(110deg,#e4cb8b,#bd9a53) !important;color:#202b22 !important;border:1px solid #ecd8a1 !important;box-shadow:0 6px 28px #0005,0 0 28px #ceae5820 !important; }
+#mainMenu .title-primary:hover { background:linear-gradient(110deg,#f1dda7,#d0ae67) !important;color:#18231d !important; }
+#mainMenu .title-secondary { background:transparent !important;color:#b5c7bc !important;border:1px solid #93aa9c33 !important;box-shadow:none !important; }
+#mainMenu .title-secondary:hover { background:#9ab69e10 !important;color:#f0e8d3 !important; }
+#gameContainer:has(#mainMenu:not(.hidden)) #nebulaCanvas {opacity:.16;mask-image:radial-gradient(ellipse at 50% 54%,#0003 0%,#0008 38%,#000 78%);}
+/* 星海与彩色流星位于文字和交互控件背后。 */
+#titleStarfield {position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;mask-image:radial-gradient(ellipse at 50% 49%,#0005 0%,#0009 22%,#000 55%);}
+#mainMenu .title-homestead {z-index:1;}
+#mainMenu .title-version {z-index:5;}
+#gameContainer:has(#mainMenu:not(.hidden)) #nebulaCanvas {opacity:.28;}
+#nebulaBg {background:radial-gradient(ellipse at 12% 75%,#173f36 0%,transparent 58%),radial-gradient(ellipse at 85% 18%,#223252 0%,transparent 55%),#07121e;}

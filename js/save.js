@@ -12,7 +12,7 @@ const SaveSystem = {
       // seeds 必须是对象（旧存档可能误存为数字）
       GameState.seeds = (data.seeds && typeof data.seeds === 'object' && !Array.isArray(data.seeds)) ? data.seeds : (GameState.seeds || {});
       GameState.materials = (data.materials && typeof data.materials === 'object') ? data.materials : (GameState.materials || {});
-      GameState.unlockedPlots = clamp(Number(data.unlockedPlots) || 8, 8, 36);
+      GameState.unlockedPlots = clamp(Number(data.unlockedPlots) || 16, 16, 48);
       GameState.selectedMap = CONFIG.maps.some(map => map.id === data.selectedMap) ? data.selectedMap : 't1_1';
       GameState.selectedWeapon = CONFIG.weapons.some(weapon => weapon.id === data.selectedWeapon)
         ? data.selectedWeapon : 'harvest_sickle';
@@ -20,7 +20,19 @@ const SaveSystem = {
       GameState.unlockedCrops = Array.isArray(data.unlockedCrops)
         ? [...new Set(['wheat', 'ningqi_grass', 'tinder_grass', ...data.unlockedCrops.filter(id => CONFIG.crops.some(crop => crop.id === id))])]
         : ['wheat', 'ningqi_grass'];
-      GameState.loadout = { ...GameState.loadout, ...(data.loadout || {}) };
+      // loadout：替换而非合并，并清洗非法 id / 超限数量（修复历史脏数据与旧默认值）
+      const _rawLo = (data.loadout && typeof data.loadout === 'object') ? data.loadout : {};
+      const _validLoIds = new Set((CONFIG.consumables || []).map(c => c.id));
+      const _cleanLo = {};
+      let _loTypes = 0;
+      Object.keys(_rawLo).forEach(_id => {
+        if (!_validLoIds.has(_id)) return;
+        const _n = Math.max(0, Math.floor(Number(_rawLo[_id]) || 0));
+        if (_n <= 0 || _loTypes >= 6) return;
+        _cleanLo[_id] = Math.min(_n, 5);
+        _loTypes++;
+      });
+      GameState.loadout = _cleanLo;
       GameState.farmItems = { ...GameState.farmItems, ...(data.farmItems || {}) };
       GameState.skillLevels = { ...GameState.skillLevels, ...(data.skillLevels || {}) };
       // v5.0 修行台 / 技能 / 档案 / 收获统计
@@ -41,6 +53,8 @@ const SaveSystem = {
         item: (data.collection.item && typeof data.collection.item === 'object') ? data.collection.item : {},
         seed: (data.collection.seed && typeof data.collection.seed === 'object') ? data.collection.seed : {}
       } : { skill: {}, item: {}, seed: {} };
+      GameState.blueprints = Array.isArray(data.blueprints) ? data.blueprints.filter(id => CONFIG.weapons.some(w => w.id === id && w.blueprint)) : [];
+      GameState.expBoost = !!data.expBoost;
       GameState.ownedBlueprints = Array.isArray(data.ownedBlueprints) ? data.ownedBlueprints.slice() : [];
       GameState.safeBoxSlots = clamp(Number(data.safeBoxSlots) || 1, 1, 3);
       GameState.hardcoreFullLoss = !!data.hardcoreFullLoss;
@@ -201,6 +215,8 @@ const SaveSystem = {
         defenseLoadout: Array.isArray(GameState.defenseLoadout) ? GameState.defenseLoadout : [],
         // v5.8 卡牌系统字段
         collection: GameState.collection || { skill: {}, item: {}, seed: {} },
+        blueprints: Array.isArray(GameState.blueprints) ? GameState.blueprints : [],
+        expBoost: !!GameState.expBoost,
         ownedBlueprints: Array.isArray(GameState.ownedBlueprints) ? GameState.ownedBlueprints : [],
         safeBoxSlots: GameState.safeBoxSlots || 1,
         hardcoreFullLoss: !!GameState.hardcoreFullLoss,

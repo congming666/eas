@@ -56,7 +56,7 @@
         </div>
         <div class="npc-actions">
           <button onclick="NpcSystemUI.talk('${npcId}')" class="npc-action-btn">再聊一句</button>
-          <button onclick="NpcSystemUI.gift('${npcId}')" class="npc-action-btn">送礼（小麦+2）</button>
+          <button onclick="NpcSystemUI.gift('${npcId}')" class="npc-action-btn">送礼（消耗小麦 ×2）</button>
           ${dlg.category === 'quest_offer' ? `<button onclick="NpcSystemUI.acceptQuest('${npcId}','${dlg.questId}')" class="npc-action-btn npc-quest-btn">接受任务</button>` : ''}
         </div>
         <div class="npc-rewards">
@@ -67,12 +67,12 @@
     },
 
     gift(npcId) {
-      if (GameState.gold >= 10) {
-        GameState.gold -= 10;
+      if (Warehouse.removeItem('wheat', 2)) {
         NpcSystem.giveGift(npcId, 'wheat');
         this.talk(npcId);
         if (typeof Farm !== 'undefined') Farm.render();
-      } else showToast('金币不足（送礼需10金币）', 'warning');
+              SaveSystem.save();
+      } else showToast('小麦不足（送礼需要2份小麦）', 'warning');
     },
 
     acceptQuest(npcId, questId) {
@@ -111,7 +111,7 @@
           <div class="building-info">
             <div class="building-name">${b.name} Lv.${level}/${b.maxLevel}</div>
             <div class="building-desc">${b.description}</div>
-            <div class="building-effect">${b.effects[Math.min(level, b.effects.length - 1)].desc}</div>
+            <div class="building-effect">${level ? '当前：' + b.effects[level - 1].desc : '尚未建造'}${cost ? ' · 下级：' + b.effects[level].desc : ''}</div>
           </div>
           ${cost ? `<button class="building-upgrade-btn" onclick="TechSystemUI.upgrade('${b.id}')">升级<br>${cost.gold}💰 ${cost.materials}📦</button>` : '<div class="building-max">已满级</div>'}
         `;
@@ -122,6 +122,7 @@
     upgrade(id) {
       if (TechSystem.upgradeBuilding(id)) {
         this._renderBuildings();
+        SaveSystem.save();
         if (typeof Farm !== 'undefined') Farm.render();
       }
     },

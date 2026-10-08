@@ -192,7 +192,7 @@ const Greenhouse = {
       showToast('请选择要种植的稀有植物', 'warning');
       return;
     }
-    if (!GameState.greenhouse.unlockedPlants.includes(plant.id)) {
+    if (!this.isV58Plant(plant.id) && !GameState.greenhouse.unlockedPlants.includes(plant.id)) {
       showToast(`${plant.name}尚未解锁`, 'warning');
       return;
     }
@@ -229,6 +229,8 @@ const Greenhouse = {
           amount = randInt(drop.amount[0], drop.amount[1]);
         } else if (typeof drop.amount === 'number') {
           amount = drop.amount;
+        } else if (Number.isFinite(drop.min) && Number.isFinite(drop.max)) {
+          amount = randInt(drop.min, drop.max);
         }
 
         if (drop.id === 'gold') {
@@ -243,7 +245,7 @@ const Greenhouse = {
           // v5.0 修为类产物直接转化为修为
           const _gd = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
           if (_gd && _gd.type === 'cultivation' && window.CharacterSystem) {
-            const _cult = (_gd.cult || 0) * amount;
+            const _cult = (_gd.cult ?? _gd.value ?? 0) * amount;
             CharacterSystem.addExp(_cult);
             rewards.push(`修为+${_cult}`);
           } else {
@@ -259,7 +261,7 @@ const Greenhouse = {
 
     // 小概率解锁新植物
     if (plant.rarity === 'legendary' && Math.random() < 0.15) {
-      const locked = CONFIG.greenhousePlants.filter(p => !GameState.greenhouse.unlockedPlants.includes(p.id));
+      const locked = CONFIG.greenhousePlants.filter(p => !this.isV58Plant(p.id) && !GameState.greenhouse.unlockedPlants.includes(p.id));
       if (locked.length > 0) {
         const newPlant = locked[randInt(0, locked.length - 1)];
         GameState.greenhouse.unlockedPlants.push(newPlant.id);
@@ -338,9 +340,10 @@ const Greenhouse = {
         this.useRareSeedPack();
         return;
       case 'exp_boost_card':
+        if (GameState.expBoost) { showToast('已有修为加成待使用', 'warning'); return; }
         Warehouse.removeItem(itemId, 1);
         GameState.expBoost = true;
-        showToast('经验加成已激活，下次远征击杀经验+50%', 'success');
+        showToast('经验加成已激活，下次成功撤离修为+50%（失败保留）', 'success');
         break;
       case 'weapon_upgrade_stone':
         Warehouse.removeItem(itemId, 1);
@@ -381,7 +384,8 @@ const Greenhouse = {
 
   // 使用稀有种子包
   useRareSeedPack() {
-    const locked = CONFIG.greenhousePlants.filter(p => !GameState.greenhouse.unlockedPlants.includes(p.id));
+    if (Warehouse.getCount('rare_seed_pack') <= 0) return;
+    const locked = CONFIG.greenhousePlants.filter(p => !this.isV58Plant(p.id) && !GameState.greenhouse.unlockedPlants.includes(p.id));
     if (locked.length === 0) {
       showToast('所有稀有植物都已解锁', 'warning');
       return;

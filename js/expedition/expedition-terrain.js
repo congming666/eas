@@ -7,7 +7,7 @@ Object.assign(Expedition.prototype, {
 
   updateVision() {
     const cell = this.visionCellSize;
-    const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
+    const radius = this.visionRadius * (this.eventModifiers?.vision || 1) * this.getTerrainAt(this.player.x, this.player.y).visionMul;
     const minX = Math.max(0, Math.floor((this.player.x - radius) / cell));
     const maxX = Math.min(Math.ceil(CONFIG.expedition.mapSize / cell), Math.ceil((this.player.x + radius) / cell));
     const minY = Math.max(0, Math.floor((this.player.y - radius) / cell));
@@ -25,13 +25,13 @@ Object.assign(Expedition.prototype, {
   },
 
   isWorldVisible(x, y) {
-    const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
+    const radius = this.visionRadius * (this.eventModifiers?.vision || 1) * this.getTerrainAt(this.player.x, this.player.y).visionMul;
     // 实时视野：离开当前视野后，所有地图实体都隐藏。
     return dist({ x, y }, this.player) <= radius;
   },
 
   renderFogOfWar(ctx) {
-    const radius = this.visionRadius * (this.eventModifiers?.vision || 1);
+    const radius = this.visionRadius * (this.eventModifiers?.vision || 1) * this.getTerrainAt(this.player.x, this.player.y).visionMul;
     const fogCtx = this.fogCanvas.getContext('2d');
     if (this.fogDirty) {
       fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
@@ -86,85 +86,7 @@ Object.assign(Expedition.prototype, {
     const size = CONFIG.expedition.mapSize;
     const theme = this.map.terrain;
 
-    // 出生区固定地标，确保玩家进入地图就能感知地形差异。
-    this.terrainRoads.push(
-      { x1: -100, y1: 470, cx: size * .46, cy: 650, x2: size + 100, y2: 560, width: 62 },
-    );
-    this.terrainPatches.push({
-      x: 1030, y: 360, rx: 185, ry: 120, rotation: -0.18, type: 'water',
-      color: theme.water, alpha: 0.46, phase: 0.8,
-    });
-    this.terrainFields.push({ x: 390, y: 250, w: 360, h: 235, rotation: 0.03, ruined: this.map.tier >= 3 });
-
-    for (let i = 0; i < Math.max(1, this.map.tier - 1); i++) {
-      const horizontal = i % 2 === 0;
-      this.terrainRoads.push(horizontal
-        ? { x1: -100, y1: rand(260, size - 260), cx: size * .5, cy: rand(240, size - 240), x2: size + 100, y2: rand(260, size - 260), width: rand(46, 72) }
-        : { x1: rand(260, size - 260), y1: -100, cx: rand(240, size - 240), cy: size * .5, x2: rand(260, size - 260), y2: size + 100, width: rand(46, 72) });
-    }
-
-    for (let i = 0; i < 12 + this.map.tier * 3; i++) {
-      const waterChance = (0.14 + this.map.tier * 0.015) * (this.map.waterHeavy ? 2.2 : 1);
-      const type = Math.random() < waterChance ? 'water' : (Math.random() < 0.5 ? 'soil' : 'grass');
-      this.terrainPatches.push({
-        x: rand(100, size - 100), y: rand(100, size - 100),
-        rx: rand(90, 260), ry: rand(65, 190), rotation: rand(0, Math.PI), type,
-        color: type === 'water' ? theme.water : (type === 'soil' ? theme.soil : theme.glow),
-        alpha: type === 'grass' ? 0.07 : (type === 'water' ? 0.42 : 0.34),
-        phase: rand(0, Math.PI * 2),
-      });
-    }
-
-    for (let i = 0; i < 3 + this.map.tier; i++) {
-      this.terrainFields.push({
-        x: rand(120, size - 520), y: rand(120, size - 420),
-        w: rand(230, 470), h: rand(150, 330), rotation: rand(-0.16, 0.16),
-        ruined: Math.random() < this.map.tier * 0.16,
-      });
-    }
-
-    const groundDetails = this.map.tier <= 2 ? ['grass', 'pebble', 'straw'] : ['crack', 'pebble', 'blight'];
-    for (let i = 0; i < 30 + this.map.tier * 8; i++) {
-      this.terrainDecor.push({
-        x: rand(50, size - 50), y: rand(50, size - 50),
-        kind: groundDetails[randInt(0, groundDetails.length - 1)],
-        size: randInt(5, 13), alpha: rand(0.18, 0.42), rotation: rand(0, Math.PI * 2),
-      });
-    }
-
-    const obstacleTypes = [
-      ['tree', 'bush', 'rock', 'hay', 'fence'],
-      ['tree', 'bush', 'rock', 'hay', 'fence', 'ruin'],
-      ['deadTree', 'rock', 'ruin', 'toxicCrystal', 'fence'],
-      ['deadTree', 'rock', 'monolith', 'voidCrystal', 'ruin'],
-    ][this.map.tier - 1];
-    for (let i = 0; i < 22 + this.map.tier * 7; i++) {
-      let x = rand(120, size - 120), y = rand(120, size - 120);
-      let attempts = 0;
-      while (dist({x, y}, this.player) < 260 && attempts++ < 12) {
-        x = rand(120, size - 120); y = rand(120, size - 120);
-      }
-      const type = obstacleTypes[randInt(0, obstacleTypes.length - 1)];
-      const scales = { tree:1.1, bush:.88, deadTree:1.05, rock:.9, hay:.9, fence:1.15, ruin:1.25, toxicCrystal:1, voidCrystal:1.05, monolith:1.25 };
-      const scale = (scales[type] || 1) * rand(.78, 1.22);
-      const footprint = { tree:32, bush:26, rock:19, hay:20, fence:26, ruin:25, deadTree:28, toxicCrystal:16, voidCrystal:16, monolith:19 };
-      // 植物类碰撞盒扩大到覆盖视觉树冠/灌木本体，避免玩家角色“钻”进植物里。
-      // 数值以精灵图不透明像素包围盒为准：树冠半宽约43、灌木约13、枯树约21（scale=1）。
-      const footprintShape = {
-        tree: { rx: 52, ry: 32, offsetY: 4 },
-        bush: { rx: 34, ry: 24, offsetY: 4 },
-        rock: { rx: 23, ry: 15, offsetY: 3 },
-        deadTree: { rx: 38, ry: 26, offsetY: 3 },
-      }[type];
-      this.obstacles.push({
-        type, x, y, scale, radius: (footprint[type] || 18) * scale,
-        collisionRx: footprintShape?.rx * scale,
-        collisionRy: footprintShape?.ry * scale,
-        collisionOffsetY: (footprintShape?.offsetY || 0) * scale,
-        rotation: rand(-.16, .16)
-      });
-    }
-
+    this.generateTerrainRegions();
     const trapCatalog = [
       { type: 'thorn', name: '荆棘丛', icon: '🌵', color: '#85c85d', radius: 34, damage: 8, cooldown: 1.4, slow: 1.1 },
       { type: 'bear', name: '捕兽夹', icon: '⚙️', color: '#e5b65a', radius: 26, damage: 18, cooldown: 3.5, slow: 2.2 },
@@ -187,27 +109,34 @@ Object.assign(Expedition.prototype, {
     // 使用 chunk canvas 实际尺寸，而非全局画布尺寸（修复全黑问题）
     const viewW = ctx.canvas.width || CONFIG.canvas.width;
     const viewH = ctx.canvas.height || CONFIG.canvas.height;
-    // v3.5 优先画地图背景图，没有图才用纯色
-    let usedBgImage = false;
-    if (this.mapBgLoaded && this.mapBgImg && this.mapBgImg.complete && this.mapBgImg.naturalWidth > 0) {
-      const iw = this.mapBgImg.naturalWidth, ih = this.mapBgImg.naturalHeight;
-      const scale = Math.max(viewW / iw, viewH / ih);
-      const dw = iw * scale, dh = ih * scale;
-      const offX = -((cam.x * 0.5) % dw);
-      const offY = -((cam.y * 0.5) % dh);
-      ctx.globalAlpha = 0.85;
-      for (let x = offX - dw; x < viewW + dw; x += dw) {
-        for (let y = offY - dh; y < viewH + dh; y += dh) {
-          ctx.drawImage(this.mapBgImg, x, y, dw, dh);
+    // 地表完全由世界区域生成；不再使用有视差的整幅背景作为地面。
+    ctx.fillStyle = '#405638';
+    ctx.fillRect(0, 0, viewW, viewH);
+    this.renderTerrainRegions(ctx, cam);
+
+    // 稳定的世界空间地表纹理：不随屏幕重复，提供草地颗粒、泥点和小石块层次。
+    ctx.save();
+    const cell = 46;
+    const sx0 = Math.floor(cam.x / cell) - 1, sy0 = Math.floor(cam.y / cell) - 1;
+    for (let gy = sy0; gy < sy0 + Math.ceil(viewH / cell) + 3; gy++) {
+      for (let gx = sx0; gx < sx0 + Math.ceil(viewW / cell) + 3; gx++) {
+        const seed = Math.abs((gx * 928371 + gy * 689287) | 0);
+        const px = gx * cell + (seed % 31), py = gy * cell + ((seed >>> 5) % 29);
+        const x = px - cam.x, y = py - cam.y;
+        if (x < -20 || y < -20 || x > viewW + 20 || y > viewH + 20) continue;
+        const kind = seed % 5;
+        ctx.globalAlpha = 0.08 + (seed % 4) * 0.018;
+        if (kind < 2) {
+          ctx.strokeStyle = theme.glow; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x - 3, y + 4); ctx.lineTo(x, y - 4); ctx.lineTo(x + 4, y + 2); ctx.stroke();
+        } else if (kind === 2) {
+          ctx.fillStyle = '#5f503a'; ctx.beginPath(); ctx.ellipse(x, y, 3 + seed % 3, 1.5, 0.2, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillStyle = theme.path; ctx.beginPath(); ctx.arc(x, y, 2 + seed % 3, 0, Math.PI * 2); ctx.fill();
         }
       }
-      ctx.globalAlpha = 1;
-      usedBgImage = true;
     }
-    if (!usedBgImage) {
-      ctx.fillStyle = this.map.bgColor;
-      ctx.fillRect(0, 0, viewW, viewH);
-    }
+    ctx.restore();
 
     // Continuous grass field: 用全局坐标算散点，避免 chunk 拼接处出现接缝
     ctx.save();
@@ -227,11 +156,6 @@ Object.assign(Expedition.prototype, {
       if (x < -20 || x > viewW + 20 || y < -20 || y > viewH + 20) continue;
       ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + 3, y - 3); ctx.stroke();
     }
-    const light = ctx.createLinearGradient(0, 0, 0, viewH);
-    light.addColorStop(0, 'rgba(255,255,255,.045)');
-    light.addColorStop(0.52, 'rgba(255,255,255,0)');
-    light.addColorStop(1, 'rgba(0,0,0,.18)');
-    ctx.globalAlpha = 1; ctx.fillStyle = light; ctx.fillRect(0, 0, viewW, viewH);
     ctx.restore();
 
     this.terrainPatches.forEach(patch => {
@@ -346,38 +270,6 @@ Object.assign(Expedition.prototype, {
     });
 
     // v3.7 绘制高低差区域
-    if (this.heightZones) {
-      this.heightZones.forEach(z => {
-        const sx = z.x - cam.x, sy = z.y - cam.y;
-        if (sx < -z.r || sx > viewW + z.r || sy < -z.r || sy > viewH + z.r) return;
-        const g = ctx.createRadialGradient(sx, sy, z.r * 0.2, sx, sy, z.r);
-        if (z.type === 'high') {
-          g.addColorStop(0, 'rgba(255,220,140,0.18)');
-          g.addColorStop(1, 'rgba(255,220,140,0)');
-        } else {
-          g.addColorStop(0, 'rgba(80,60,40,0.22)');
-          g.addColorStop(1, 'rgba(80,60,40,0)');
-        }
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(sx, sy, z.r, 0, Math.PI * 2);
-        ctx.fill();
-        // 边框圈
-        ctx.strokeStyle = z.type === 'high' ? 'rgba(255,220,140,0.4)' : 'rgba(80,60,40,0.4)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.arc(sx, sy, z.r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      });
-    }
-
-    const vignette = ctx.createRadialGradient(viewW / 2, viewH / 2, 170, viewW / 2, viewH / 2, 720);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,.12)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, viewW, viewH);
   },
 
   renderTerrain(ctx, cam) {
@@ -567,34 +459,17 @@ Object.assign(Expedition.prototype, {
   // v3.4 地图词条实际逻辑
   // v3.7 生成高低差区域（高地/洼地）
   generateHeightZones() {
-    const size = CONFIG.expedition.mapSize;
-    this.heightZones = [];
-    // 2-3 个高地（远程怪占，玩家上去射程+15%）
-    const numHigh = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numHigh; i++) {
-      const p = this.findSafeSpawn(200, size - 200, 100);
-      this.heightZones.push({ x: p.x, y: p.y, r: 90 + Math.random() * 50, type: 'high' });
-    }
-    // 2-3 个洼地（减速 30%）
-    const numLow = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numLow; i++) {
-      const p = this.findSafeSpawn(200, size - 200, 100);
-      this.heightZones.push({ x: p.x, y: p.y, r: 80 + Math.random() * 40, type: 'low' });
-    }
+    this.heightZones = this.terrainRegions.filter(r => r.type === 'highland').map(r => ({x:r.x,y:r.y,r:r.rx,type:'high'}));
   },
 
-  // 查询某点所在的高度区
   getHeightAt(x, y) {
-    if (!this.heightZones) return 'normal';
-    for (const z of this.heightZones) {
-      const d = Math.hypot(x - z.x, y - z.y);
-      if (d < z.r) return z.type;
-    }
-    return 'normal';
+    const id = this.getTerrainAt(x,y).id;
+    return id === 'highland' ? 'high' : id === 'mud' ? 'low' : 'normal';
   },
 
   // v3.7 打道具（油桶爆炸/木箱掉钱）
   damageProp(pr, dmg) {
+    if (!pr || pr.destroyed || !Number.isFinite(dmg) || dmg <= 0) return;
     pr.hp -= dmg;
     this.spawnAoeEffect(pr.x, pr.y, 20, '#aaa');
     if (pr.hp <= 0) {
@@ -611,7 +486,7 @@ Object.assign(Expedition.prototype, {
         });
         // 对玩家也造成伤害（谨慎用）
         const pd = Math.hypot(this.player.x - pr.x, this.player.y - pr.y);
-        if (pd < 100) this.player.hp -= 15;
+        if (pd < 100) this.damagePlayer(15, { type: 'barrel', x: pr.x, y: pr.y });
         showToast('💥 油桶爆炸！', 'gold');
       } else if (pr.kind === 'crate') {
         // 掉钱
@@ -627,25 +502,9 @@ Object.assign(Expedition.prototype, {
 
   // v3.7 生成地标建筑（每张图 1 个独特锚点）
   generateLandmarks() {
-    const size = CONFIG.expedition.mapSize;
-    const tier = this.map.tier;
-    // 按 tier 选地标
-    const landmarkPool = {
-      1: ['dead_tree', 'windmill'],
-      2: ['stone_arch', 'dry_well'],
-      3: ['giant_sword', 'stone_circle'],
-    };
-    const pool = landmarkPool[tier] || landmarkPool[1];
-    const chosen = pool[Math.floor(Math.random() * pool.length)];
-    const p = this.findSafeSpawn(250, size - 250, 200);
-    this.landmarks = [{ type: chosen, x: p.x, y: p.y, size: 180 }];
-    // 预加载图片
-    this.landmarkImgs = this.landmarkImgs || {};
-    if (!this.landmarkImgs[chosen]) {
-      const img = new Image();
-      img.src = `assets/landmarks/${chosen}_t.png`;
-      this.landmarkImgs[chosen] = img;
-    }
+    // 无功能的大型贴图已停用，真实节点由 terrainLandmarks 管理。
+    this.landmarks = [];
+    this.landmarkImgs = {};
   },
 
   // v3.7 生成可交互道具（油桶/木箱/高草/骷髅/推车）
@@ -697,9 +556,11 @@ Object.assign(Expedition.prototype, {
   generatePatrols() {
     const size = CONFIG.expedition.mapSize;
     this.patrols = [];
-    const numPatrols = 2 + Math.floor(Math.random() * 2);
+    const isT1 = this.map.tier === 1;
+    // T1 教学图巡逻队更少（1-2 支），高 T 维持 2-3 支
+    const numPatrols = (isT1 ? 1 : 2) + Math.floor(Math.random() * 2);
     const monsterTypesByTier = {
-      1: ['boar', 'wolf', 'spider'],
+      1: ['boar', 'bat', 'spider'],
       2: ['boar', 'wolf', 'gargoyle', 'brute'],
       3: ['shadow', 'lava', 'brute', 'gargoyle'],
     };
@@ -760,14 +621,14 @@ Object.assign(Expedition.prototype, {
     if (id === 't1_4') {
       for (let i = 0; i < 22; i++) {
         const p = this.findSafeSpawn(150, size - 150, 28);
-        this.obstacles.push({ x: p.x, y: p.y, w: rand(36, 70), h: rand(36, 70), type: 'rock', hp: 999 });
+        this.obstacles.push({ x: p.x, y: p.y, radius: 28, collisionRx: 28, collisionRy: 20, scale: 1, rotation: 0, type: 'rock', hp: 999, projectileBlock: true });
       }
     }
     // T2_3 旧磨坊：多建筑障碍
     if (id === 't2_3') {
       for (let i = 0; i < 14; i++) {
         const p = this.findSafeSpawn(200, size - 200, 40);
-        this.obstacles.push({ x: p.x, y: p.y, w: rand(50, 90), h: rand(50, 90), type: 'building', hp: 999 });
+        this.obstacles.push({ x: p.x, y: p.y, radius: 38, collisionRx: 38, collisionRy: 26, scale: 1.3, rotation: 0, type: 'rock', hp: 999, projectileBlock: true });
       }
     }
     // T2_4 烟熏果园：怪物埋伏在玩家附近
@@ -855,12 +716,12 @@ Object.assign(Expedition.prototype, {
       if (this.map.tier >= 3) extraTypes.push('wolf');
       const pool = [...basicTypes, ...extraTypes];
       // v1.4 新怪按T级加入
-      if (this.map.tier >= 1) pool.push('treant');          // T1+ 树精
+      if (this.map.tier >= 2) pool.push('treant');          // 树精（T1 教学图不出现）
       if (this.map.tier >= 2) pool.push('gargoyle');       // T2+ 石像鬼
       if (this.map.tier >= 3) pool.push('shadow_demon');   // T3+ 影魔
       // v1.4 精英怪低概率直接生成
       if (this.map.tier >= 2 && Math.random() < 0.08) pool.push('stone_golem');
-      if (this.map.tier >= 1 && Math.random() < 0.06) pool.push('boar_king');
+      if (this.map.tier >= 2 && Math.random() < 0.06) pool.push('boar_king');
       // 反制兵种按T级固定混入（T2起：疾风狼/食草兽，T3+厚甲猪）
       const mix = CONFIG.counterMixes[this.map.tier - 1] || { swift_wolf: 0, herbivore: 0, armored_boar: 0 };
       ['swift_wolf', 'herbivore', 'armored_boar'].forEach(mt => {
@@ -958,6 +819,7 @@ Object.assign(Expedition.prototype, {
   },
 
   spawnBoss() {
+    if (this.elapsed < 368) { this.bossPending = true; return; }
     if (this.bossSpawned) return;
     this.bossSpawned = true;
     if (window.V5 && this.map.bossId) {
@@ -967,6 +829,7 @@ Object.assign(Expedition.prototype, {
     this.boss = {
       type:'boss', name:['苔岩裂颚兽','幽潮骨翼龙','霜脉巨灵','紫月灾兽'][this.map.tier-1],
       x:position.x, y:position.y, radius:46,
+      // 仅在 V5 不可用时使用统一 balance 兜底；正常 Boss 由 CONFIG.bosses + V5.makeBoss 创建。
       hp:this.balance.bossHp, maxHp:this.balance.bossHp,
       damage:this.balance.bossDamage, speed:76 + this.map.tier * 5,
       attackRange:70, attackCd:1.5, abilityCd:4, abilityIndex:0, phase:1, stunned:0,
@@ -1033,7 +896,7 @@ Object.assign(Expedition.prototype, {
       const sx = f.x - cam.x, sy = f.y - cam.y;
       if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
       const a = (f.life / 5) * 0.25;
-      ctx.fillStyle = 'rgba(60,45,30,' + a + ')';
+      ctx.fillStyle = f.material === 'water' ? 'rgba(160,225,240,'+a+')' : 'rgba(60,45,30,'+a+')';
       ctx.beginPath();
       ctx.ellipse(sx, sy, 6, 3, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1057,19 +920,10 @@ Object.assign(Expedition.prototype, {
       speed = CONFIG.player.sprintSpeed;
       this.player.energy -= CONFIG.player.sprintCost * dt;
     }
-    let terrainModifier = 1;
-    for (const patch of this.terrainPatches) {
-      const nx = (this.player.x - patch.x) / patch.rx;
-      const ny = (this.player.y - patch.y) / patch.ry;
-      if (nx * nx + ny * ny <= 1) {
-        if (patch.type === 'water') terrainModifier = Math.min(terrainModifier, 0.58);
-        else if (patch.type === 'soil') terrainModifier = Math.min(terrainModifier, 0.82);
-      }
-    }
+    const ground = this.getTerrainAt(this.player.x, this.player.y);
+    let terrainModifier = ground.moveMul;
     if (this.player.slow > 0) terrainModifier *= 0.56;
-    // v3.7 洼地减速
     const hz = this.getHeightAt(this.player.x, this.player.y);
-    if (hz === 'low') terrainModifier *= 0.7;
     // v5.4 贪婪成本：背包超重（>12 格）小幅降移速，最多 -12%
     let carryModifier = 1;
     if (typeof LoadoutSystem !== 'undefined' && this.bag && LoadoutSystem.usedSlots) {
@@ -1077,10 +931,22 @@ Object.assign(Expedition.prototype, {
       if (_used > 12) carryModifier = Math.max(0.82, 1 - 0.045 * (_used - 12));
     }
     speed *= terrainModifier * carryModifier;
+    const targetVx = dx * speed, targetVy = dy * speed;
+    const accel = len > 0 ? 11 : 15;
+    this.player.vx = lerp(this.player.vx || 0, targetVx, clamp(accel * dt, 0, 1));
+    this.player.vy = lerp(this.player.vy || 0, targetVy, clamp(accel * dt, 0, 1));
+    if (len > 0) {
+      const nextFacing = Math.atan2(dy, dx);
+      // 角度环绕处理，避免从左侧切到右侧时绕远路旋转。
+      let delta = nextFacing - (this.player.facing || 0);
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      this.player.facing = (this.player.facing || 0) + delta * clamp(12 * dt, 0, 1);
+    }
     const previousX = this.player.x;
     const previousY = this.player.y;
-    this.player.x += dx * speed * dt;
-    this.player.y += dy * speed * dt;
+    this.player.x += this.player.vx * dt;
+    this.player.y += this.player.vy * dt;
     // 挥击突进：惯性位移随时间衰减
     const lungeX = this.player.lungeX || 0, lungeY = this.player.lungeY || 0;
     if (lungeX || lungeY) {
@@ -1106,10 +972,11 @@ Object.assign(Expedition.prototype, {
         this.player.y = previousY;
       }
     }
+    this.player.walkDistance = (this.player.walkDistance || 0) + Math.hypot(this.player.x - previousX, this.player.y - previousY);
     this.updateVision();
 
     // v3.4 地图危险区（坑/泥/毒雾）
-    if (this.hazardZones) {
+    if (this.elapsed >= 120 && this.hazardZones) {
       for (const hz of this.hazardZones) {
         const d = dist(this.player, hz);
         if (d < hz.r) {
@@ -1144,6 +1011,13 @@ Object.assign(Expedition.prototype, {
 
     // 能量恢复
     this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + CONFIG.player.energyRegen * dt);
+    this.player.moveSpeed = Math.hypot(this.player.vx || 0, this.player.vy || 0);
+    if (this.player.moveSpeed > 8 && Math.random() < dt * 5) {
+      this.footprints = this.footprints || [];
+      const mat = ground.id === 'water' ? 'water' : ground.id === 'mud' ? 'mud' : 'soil';
+      this.footprints.push({ x: this.player.x, y: this.player.y + 8, life: 5, material: mat });
+      this.particles.push({ x: this.player.x, y: this.player.y + 8, vx: rand(-8,8), vy: rand(-18,-5), life:.28, maxLife:.28, size: mat === 'water' ? 3 : 2, color: mat === 'water' ? '#9ed9e5' : '#92704a', type:'dust' });
+    }
 
     // 计时器
     this.player.attackCd = Math.max(0, this.player.attackCd - dt);
@@ -1155,25 +1029,6 @@ Object.assign(Expedition.prototype, {
     if (this.footprints) {
       for (const f of this.footprints) f.life -= dt;
     }
-    if (Math.hypot(this.player.vx || 0, this.player.vy || 0) > 50) {
-      this._footTimer = (this._footTimer || 0) - dt;
-      if (this._footTimer <= 0) {
-        this.addFootprint(this.player.x + (Math.random()-0.5)*8, this.player.y + 6);
-        // v3.9 走路扬尘
-        this.particles.push({
-          x: this.player.x + (Math.random()-0.5)*10,
-          y: this.player.y + 6,
-          vx: (Math.random()-0.5)*20,
-          vy: -20 - Math.random()*15,
-          life: 0.5, maxLife: 0.5,
-          size: 3 + Math.random()*3,
-          color: 'rgba(140,120,90,0.5)',
-          grav: 60, drag: 2
-        });
-        this._footTimer = 0.25;
-      }
-    }
-    // v3.8 本局高光统计
     const rs = this.runStats;
     if (rs) {
       const distFromSpawn = Math.hypot(this.player.x - this.spawnX, this.player.y - this.spawnY);
@@ -1213,6 +1068,7 @@ Object.assign(Expedition.prototype, {
     }
   },
   updateTraps(dt) {
+    if (this.elapsed < 120) return;
     // 环境陷阱（v5.1：支持定身 root、Boss 投放陷阱限时存在）
     for (let ti = this.traps.length - 1; ti >= 0; ti--) {
       const trap = this.traps[ti];

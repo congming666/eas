@@ -6,16 +6,27 @@
     openDecoration(){ document.getElementById('decorationModal').classList.remove('hidden'); this.renderDecoration(); },
     closeModal(id){ document.getElementById(id).classList.add('hidden'); },
 
-    renderProcessing(){
-      document.getElementById('processingLevel').textContent = 'Lv.' + GameState.workshopLevel;
-      document.getElementById('workshopUpgradeCost').textContent = GameState.workshopLevel * 100;
+    refreshProcessingQueue(){
       // 队列
       const q = document.getElementById('processingQueue');
       if (GameState.processingQueue.length === 0) q.textContent = '加工队列：空闲';
       else q.innerHTML = '加工队列：' + GameState.processingQueue.map(j => {
         const r = FarmRecipes.find(x => x.id === j.recipeId);
-        return r ? `${r.icon}${r.name} ${j.remaining.toFixed(0)}s` : '';
+        return r ? `${r.icon}${r.name} ×${j.qty} · ${j.awaitingSpace ? '已完成，等待仓库空位' : Math.ceil(j.remaining)+'秒'}` : '';
       }).join(' · ');
+    },
+    refreshProcessing(){
+      if (document.getElementById('processingModal')?.classList.contains('hidden')) return;
+      const key = JSON.stringify([GameState.workshopLevel,GameState.gold,GameState.warehouse.items,GameState.resources,GameState.processingQueue.map(j=>j.recipeId)]);
+      if (key !== this._processingKey) { this._processingKey=key; this.renderProcessing(); }
+      else this.refreshProcessingQueue();
+    },
+    renderProcessing(){
+      document.getElementById('processingLevel').textContent = 'Lv.' + GameState.workshopLevel;
+      const upgradeCost = document.getElementById('workshopUpgradeCost');
+      upgradeCost.textContent = GameState.workshopLevel >= 3 ? '已满级，无需' : GameState.workshopLevel * 100;
+      upgradeCost.closest('button').disabled = GameState.workshopLevel >= 3 || GameState.gold < GameState.workshopLevel * 100;
+      this.refreshProcessingQueue();
       // 配方
       const list = document.getElementById('recipeList');
       list.innerHTML = '';
@@ -25,7 +36,7 @@
         juice:['远征','本局能量上限 +40 并回满',1], egg:['远征','120 秒攻击 +15%',1], mint_tea:['远征','60 秒移速 +15%',1],
         ginseng_soup:['远征','回满血，60 秒攻击 +20%',1], torch:['远征','每支照明约 60 秒（难度越高越短），无火把视野极小',1],
         poison_bomb:['远征','投掷 AOE 60 伤并减速 3 秒',1], insecticide:['远征','驱虫：6 秒内身边怪物丢失目标',1],
-        flour:['再加工','制作面包的原料',0], oil:['再加工','制作火把的原料',0], feed:['再加工','制作鸡蛋的原料',0],
+        flour:['再加工','制作面包的原料',0], oil:['再加工','油莎草可直接产出；2份油制作1支火把',0], feed:['再加工','制作鸡蛋的原料',0],
         compost:['农场','修行台角色升级材料',0], refined_iron:['锻造','高级武器锻造/升级材料',0],
         pumpkin_lantern:['装饰','加工即得，美观度 +5',0]
       };
@@ -396,14 +407,15 @@
     if (!hs) return;
     const cv = document.getElementById('v58Panorama');
     if (!cv) return;
-    const W = cv.clientWidth, H = 230;
+    const W = cv.clientWidth, H = cv.clientHeight;
     if (W === 0) return;
-    if (cv.width !== W * devicePixelRatio) { cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio; }
+    if (cv.width !== Math.round(W * devicePixelRatio) || cv.height !== Math.round(H * devicePixelRatio)) { cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio; }
     const c = cv.getContext('2d');
     c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     c.clearRect(0, 0, W, H);
     const t = (Date.now() / 1000);
 
+    if (window.FarmPanorama) { FarmPanorama.draw(c, W, H, t); return; }
     // 天空
     const sky = skyColors();
     let g = c.createLinearGradient(0, 0, 0, H * 0.55);
@@ -495,8 +507,10 @@
   }
 
   /* ---------- 主循环：仅农场可见时绘制 ---------- */
-  (function loop() {
-    if (farmVisible()) {
+  let lastFarmFrame = 0;
+  (function loop(now = 0) {
+    if (!document.hidden && farmVisible() && now - lastFarmFrame >= 100) {
+      lastFarmFrame = now;
       try { ensureCultBed(); ensurePanorama(); drawPanorama(); refreshChips(); } catch (e) {}
     }
     requestAnimationFrame(loop);

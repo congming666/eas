@@ -356,7 +356,7 @@
     onDeath: function (ctx) {
       ctx = ctx || {};
       var gs = GS();
-      var safeSlots = gs.safeBoxSlots || 1;
+      var safeSlots = clamp(Number(gs.safeBoxSlots || gs.safeSlots || 1), 1, 3);
       // 安全箱前 safeSlots 格必保留
       var safeBoxKept = (ctx.safeBox || []).slice(0, safeSlots);
       // 带入消耗品/种子/武器实例丢失；局内战利品全丢
@@ -378,6 +378,10 @@
         var coll = _coll();
         ['item', 'seed'].forEach(function (sec) {
           Object.keys(coll[sec]).forEach(function (id) { coll[sec][id].count = 0; });
+        });
+        // 硬核模式下安全箱中的实体卡也不保留；非卡牌物资仍按安全箱规则保留。
+        safeBoxKept = safeBoxKept.filter(function (item) {
+          return !(item && (item.type === 'card' || item.cardType || item.defId));
         });
       }
       // 技能收藏与精通永不丢失：不触碰 collection.skill

@@ -171,6 +171,7 @@
   // 闪电
   // ============================================================
   function nearCampfire(g, x, y) {
+    if (g.campfire && Math.hypot(g.campfire.x-x,g.campfire.y-y)<100) return true;
     if (!g.fxProps) return false;
     return g.fxProps.some(p => p.type === 'campfire' && Math.hypot(p.x - x, p.y - y) < 240);
   }
@@ -270,9 +271,16 @@
   function updateExpedition(g, dt) {
     const s = attachExpedition(g);
     s.t += dt;
+    // Expedition pacing: calm before 360 seconds, then forecast storm.
+    if ((g.elapsed || 0) < 360) {
+      s.state = 'clear'; s.next = null; s.timer = 360 - (g.elapsed || 0); s.duration = 360;
+    } else if (!s.riskWeatherStarted) {
+      s.riskWeatherStarted = true; s.next = 'storm'; s.timer = s.trans; s.duration = s.trans;
+      showToast('天气预报：雷暴将在 12 秒后到达，注意河湾导电', 'warning');
+    }
     // 预报：进入过渡窗口时宣布下一天气
     s.timer -= dt;
-    if (!s.next && s.timer <= s.trans) {
+    if (!s.next && s.timer <= s.trans && (g.elapsed || 0) >= 360) {
       s.next = weightedPick(expeditionWeights(g), s.state);
       if (typeof window.showToast === 'function') {
         const c = CAT[s.next];

@@ -69,7 +69,7 @@ const WorldFX = (() => {
 
     // ---- 密林带 2-3 片 ----
     const treeType = tier <= 1 ? 'tree' : (tier === 2 ? 'tree' : 'deadTree');
-    const zoneN = 2 + (Math.random() < 0.5 ? 1 : 0);
+    const zoneN = g.terrainRegions ? 0 : 2 + (Math.random() < 0.5 ? 1 : 0);
     for (let z = 0; z < zoneN; z++) {
       const c = safePoint(g, size, 360);
       const rx = rand(230, 360), ry = rand(190, 310);
@@ -90,7 +90,7 @@ const WorldFX = (() => {
     }
 
     // ---- 废墟墙（L 形院子）3+tier 组 ----
-    const groups = 3 + tier;
+    const groups = g.terrainRegions ? 0 : 3 + tier;
     for (let gi = 0; gi < groups; gi++) {
       const c = safePoint(g, size, 300);
       const baseRot = Math.random() * TAU;
@@ -343,10 +343,19 @@ const WorldFX = (() => {
 
   // ---------- 叙事竖物（篝火/断剑/水晶/路标/木箱）----------
   function renderSetProp(ctx, g, p) {
+    if (p.used) return;
     const sx = p.x - g.camera.x, sy = p.y - g.camera.y;
     const t = performance.now() / 1000;
     ctx.save();
     ctx.translate(sx, sy);
+    if (p.interactionLabel && Math.hypot(g.player.x-p.x,g.player.y-p.y)<65) {
+      ctx.strokeStyle='#e2c882';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.ellipse(0,3,20,9,0,0,TAU);ctx.stroke();
+      ctx.font='12px sans-serif';ctx.textAlign='center';
+      const label='左键 · '+p.interactionLabel;
+      ctx.fillStyle='rgba(13,27,21,.92)';ctx.fillRect(-112,-67,224,23);
+      ctx.fillStyle='#f2dfad';ctx.fillText(label,0,-51);
+    }
     if (p.type === 'crate') {
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
       ctx.beginPath(); ctx.ellipse(3, 8, 16, 6, 0, 0, TAU); ctx.fill();

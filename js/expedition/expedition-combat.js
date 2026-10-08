@@ -1,5 +1,12 @@
 /* Expedition 原型混合：怪物AI/Boss/技能/植物防线/拾取/撤离/结算（由 expedition.js 拆分） */
 Object.assign(Expedition.prototype, {
+  pushCombatFeedback(text, color = '#ffffff', x = this.player?.x, y = this.player?.y, duration = 0.9) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (!this.combatFeedback) this.combatFeedback = [];
+    if (this.combatFeedback.some(f => f.text === text && f.life > 0.25 && Math.hypot(f.x - x, f.y - y) < 70)) return;
+    if (this.combatFeedback.length >= 12) this.combatFeedback.shift();
+    this.combatFeedback.push({ text, color, x, y, life: duration, maxLife: duration });
+  },
   castBossAbility(boss, d, angle) {
     const phase2 = boss.phase === 2;
     const idx = boss.castIndex || 0;
@@ -73,6 +80,7 @@ Object.assign(Expedition.prototype, {
   },
 
   spawnBeastWave() {
+    if (this.elapsed < 360) return;
     this.beastWave.wave++;
     this.beastWave.active = true;
     if (window.Telemetry) Telemetry.onBeastWave(this);
@@ -81,8 +89,11 @@ Object.assign(Expedition.prototype, {
     // v5.4 指数兽潮：数量 1.18^(波次-1)，密度上限 26+Tier*8，后期压力指数抬升而非线性
     const _wn = this.beastWave.wave;
     const _cap = 32 + this.map.tier * 10;
-    const count = Math.min(_cap, Math.round((12 + this.map.tier * 4) * Math.pow(1.34, _wn - 1)));
-    const types = ['boar', 'bat', 'spider', 'locust', 'wolf'];
+    const _isT1 = this.map.tier === 1;
+    // T1 教学图兽潮规模更小、只用基础怪；高 T 维持指数压力
+    const _base = _isT1 ? 6 : (12 + this.map.tier * 4);
+    const count = Math.min(_cap, Math.round(_base * Math.pow(1.34, _wn - 1)));
+    const types = _isT1 ? ['boar', 'bat', 'spider'] : ['boar', 'bat', 'spider', 'locust', 'wolf'];
     for (let i = 0; i < count; i++) {
       const type = types[randInt(0, types.length - 1)];
       const data = CONFIG.monsters[type];
@@ -327,7 +338,7 @@ Object.assign(Expedition.prototype, {
           for (const m of this.monsters) {
             if (m.hp <= 0) continue;
             const d = Math.hypot(m.x - p.x, m.y - p.y);
-            if (d < p.range) this.damageEnemy(m, 8 * dt * 10, '#ff6633', false, { noKnockback: true });
+            if (d < p.range) this.damageEnemy(m, 8 * dt * 10, '#ff6633', false, { noKnockback: true, fromPlant: true, element: 'fire' });
           }
           break;
         }
@@ -376,7 +387,7 @@ Object.assign(Expedition.prototype, {
             for (const m of this.monsters) {
               if (m.hp <= 0) continue;
               const d = Math.hypot(m.x - p.x, m.y - p.y);
-              if (d < p.range) this.damageEnemy(m, 30, '#ffaa00', false);
+              if (d < p.range) this.damageEnemy(m, 30, '#ffaa00', false, { fromPlant: true, element: 'fire' });
             }
             this.plants.splice(i, 1);
           }
@@ -392,7 +403,7 @@ Object.assign(Expedition.prototype, {
               const proj = mx * Math.cos(ang) + my * Math.sin(ang);
               if (proj > 0 && proj < p.range) {
                 const perp = Math.abs(-mx * Math.sin(ang) + my * Math.cos(ang));
-                if (perp < 40) this.damageEnemy(m, 15, '#ff4400', false);
+                if (perp < 40) this.damageEnemy(m, 15, '#ff4400', false, { fromPlant: true, element: 'fire' });
               }
             }
             p.cd = 0.5;
@@ -414,7 +425,7 @@ Object.assign(Expedition.prototype, {
           if (p.cd <= 0) {
             const near = this.monsters.filter(m => m.hp > 0).sort((a,b) =>
               Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y)).slice(0,3);
-            for (const m of near) this.damageEnemy(m, 10, '#ffff66', false);
+            for (const m of near) this.damageEnemy(m, 10, '#ffff66', false, { fromPlant: true, element: 'lightning' });
             p.cd = 0.8;
           }
           break;
@@ -437,7 +448,7 @@ Object.assign(Expedition.prototype, {
               for (const mm of this.monsters) {
                 if (mm.hp <= 0) continue;
                 const dd = Math.hypot(mm.x - p.x, mm.y - p.y);
-                if (dd < p.range + 30) this.damageEnemy(mm, 50, '#aa44ff', false);
+                if (dd < p.range + 30) this.damageEnemy(mm, 50, '#aa44ff', false, { fromPlant: true, element: 'poison' });
               }
               this.plants.splice(i, 1);
               break;
@@ -502,8 +513,7 @@ Object.assign(Expedition.prototype, {
       const d = Math.hypot(w.x - this.player.x, w.y - this.player.y);
       if (d < 40) {
         w.picked = true;
-        if (!GameState.warehouse.crops) GameState.warehouse.crops = {};
-        GameState.warehouse.crops[w.givesSeed] = (GameState.warehouse.crops[w.givesSeed] || 0) + 1;
+        this.spawnGroundLoot({ type: 'seed_pickup', seedId: w.givesSeed, name: w.name + '种子', icon: w.icon, amount: 1 }, w.x, w.y);
         showToast(`🌿 采摘到种子：${w.name}！`, 'success');
         return true;
       }
@@ -662,6 +672,11 @@ Object.assign(Expedition.prototype, {
   },
 
   spawnGroundLoot(item, x, y) {
+    if (item?.type === 'material' && item.matId) item = { ...item, id: item.matId };
+    if (item && item.type === 'gold' && item.amount) {
+      const rewardMul = this.balance && Number.isFinite(this.balance.reward) ? this.balance.reward : 1;
+      item = { ...item, amount: Math.max(1, Math.round(item.amount * rewardMul)) };
+    }
     this.groundLoot.push({
       ...item,
       x: x + rand(-28, 28),
@@ -1012,8 +1027,10 @@ Object.assign(Expedition.prototype, {
   },
 
   tryInteract() {
+    if (this.paused || this.choiceOpen || this.gameOver) return;
     const worldMouseX = this.mouse.x + this.camera.x;
     const worldMouseY = this.mouse.y + this.camera.y;
+    if (this.interactWorldProp(this.mouse.x + this.camera.x, this.mouse.y + this.camera.y)) return;
     // v5.8 篝火 / 商人
     if (this.campfire && dist(this.player, this.campfire) < 50 && dist({ x: worldMouseX, y: worldMouseY }, this.campfire) < 44) { this.openCampfire(); return; }
     if (this.merchant && dist(this.player, this.merchant) < 50 && dist({ x: worldMouseX, y: worldMouseY }, this.merchant) < 44) { this.openMerchant(); return; }
@@ -1072,6 +1089,7 @@ Object.assign(Expedition.prototype, {
 
   // 弹出三选一夺卡（道路节点/精英/Boss/宝箱/商人）
   offerCapture(reason) {
+    if (this.elapsed < 120) return;
     if (this.gameOver || this.choiceOpen) return;
     if (typeof CardV58 === 'undefined' || !CardV58.rollCapture) return;
     let res;
@@ -1136,7 +1154,9 @@ Object.assign(Expedition.prototype, {
 
   // 篝火：升级卡 / 移除卡 / 休息回血
   openCampfire() {
-    if (this.gameOver || this.choiceOpen) return;
+    if (this.elapsed < 120) { showToast('探索期：先熟悉武器，营地将在 2 分钟后开放', 'info'); return; }
+    if (this.gameOver || this.choiceOpen || this.campfire?.used) return;
+    this.safeNode = 'campfire';
     this.choiceOpen = true;
     this._mountModal('v58CampfireOverlay', `<h3 class="v58-modal-title">🔥 篝火休息</h3>
       <div class="v58-cap-row">
@@ -1167,12 +1187,19 @@ Object.assign(Expedition.prototype, {
     }
     this._closeModal('v58CampfireOverlay');
     this.choiceOpen = false;
+    if (this.campfire) this.campfire.used = true;
+    this.safeNode = null;
     this.updateHUD();
   },
 
   // 商人：买卡 / 删卡 / 升级 / 补货
   openMerchant() {
-    if (this.gameOver || this.choiceOpen) return;
+    if (this.elapsed < 120) { showToast('商队将在 2 分钟后营业', 'info'); return; }
+    if (this.gameOver || this.merchant?.used) return;
+    this.safeNode = 'merchant';
+    const existing = document.getElementById('v58CaptureOverlay');
+    if (existing) existing.remove();
+    this.choiceOpen = false;
     this.choiceOpen = true;
     const stockHtml = (this.merchantStock || []).map((defId, i) => {
       const d = (typeof CardV58 !== 'undefined') ? (CardV58.getDef('item', defId) || {}) : {};
@@ -1226,7 +1253,10 @@ Object.assign(Expedition.prototype, {
       for (let i = 0; i < 3 && ids.length; i++) this.merchantStock.push(ids[Math.floor(Math.random() * ids.length)]);
       showToast('🔄 货架已补货', 'success');
     }
-    this.openMerchant(); // 刷新
+    this._closeModal('v58MerchantOverlay');
+    if (act !== 'restock' && this.merchant) this.merchant.used = true;
+    this.safeNode = null;
+    this.choiceOpen = false;
   },
   _merchantBuyStock(i) {
     const defId = (this.merchantStock || [])[i];
@@ -1234,7 +1264,10 @@ Object.assign(Expedition.prototype, {
     if (!this._spendGold(100)) return;
     const card = CardV58.makeCard('item', defId, { acquiredFrom: 'merchant' });
     if (card) { this.tempCards.push(card); showToast(`🛒 购入 ${(CardV58.getDef('item', defId) || {}).name}`, 'gold'); }
-    this.openMerchant();
+    this._closeModal('v58MerchantOverlay');
+    if (this.merchant) this.merchant.used = true;
+    this.safeNode = null;
+    this.choiceOpen = false;
   },
 
   // ===== v5.8 战斗层：协同(synergyMods) + 词条(cardStats.affixMods) =====
@@ -1316,6 +1349,10 @@ Object.assign(Expedition.prototype, {
     if (oh.burnChance && rng() < oh.burnChance) this.applyBurn(target, 10 * (oh.burnStack || 1), 3);
     if (oh.bleedChance && rng() < oh.bleedChance) { target.bleedStack = (target.bleedStack || 0) + 1; target.bleedUntil = performance.now() + 3000; }
     if (oh.shockChance && rng() < oh.shockChance) target.shockTimer = 2;
+    if (oh.freezeChance && rng() < oh.freezeChance) {
+      target.stunned = Math.max(target.stunned || 0, 1 + ((this.syn && this.syn.freezeDur) || 0));
+      target.slow = Math.max(target.slow || 0, 0.8);
+    }
     if (oh.poisonChance && rng() < oh.poisonChance) target.poisonTimer = 3;
     if (oh.slowChance && rng() < oh.slowChance) target.slow = Math.max(target.slow || 0, oh.slowAmt || 0.2);
   },
@@ -1342,11 +1379,12 @@ Object.assign(Expedition.prototype, {
 
   playerAttack() {
     if (this.player.attackCd > 0) return;
+    this.lastTerrainAttackAt = this.elapsed;
     const w = this.weapon;
     // v2.0 等级词条：攻速/射程/速度修正
     const cdMult = 1 + (w.cdBonus || 0);
     this.player.attackCd = Math.max(0.08, w.cooldown * cdMult);
-    const effRange = w.range * (1 + (w.rangeBonus || 0));
+    const effRange = w.range * (1 + (w.rangeBonus || 0)) * (w.mode === 'melee' ? 1 : this.getTerrainAt(this.player.x, this.player.y).rangeMul);
     const effSpeed = w.projectileSpeed * (1 + (w.speedBonus || 0));
     const worldMouseX = this.mouse.x + this.camera.x;
     const worldMouseY = this.mouse.y + this.camera.y;
@@ -1647,15 +1685,18 @@ Object.assign(Expedition.prototype, {
       // 安全箱里的物品也一并入库
       (this.safeBox || []).forEach(i => {
         if (i.type === 'gold') GameState.gold += i.amount;
-        else if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
+        else if (i.type === 'seed' || i.type === 'seed_item') {
+          Warehouse.addItem('seeds', i.amount || 1);
+          const cropId = i.cropId || i.seedId;
+          if (CONFIG.crops.some(c => c.id === cropId) && !GameState.unlockedCrops.includes(cropId)) GameState.unlockedCrops.push(cropId);
+        }
         else if (i.type === 'material') {
-          const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+          const matId = i.matId || (i.id && (CONFIG.resources?.[i.id] || CONFIG.warehouseItems[i.id]) ? i.id : null);
           if (matId && window.CONFIG.resources && CONFIG.resources[matId] && window.ResourceSystem) ResourceSystem.add(matId, i.amount);
           else if (matId && CONFIG.warehouseItems[matId]) Warehouse.addItem(matId, i.amount);
           else Warehouse.addItem('materials', i.amount);
         }
-        else if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
-        else if (i.type === 'farm_item') Warehouse.addItem(i.id, i.amount);
+        else if (i.type === 'consumable' || i.type === 'farm_item') Warehouse.addItem(i.id, i.amount);
       });
       this.bag.filter(i => i.type === 'seed').forEach(i => {
         Warehouse.addItem('seeds', i.amount);
@@ -1666,7 +1707,7 @@ Object.assign(Expedition.prototype, {
       });
       this.bag.filter(i => i.type === 'material').forEach(i => {
         // v5.0 具体资源进 materials 背包，其余按仓库物品/通用材料
-        const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+        const matId = i.matId || (i.id && (CONFIG.resources?.[i.id] || CONFIG.warehouseItems[i.id]) ? i.id : null);
         if (matId && window.CONFIG.resources && CONFIG.resources[matId] && window.ResourceSystem) ResourceSystem.add(matId, i.amount);
         else if (matId && CONFIG.warehouseItems[matId]) Warehouse.addItem(matId, i.amount);
         else Warehouse.addItem('materials', i.amount);
@@ -1693,7 +1734,9 @@ Object.assign(Expedition.prototype, {
       // v5.8 死亡结算：带入消耗品/种子/武器实例丢失、局内战利品全丢、安全箱保留、收藏精通不丢、免死令免降级
       this._runDeathSettlement();
       // v3.6 失败：玩家主动存入 this.safeBox 的物品必保留，其余全掉
-      const safeItems = this.safeBox || [];
+      const safeCap = (typeof LoadoutSystem !== 'undefined' && LoadoutSystem.getSafeCapacity) ? LoadoutSystem.getSafeCapacity() : Math.max(1, Math.min(3, Number(GameState.safeBoxSlots || GameState.safeSlots || 1)));
+      const safeItems = (this.safeBox || []).slice(0, safeCap);
+      this.safeBox = safeItems;
       safeItems.forEach(i => keptItems.push({ ...i, kept: true }));
       this.bag.forEach(i => {
         // 安全箱里的物品已经算 kept 过了，这里只处理 bag 里的（非安全箱物品）
@@ -1703,14 +1746,18 @@ Object.assign(Expedition.prototype, {
       Warehouse.beginBatch();
       safeItems.forEach(i => {
         if (i.type === 'gold') GameState.gold += i.amount;
-        else if (i.type === 'seed') Warehouse.addItem('seeds', i.amount);
+        else if (i.type === 'seed' || i.type === 'seed_item') {
+          Warehouse.addItem('seeds', i.amount || 1);
+          const cropId = i.cropId || i.seedId;
+          if (CONFIG.crops.some(c => c.id === cropId) && !GameState.unlockedCrops.includes(cropId)) GameState.unlockedCrops.push(cropId);
+        }
         else if (i.type === 'material') {
-          const matId = i.matId || (i.id && CONFIG.warehouseItems[i.id] ? i.id : null);
+          const matId = i.matId || (i.id && (CONFIG.resources?.[i.id] || CONFIG.warehouseItems[i.id]) ? i.id : null);
           if (matId && window.CONFIG.resources && CONFIG.resources[matId] && window.ResourceSystem) ResourceSystem.add(matId, i.amount);
           else if (matId && CONFIG.warehouseItems[matId]) Warehouse.addItem(matId, i.amount);
           else Warehouse.addItem('materials', i.amount);
         }
-        else if (i.type === 'consumable') Warehouse.addItem(i.id, i.amount);
+        else if (i.type === 'consumable' || i.type === 'farm_item') Warehouse.addItem(i.id, i.amount);
       });
       Warehouse.endBatch();
     }
@@ -1750,7 +1797,7 @@ Object.assign(Expedition.prototype, {
       kills: this.killCount,
       chests: this.chestOpened,
       damageTaken: this.damageTaken,
-      goldEarned: this.result === 'success' ? totalGold : Math.floor(totalGold * 0.2),
+      goldEarned: this.result === 'success' ? totalGold : 0,
       keptItems, lostItems,
       plantGrowth: this.growthSummary || [],
       highlights: highlights.slice(0, 4),
@@ -1767,6 +1814,7 @@ Object.assign(Expedition.prototype, {
   // 施加灼烧：刷新持续时间，取更高 dps
   applyBurn(target, dps = 14, duration = 2.5) {
     if (!target || target.hp <= 0) return;
+    if (this.getTerrainAt(target.x,target.y).id === 'water') { target.burn = null; return; }
     const cur = target.burn;
     target.burn = { time: duration, dps: Math.max(cur ? cur.dps : 0, dps),
       tick: cur ? Math.min(cur.tick, 0.2) : 0.1, fx: 0 };
@@ -1777,6 +1825,7 @@ Object.assign(Expedition.prototype, {
   // 灼烧状态推进：火焰视觉 + 每 0.4s 一跳伤害（quiet，不击退不顿帧）
   updateBurn(m, dt) {
     if (!m.burn) return;
+    if (this.getTerrainAt(m.x,m.y).id === 'water') { m.burn = null; return; }
     m.burn.time -= dt;
     m.burn.fx -= dt;
     if (m.burn.fx <= 0) { m.burn.fx = 0.06; this.spawnFlame(m.x + rand(-m.radius * 0.6, m.radius * 0.6), m.y - m.radius * 0.4); }
@@ -1857,20 +1906,24 @@ Object.assign(Expedition.prototype, {
 
   damageEnemy(target, amount, color = '#ffffff', heavy = false, hitInfo = null) {
     if (!target || target.hp <= 0) return;
+    amount = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+    if (amount <= 0) return;
     if (target.armor) amount *= (1 - target.armor); // 厚甲猪减伤
     if (target.armorUntil && target.armorUntil > performance.now()) amount *= (1 - (target.armorReduce || 0.35)); // v5.1 Boss 岩石护甲
     if (window.WeatherSystem) amount = WeatherSystem.modifyOutgoing(this, amount, { weaponId: (hitInfo && hitInfo.weaponId) || (this.weapon && this.weapon.id), color: color, element: hitInfo && hitInfo.element }); // v5.7 雨弱火/湿导电
+    amount *= this.terrainElementMultiplier(target, hitInfo);
     const isBoss = target.type === 'boss';
     if (isBoss && target.enrageStage > 0) amount *= (1 + 0.12 * target.enrageStage); // v5.4 r4 狂暴阶防御崩坏：每阶受伤+12%，长尾双向收束
     const fromPlayer = hitInfo ? hitInfo.fromPlayer === true : false;
+    if (fromPlayer) this.lastTerrainAttackAt = this.elapsed;
     if (fromPlayer && typeof CombatEnhancement !== 'undefined') {
       amount *= CombatEnhancement.getComboMul();
-      if (CombatEnhancement.nextAttackCrit) { CombatEnhancement.nextAttackCrit = false; amount *= 2.0; if (hitInfo) hitInfo.crit = true; }
+      if (CombatEnhancement.nextAttackCrit) { CombatEnhancement.nextAttackCrit = false; if (hitInfo) hitInfo.crit = true; }
       CombatEnhancement.onEnemyHit();
       if (hitInfo && hitInfo.x !== undefined) CombatEnhancement.damageDestructible(hitInfo.x, hitInfo.y, amount);
     }
     // v5.8 玩家伤害：词条 dmgMult + 克制环 ±25% + onHit 状态(燃烧/流血/感电/中毒/减速)
-    if (fromPlayer) {
+    if (fromPlayer || (hitInfo && hitInfo.fromPlant)) {
       const _cs = hitInfo && hitInfo.skillId ? this._skillCardStats(hitInfo.skillId) : {};
       amount *= (1 + (_cs.dmgMult || 0)) * this._counterMultFor(hitInfo, target);
       this._procOnHit(target, hitInfo, _cs);
@@ -1879,8 +1932,9 @@ Object.assign(Expedition.prototype, {
     const quiet = !!(hitInfo && hitInfo.quiet);
     // v2.0 武器等级：暴击率加成（镰刀Lv6 +10%、飞刃Lv6 +15%）
     const critBonus = (fromPlayer && this.weapon && this.weapon.critChanceBonus) ? this.weapon.critChanceBonus : 0;
-    const critBase = (fromPlayer && hitInfo && hitInfo.crit !== false) ? (0.20 + critBonus) : 0;
-    const isCrit = critBase > 0 && Math.random() < critBase;
+    const _affixCrit = fromPlayer && this.syn && this.syn.critChance ? this.syn.critChance : 0;
+    const critBase = (fromPlayer && hitInfo && hitInfo.crit !== false) ? (0.20 + critBonus + _affixCrit) : 0;
+    const isCrit = !quiet && (hitInfo?.crit === true || (critBase > 0 && Math.random() < critBase));
     if (isCrit) {
       let critMult = 1.8;
       if (fromPlayer && this.weapon && this.weapon.critDmgBonus) critMult += this.weapon.critDmgBonus;
@@ -1896,41 +1950,48 @@ Object.assign(Expedition.prototype, {
       const curSeg = Math.min(seg, Math.ceil((target.hp/target.maxHp)*seg));
       if (curSeg < _prevSeg) CombatEnhancement.onSegmentBreak(target);
     }
-    target.hitFlash = heavy ? 0.22 : 0.14;
+    if (!quiet) target.hitFlash = heavy ? 0.18 : 0.10;
     // v3.3 攻击打断：命中正在前摇的非精英/Boss 怪，20% 概率打断
     if (target.windupT > 0 && !target.elite && target.type !== 'boss' && fromPlayer && Math.random() < 0.20) {
       target.windupT = 0; target.windupKind = null;
       target.stunned = Math.max(target.stunned || 0, 0.6);
       this.spawnImpact(target.x, target.y, '#aaffcc', 1.2);
-      showToast('打断！', 'success');
+      this.pushCombatFeedback('打断', '#aaffcc', target.x, target.y);
     }
-    target.state = target.hp <= 0 ? 'death' : 'hit';
-    target.stateTimer = target.hp <= 0 ? .4 : .18;
+    if (!quiet || target.hp <= 0) {
+      target.state = target.hp <= 0 ? 'death' : 'hit';
+      target.stateTimer = target.hp <= 0 ? .4 : .18;
+    }
     // v2.0 镰刀Lv7 击杀回血
     if (target.hp <= 0 && fromPlayer && this.weapon && this.weapon.lifesteal) {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.weapon.lifesteal);
     }
     const dmgColor = isCrit ? '#ffd968' : color;
-    this.damageNumbers.push({
+    const merged = quiet && this.damageNumbers.find(n => n.target === target && n.quiet && n.life > 0.25);
+    if (merged) merged.value += Math.round(amount);
+    else this.damageNumbers.push({
+      target, quiet,
       x: target.x + rand(-8, 8), y: target.y - target.radius - 8,
       value: Math.round(amount), color: dmgColor, life: isCrit ? 0.9 : 0.72, maxLife: isCrit ? 0.9 : 0.72,
       vx: rand(-10, 10), vy: heavy ? -64 : -48, heavy: heavy || isCrit, crit: isCrit
     });
     // 命中点光爆 + 沿攻击方向的定向火花 + 冲击环（重击/暴击/Boss）
-    const hitX = hitInfo ? hitInfo.x : target.x;
-    const hitY = hitInfo ? hitInfo.y : target.y;
-    const hitAngle = hitInfo ? hitInfo.angle : Math.atan2(target.y - this.player.y, target.x - this.player.x);
+    const hitX = Number.isFinite(hitInfo?.x) ? hitInfo.x : target.x;
+    const hitY = Number.isFinite(hitInfo?.y) ? hitInfo.y : target.y;
+    const hitAngle = Number.isFinite(hitInfo?.angle) ? hitInfo.angle : Math.atan2(target.y - this.player.y, target.x - this.player.x);
     const weaponId = hitInfo ? hitInfo.weaponId : '';
     // 武器专属配色：命中光爆与定向火花颜色随武器变化
     const fx = WEAPON_FX[weaponId];
     const impactColor = isCrit ? '#fff3b0' : (fx ? fx.impact : color);
     const sparkColor = isCrit ? '#fff0a0' : (fx ? fx.spark : color);
+    if (this.damageNumbers.length > 40) this.damageNumbers.splice(0, this.damageNumbers.length - 40);
+    if (quiet) return;
     this.spawnImpact(hitX, hitY, impactColor, isCrit ? 1.6 : 1);
     this.spawnDirectionalSparks(hitX, hitY, hitAngle, sparkColor, heavy ? 12 : 8, isBoss ? 1.25 : 1);
     const hp = this.allocParticle();
     Object.assign(hp, { x: hitX, y: hitY, vx: 0, vy: 0, life: 0.22, maxLife: 0.22, type: 'hitImg', size: isCrit ? 90 : 60 });
     this.particles.push(hp);
-    if (heavy || isCrit || isBoss) this.spawnShockRing(hitX, hitY, isBoss ? '#ffd9a0' : impactColor, isBoss ? 84 : 52);
+    if (heavy || isCrit) this.spawnShockRing(hitX, hitY, isBoss ? '#ffd9a0' : impactColor, isBoss ? 84 : 52);
     // 冻结碎裂：被寒冰藤减速（冰冻状态）的敌人受击时碎冰飞溅，死亡时大碎裂
     if (target.slow > 0 && fromPlayer) this.spawnFrostShatter(hitX, hitY, target.hp <= 0);
     if (!quiet) {
@@ -1938,13 +1999,16 @@ Object.assign(Expedition.prototype, {
       const knockPower = (heavy ? 215 : 130) * (isBoss ? 0.3 : 1) * (isCrit ? 1.7 : 1);
       target.knockX = (target.knockX || 0) + Math.cos(hitAngle) * knockPower;
       target.knockY = (target.knockY || 0) + Math.sin(hitAngle) * knockPower;
-      if (target.hp > 0) this.hitStop = Math.max(this.hitStop, isCrit ? 0.14 : heavy ? 0.09 : 0.05);
+      if (target.hp > 0) this.hitStop = Math.max(this.hitStop, isCrit ? 0.045 : heavy ? 0.03 : 0.015);
       if (target.hp > 0 && (isCrit || heavy)) this.screenShake = Math.max(this.screenShake, isCrit ? 0.5 : 0.32);
     }
     if (isCrit) {
       this.critFlash = Math.max(this.critFlash, 0.2);
       AudioManager.playCritHit();
+      this.pushCombatFeedback('暴击', '#ffd968', target.x, target.y);
     }
+    if (hitInfo && hitInfo.element) this.pushCombatFeedback(`${hitInfo.element === 'fire' ? '火焰' : hitInfo.element === 'ice' ? '冰霜' : hitInfo.element === 'lightning' ? '雷电' : '附魔'}`, color, target.x, target.y, .65);
+    if (hitInfo && hitInfo.countered) this.pushCombatFeedback('克制', '#8affd8', target.x, target.y, .75);
     AudioManager.playMonsterHit(isBoss ? 'heavy' : (isCrit ? 'crit' : heavy ? 'heavy' : 'normal'), weaponId);
     if (isBoss) AudioManager.playBossHit();
     if (this.fxSprites && this.fxSprites.hitBlood) {
@@ -1954,6 +2018,7 @@ Object.assign(Expedition.prototype, {
   },
 
   damagePlayer(amount, source) {
+    if (!Number.isFinite(amount) || amount <= 0 || this.player.hp <= 0) return;
     if (this.player.invuln > 0) return;
     if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.checkPerfectDodge()) return;
     // 记录最后伤害来源（死亡原因埋点/平衡报表用）
@@ -1968,7 +2033,7 @@ Object.assign(Expedition.prototype, {
     }
     const defendingTower = this.towers.find(t => t.state === 'player' && dist(t, this.player) <= t.range);
     if (this.beastWave.active) {
-      amount *= defendingTower ? 0.38 : 1.45;
+      amount *= defendingTower ? 0.38 : (((this.map && this.map.tier) === 1) ? 1.15 : 1.45);
     } else if (defendingTower) {
       amount *= 0.76;
     }
@@ -1978,23 +2043,31 @@ Object.assign(Expedition.prototype, {
     // v5.8 协同：summon2/armor3 减伤(damageTaken 为负) + armor2/3 开战叠甲吸收 + 反伤
     // 注：frost_barrier/iron_armor/thorn_burst 的护盾/减伤/反伤由 js/v5.js 的 V5.modifyIncomingDamage
     // （上方 amount = V5.modifyIncomingDamage(this, amount)）统一消费 this.v5.shield / iron / reflect，此处不重复。
-    if (this.syn && this.syn.damageTaken) amount *= (1 + this.syn.damageTaken);
+    if (this.syn && this.syn.damageTaken) amount *= Math.max(0, 1 + this.syn.damageTaken);
+    amount = Math.max(0, amount);
     if (this.cardShield > 0 && amount > 0) {
       const absorbed = Math.min(this.cardShield, amount);
       this.cardShield -= absorbed; amount -= absorbed;
     }
+    if (amount <= 0) {
+      this.pushCombatFeedback('格挡', '#86d9ff', this.player.x, this.player.y);
+      return;
+    }
     this.player.hp -= amount;
     if (this.syn && this.syn.reflect && source && source.hp !== undefined && source.hp > 0 && source !== this.player) {
-      source.hp -= amount * this.syn.reflect;
+      source.hp = Math.max(0, source.hp - Math.max(0, amount * this.syn.reflect));
     }
     this._lastCombat = performance.now() / 1000;
     this.player.hitStun = (this.v5 && this.v5.iron > 0) ? 0 : 0.15; // 金刚藤甲霸体
     AudioManager.playPlayerHurt();
-    this.damageTaken += amount;
+    this.damageTaken += Math.max(0, amount);
     this.screenShake = Math.min(1, this.screenShake + 0.48);
     this.playerDamageFlash = 0.38;
     this.spawnHitParticles(this.player.x, this.player.y, '#ff4444');
     this.spawnShockRing(this.player.x, this.player.y, '#ff5544', 42);
+    const sx = source?.x ?? this.player.x, sy = source?.y ?? this.player.y;
+    const dir = Math.atan2(sy - this.player.y, sx - this.player.x);
+    this.pushCombatFeedback('受击', '#ff625c', this.player.x + Math.cos(dir) * 28, this.player.y + Math.sin(dir) * 28, .7);
     if (typeof CombatEnhancement !== 'undefined') {
       CombatEnhancement.onPlayerHit();
       const attacker = this.monsters.find(m => m.hp > 0 && Math.sqrt((m.x-this.player.x)**2+(m.y-this.player.y)**2) < 60);
@@ -2009,7 +2082,6 @@ Object.assign(Expedition.prototype, {
 
   updateRunSystems(dt) {
     if (window.V5) V5.tick(this, dt);
-    this.updatePlants(dt);
     if (typeof CombatEnhancement !== 'undefined') CombatEnhancement.update(dt);
     if (typeof DifficultySystem !== 'undefined') { DifficultySystem.tick(dt, this); DifficultySystem.tickPoison(dt, this); }
     this.updateWorldSystems(dt);
@@ -2066,8 +2138,9 @@ Object.assign(Expedition.prototype, {
             if (m.windupTarget === 'plant' && m.windupPlant && m.windupPlant.hp > 0) {
               this.damagePlant(m.windupPlant, m.damage);
             } else {
-              this.damagePlayer(m.damage, m);
-              if (typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
+              const inReach = dist(m, this.player) <= (m.attackRange || (m.type === 'boss' ? 110 : 48)) + (this.player.radius || 14);
+              if (inReach) this.damagePlayer(m.damage, m);
+              if (inReach && typeof DifficultySystem !== 'undefined') DifficultySystem.applyPoison(m, this);
             }
           }
           m.windupT = 0; m.windupKind = null; m.windupPlant = null;
@@ -2080,7 +2153,7 @@ Object.assign(Expedition.prototype, {
       if (m.stunned > 0) return;
 
       const d = dist(m, this.player);
-      const canSee = this.beastWave.active || (this.player.stealth <= 0 && d < 400);
+      const canSee = this.terrainCanDetect(m, d);
 
       // v3.7 巡逻队 AI：玩家不在视野内时沿路线走
       if (m.patrolRoute && !this.beastWave.active) {
@@ -2221,6 +2294,7 @@ Object.assign(Expedition.prototype, {
         this.nutrient = Math.min(this.nutrientMax, this.nutrient + nutrientGain);
         this.damageNumbers.push({ x: m.x, y: m.y - 22, value: `+${nutrientGain}`, color: '#ffe28a', life: .6, maxLife: .6, vx: 0, vy: -42, heavy: false });
         if (m.type === 'boss') {
+          this.spawnGroundLoot({ type: 'farm_item', id: 'rare_seed_pack', name: '稀有种子包', amount: 1, icon: '🌱' }, m.x, m.y + 24);
           this.spawnGroundLoot({ type: 'material', name: '首领核心', amount: 2 + this.map.tier, icon: '◆' }, m.x + 18, m.y);
           this.spawnGroundLoot({ type: 'gold', name: '首领赏金', amount: 150 * this.map.tier, icon: '💰' }, m.x - 18, m.y);
           showToast(`首领「${m.name}」已击败，撤离奖励提升`, 'success');
@@ -2413,10 +2487,14 @@ Object.assign(Expedition.prototype, {
           }
           p._aimInit = true;
         }
+        const prevX = p.x, prevY = p.y;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.life -= dt;
         let dead = p.life <= 0;
+        if (!dead && this.terrainBlocksProjectile(prevX, prevY, p.x, p.y, p.radius || 0)) {
+          dead = true; p.ricochet = 0; this.spawnImpact(p.x, p.y, '#b5b7a0', .65);
+        }
         // v3.7 弹道打道具（油桶/木箱）
         if (!dead && p.fromPlayer && this.props) {
           for (const pr of this.props) {
@@ -2447,6 +2525,7 @@ Object.assign(Expedition.prototype, {
                   x: p.x, y: p.y,
                   angle: Math.atan2(p.vy, p.vx),
                   weaponId: p.weaponId || '',
+                  element: p.element, fromPlant: !!p.fromPlant,
                   fromPlayer: !!p.fromPlayer
                 });
               }

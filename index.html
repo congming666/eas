@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>农庄牌：荒野远征 v5.8.0</title>
 <meta name="game-version" content="5.8.0">
-<link rel="stylesheet" href="css/style.css?v=5.8.0">
-<link rel="stylesheet" href="css/v58-title.css?v=5.8.0">
-<link rel="stylesheet" href="css/v58-card.css?v=5.8.0">
-<link rel="stylesheet" href="css/v58-farm.css?v=5.8.0">
-<link rel="stylesheet" href="css/v58-expedition.css?v=5.8.0">
+<link rel="stylesheet" href="css/style.css?v=layout-20261008">
+<link rel="stylesheet" href="css/v58-title.css?v=stars-20261008c">
+<link rel="stylesheet" href="css/v58-card.css?v=layout-20261008">
+<link rel="stylesheet" href="css/v58-farm.css?v=layout-20261008">
+<link rel="stylesheet" href="css/v58-expedition.css?v=layout-20261008">
+<link rel="stylesheet" href="css/expedition-layout.css?v=layout-20261008">
+<link rel="stylesheet" href="css/farm-comfort.css?v=weapon-icons-20261008">
 </head>
 <body>
 <div id="gameContainer">
@@ -18,23 +20,25 @@
   <canvas id="gameCanvas" width="1280" height="720"></canvas>
   <div id="audioControl">
     <button id="musicToggle" type="button" onclick="AudioManager.toggle()">♫ 音乐：开</button>
-    <input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)">
+    <details class="title-settings"><summary>设置</summary><div class="title-settings-panel"><label for="musicVolume">音乐音量</label><input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)"><label class="title-motion-option"><input id="titleReduceMotion" type="checkbox">减少首页动效</label></div></details>
   </div>
 
   <!-- 主菜单 · 星云序章 -->
   <div id="mainMenu" class="overlay">
     <div class="nebula-topbar">
-      <div class="nebula-brand nebula-glow">🌾 农庄牌 · 荒野远征</div>
+      <div class="nebula-brand">农庄牌 <span>／</span> 荒野远征</div>
       <div class="nebula-brand-meta nebula-glow-soft">星云序章 · 拖拽旋转 · 悬浮聚光</div>
     </div>
+    <svg class="title-homestead" viewBox="0 0 400 160" aria-hidden="true"><path d="M0 143 Q80 125 160 143 T400 138 V160 H0Z" fill="#0b211d"/><path d="M232 141V85L282 47L331 85V141Z" fill="#122925"/><path d="M218 87L282 38L345 87L336 92L282 51L225 93Z" fill="#172e29"/><path d="M304 53V29H316V65" fill="#172e29"/><g fill="#e7aa5c" class="title-window"><path d="M251 92H266V115H251Z M295 92H310V115H295Z"/></g><path d="M280 141V108H291V141" fill="#081813"/><path d="M258 91V117M294 103H311M250 103H267M302 91V117" stroke="#473c2b" stroke-width="2"/></svg>
     <div class="nebula-card">
       <div class="nebula-eyebrow nebula-glow">FARMBOUND EXPEDITION</div>
       <h1 class="nebula-title nebula-glow">荒野远征</h1>
       <p class="nebula-sub nebula-glow-soft">星云之下 · 守望农场 · 远征在即</p>
-      <button class="menu-btn nebula-btn" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
-      <button class="menu-btn nebula-btn" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
-      <div class="version-info nebula-ver nebula-glow-soft">v5.7 · 天气重构：连续天气平滑过渡 × 世界空间三层雨 × 地面积水反光 × 实体闪电与距离雷声 × 雾与视野融合 × 雪与寒冷值 × 集雨桶/避雷针</div>
+      <button class="menu-btn nebula-btn title-primary" onclick="Game.startGame()"><span class="nebula-glow">开 始 游 戏</span></button>
+      <button class="menu-btn nebula-btn title-secondary" onclick="Game.showHelp()"><span class="nebula-glow">游 戏 说 明</span></button>
+
     </div>
+    <span class="title-version" id="titleVersion"></span>
     <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
   </div>
 
@@ -139,58 +143,40 @@
         <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回家园</button>
       </div>
     </div>
-    <div class="prep-content">
-      <div class="prep-column">
-        <div class="prep-panel prep-map-panel">
-          <div class="panel-title">选择远征区域</div>
-          <div class="map-select" id="mapSelect"></div>
-        </div>
-        <div class="prep-panel">
-          <div class="panel-title">⚙️ 难度选择</div>
-          <div id="difficultySelect" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
-        </div>
-        <div class="prep-panel">
-          <div class="panel-title">🃏 本次常驻技能</div>
-          <div class="prep-skill-grid" id="prepSkillGrid"></div>
-        </div>
-      </div>
-      <div class="prep-column">
-        <div class="prep-panel prep-loadout">
-          <div class="panel-title">携带消耗品</div>
-          <div class="loadout-grid" id="loadoutGrid"></div>
-        </div>
-        <div class="prep-panel prep-loadout">
-          <div class="panel-title">携带植物防线（培育满100可部署）</div>
-          <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
-        </div>
-        <div class="prep-panel">
+<div class="prep-content"><section class="prep-column"><h3 class="prep-column-title">角色与装备</h3><div class="prep-panel">
           <div class="panel-title">带入武器（死亡永久失去！）</div>
           <div id="weaponLoadoutSelect" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
           <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">⚠️ 失败将永久失去此武器，成功撤离自动回仓</div>
-        </div>
-        <div class="prep-panel">
+        </div><div class="prep-panel">
+          <div class="panel-title">🃏 本次常驻技能</div>
+          <div class="prep-skill-grid" id="prepSkillGrid"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">作物 buff（收获作物获得，带入远征）</div>
+          <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得</div>
+        </div></section><section class="prep-column"><h3 class="prep-column-title">卡牌与补给</h3><div class="prep-panel prep-loadout">
+          <div class="panel-title">携带消耗品</div>
+          <div class="loadout-grid" id="loadoutGrid"></div>
+        </div><div class="prep-panel prep-loadout">
+          <div class="panel-title">携带植物防线（培育满100可部署）</div>
+          <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
+        </div><div class="prep-panel">
           <div class="panel-title">🌱 携带种子（进图按 F1-F5 种在地上）</div>
           <div id="seedLoadoutSelect" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">最多5个，种在地上整局作战，撤离后消失</div>
-        </div>
-        <div class="prep-panel">
+        </div></section><section class="prep-column"><h3 class="prep-column-title">地图与风险</h3><div class="prep-panel prep-map-panel">
+          <div class="panel-title">选择远征区域</div>
+          <div class="map-select" id="mapSelect"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">⚙️ 难度选择</div>
+          <div id="difficultySelect" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+        </div><div class="prep-panel">
           <div class="panel-title">🔥 Heat 修改器（可选，增加奖励）</div>
           <div id="heatSelect" style="display:flex;flex-direction:column;gap:6px;"></div>
-        </div>
-        <div class="prep-panel">
-          <div class="panel-title">作物 buff（收获作物获得，带入远征）</div>
-          <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得</div>
-        </div>
-        <div class="prep-panel">
+        </div><div class="prep-panel">
           <div class="panel-title">📡 区域提示</div>
           <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">选择地图后查看地形、环境和陷阱情报。</div>
-        </div>
-        <div class="prep-actions">
-          <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">取消</button>
-          <button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()">确认配置并出发</button>
-        </div>
-      </div>
-    </div>
+        </div></section></div>
+    <footer class="prep-footer"><div id="prepSummary" role="status"></div><div class="prep-actions"><button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回农场</button><button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()" aria-describedby="prepSummary">确认配置并出发</button></div></footer>
   </div>
 
   <!-- 远征HUD -->
@@ -223,14 +209,20 @@
         <div class="timer-display" id="timerDisplay">12:00</div>
         <div class="map-badge" id="mapNameDisplay">T1 · 荒废野田</div>
       </div>
-      <div class="bag-display" id="bagDisplay"></div>
+      <div class="hud-panel hud-target" id="targetPanel">
+        <div class="target-label">当前目标</div>
+        <div class="target-name" id="targetName">探索区域</div>
+        <div class="target-progress"><i id="targetProgress" style="width:0%"></i></div>
+        <div class="target-meta" id="targetMeta">准备行动</div>
+      </div>
+
     </div>
     <div class="hud-bottom" id="skillBar"></div>
     <div id="weaponDisplay"></div>
     <div class="consumable-bar" id="consumableBar"></div>
     <div class="defense-bar" id="defenseBar"></div>
-    <canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
-    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · 近战范围内自动拾取 · <kbd>1-4</kbd> 释放技能 · <kbd>5-9</kbd> 选防线 / <kbd>Z</kbd> 切换 · 左键部署</div>
+    <div class="bag-display" id="bagDisplay"></div><div id="playerConditions"></div><div id="nodeDirection"></div><button id="hudDetailsToggle" type="button" aria-expanded="false">展开信息</button><canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · <kbd>1-4</kbd> 技能 · <kbd>Q/R/E</kbd> 道具</div>
     <div class="controls-hint">
       <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | 战利品自动拾取<br>
       <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>
@@ -245,7 +237,7 @@
       <div class="result-subtitle" id="resultSubtitle">你成功带着战利品撤离了荒野</div>
       <div class="result-stats" id="resultStats"></div>
       <div class="loot-list" id="lootList"></div>
-      <button class="menu-btn" onclick="Game.returnToFarm()">返回农场</button>
+      <div class="result-actions"><button class="menu-btn" onclick="Game.returnToFarm();Game.openExpeditionPrep()">再次远征</button><button class="secondary-btn" onclick="Game.returnToFarm()">返回农场</button><button class="secondary-btn" onclick="ExpeditionLayout.openCollection()">查看卡牌收藏</button></div>
     </div>
   </div>
 
@@ -311,40 +303,41 @@
   <div id="toastContainer"></div>
 </div>
 
-  <script src="js/config.js?v=5.8.0"></script>
-  <script src="js/crop-art.js?v=5.8.0"></script>
-  <script src="js/save.js?v=5.8.0"></script>
-  <script src="js/telemetry.js?v=5.8.0"></script>
-  <script src="js/ui.js?v=5.8.0"></script>
-  <script src="js/card.js?v=5.8.0"></script>
-  <script src="js/farm.js?v=5.8.0"></script>
-  <script src="js/farm-expansion.js?v=5.8.0"></script>
-  <script src="js/warehouse.js?v=5.8.0"></script>
-  <script src="js/greenhouse.js?v=5.8.0"></script>
-  <script src="js/performance.js?v=5.8.0"></script>
+  <script src="js/config.js?v=farm-20261008"></script>
+  <script src="js/crop-art.js?v=layout-20261008"></script>
+  <script src="js/save.js?v=layout-20261008"></script>
+  <script src="js/telemetry.js?v=title-20261008b"></script>
+  <script src="js/ui.js?v=layout-20261008"></script>
+  <script src="js/card.js?v=layout-20261008"></script>
+  <script src="js/farm.js?v=farm-20261008"></script>
+  <script src="js/farm-expansion.js?v=farm-20261008"></script>
+  <script src="js/warehouse.js?v=weapon-icons-20261008"></script>
+  <script src="js/greenhouse.js?v=layout-20261008"></script>
+  <script src="js/performance.js?v=layout-20261008"></script>
   <script src="vendor/pixi.min.js"></script>
-  <script src="js/pixi-renderer.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-types.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-core.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-terrain.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-combat.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-effects.js?v=5.8.0"></script>
-  <script src="js/expedition/expedition-render.js?v=5.8.0"></script>
-  <script src="js/weather-system.js?v=5.8.0"></script>
-  <script src="js/world-fx.js?v=5.8.0"></script>
-  <script src="js/difficulty-system.js?v=5.8.0"></script>
-  <script src="js/npc-system.js?v=5.8.0"></script>
-  <script src="js/tech-system.js?v=5.8.0"></script>
-  <script src="js/v080-ui.js?v=5.8.0"></script>
-  <script src="js/crop-expansion.js?v=5.8.0"></script>
-  <script src="js/crop-render-ext.js?v=5.8.0"></script>
-  <script src="js/combat-enhancement.js?v=5.8.0"></script>
-  <script src="js/achievement-system.js?v=5.8.0"></script>
-  <script src="js/loadout-system.js?v=5.8.0"></script>
-  <script src="js/v58/card-data.js?v=5.8.0"></script>
-  <script src="js/v58/card-system.js?v=5.8.0"></script>
-  <script src="js/v5.js?v=5.8.0"></script>
-  <script src="js/game.js?v=5.8.0"></script>
+  <script src="js/pixi-renderer.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-types.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-core.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-terrain.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-world.js?v=terrain-20261008"></script>
+  <script src="js/expedition/expedition-combat.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-effects.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-render.js?v=layout-20261008"></script>
+  <script src="js/weather-system.js?v=layout-20261008"></script>
+  <script src="js/world-fx.js?v=layout-20261008"></script>
+  <script src="js/difficulty-system.js?v=layout-20261008"></script>
+  <script src="js/npc-system.js?v=layout-20261008"></script>
+  <script src="js/tech-system.js?v=farm-20261008-layout-20261008"></script>
+  <script src="js/v080-ui.js?v=farm-20261008-layout-20261008"></script>
+  <script src="js/crop-expansion.js?v=layout-20261008"></script>
+  <script src="js/crop-render-ext.js?v=layout-20261008"></script>
+  <script src="js/combat-enhancement.js?v=layout-20261008"></script>
+  <script src="js/achievement-system.js?v=layout-20261008"></script>
+  <script src="js/loadout-system.js?v=layout-20261008"></script>
+  <script src="js/v58/card-data.js?v=layout-20261008"></script>
+  <script src="js/v58/card-system.js?v=layout-20261008"></script>
+  <script src="js/v5.js?v=farm-20261008"></script>
+  <script src="js/game.js?v=farm-20261008-layout-20261008"></script>
 
   <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -355,8 +348,9 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js?v=5.8.0"></script>
-  <script src="js/nebula-text.js?v=5.8.0"></script>
+  <script src="js/nebula.js?v=layout-20261008"></script>
+  <script src="js/nebula-text.js?v=title-20261008b"></script>
+  <script src="js/title-starfield.js?v=stars-20261008c"></script>
 
   <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
@@ -399,7 +393,9 @@
   </div>
 
 
-  <script src="js/farm-ui.js?v=5.8.0"></script>
+  <script src="js/farm-panorama.js?v=farm-20261008"></script>
+  <script src="js/farm-ui.js?v=farm-20261008"></script>
+<script src="js/expedition-layout.js?v=layout-20261008"></script>
 
   <!-- v0.8.0 NPC模态 -->
   <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">

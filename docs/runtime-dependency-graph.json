@@ -1,0 +1,447 @@
+{
+  "generatedAt": "2026-10-08T09:47:12.370Z",
+  "entry": "index.html",
+  "scripts": [
+    {
+      "order": 1,
+      "module": "js/config.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 2,
+      "module": "js/crop-art.js",
+      "provides": [
+        "CropArt"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 3,
+      "module": "js/save.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/v58/card-system.js"
+      ]
+    },
+    {
+      "order": 4,
+      "module": "js/telemetry.js",
+      "provides": [
+        "Telemetry"
+      ],
+      "dependsOn": [
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 5,
+      "module": "js/ui.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v58/card-system.js"
+      ]
+    },
+    {
+      "order": 6,
+      "module": "js/card.js",
+      "provides": [
+        "__v58Bridge",
+        "CardSystem"
+      ],
+      "dependsOn": [
+        "js/v58/card-system.js",
+        "js/v58/card-data.js",
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 7,
+      "module": "js/farm.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/farm-expansion.js",
+        "js/crop-render-ext.js",
+        "js/crop-art.js",
+        "js/crop-expansion.js",
+        "js/card.js",
+        "js/npc-system.js"
+      ]
+    },
+    {
+      "order": 8,
+      "module": "js/farm-expansion.js",
+      "provides": [
+        "FarmTraitSystem",
+        "FarmCareSystem",
+        "FarmProcessingSystem",
+        "FarmCollectionSystem",
+        "FarmDecorationSystem",
+        "FarmRecipes",
+        "DecoShopItems"
+      ],
+      "dependsOn": [
+        "js/weather-system.js",
+        "js/v5.js",
+        "js/telemetry.js"
+      ]
+    },
+    {
+      "order": 9,
+      "module": "js/warehouse.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/loadout-system.js",
+        "js/crop-art.js"
+      ]
+    },
+    {
+      "order": 10,
+      "module": "js/greenhouse.js",
+      "provides": [
+        "__ghRegisterV58"
+      ],
+      "dependsOn": [
+        "js/v5.js",
+        "js/crop-art.js"
+      ]
+    },
+    {
+      "order": 11,
+      "module": "js/performance.js",
+      "provides": [
+        "SpatialHash",
+        "TerrainChunkCache"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 12,
+      "module": "js/pixi-renderer.js",
+      "provides": [
+        "PixiEffects"
+      ],
+      "dependsOn": [
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 13,
+      "module": "js/expedition/expedition-types.js",
+      "provides": [],
+      "dependsOn": []
+    },
+    {
+      "order": 14,
+      "module": "js/expedition/expedition-core.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/tech-system.js",
+        "js/loadout-system.js",
+        "js/crop-expansion.js",
+        "js/performance.js",
+        "js/difficulty-system.js",
+        "js/combat-enhancement.js",
+        "js/crop-art.js"
+      ]
+    },
+    {
+      "order": 15,
+      "module": "js/expedition/expedition-terrain.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/combat-enhancement.js",
+        "js/v58/card-system.js",
+        "js/v58/card-data.js",
+        "js/loadout-system.js"
+      ]
+    },
+    {
+      "order": 16,
+      "module": "js/expedition/expedition-world.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 17,
+      "module": "js/expedition/expedition-combat.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/telemetry.js",
+        "js/loadout-system.js",
+        "js/crop-art.js",
+        "js/v58/card-data.js",
+        "js/v58/card-system.js",
+        "js/difficulty-system.js",
+        "js/achievement-system.js",
+        "js/tech-system.js",
+        "js/weather-system.js",
+        "js/combat-enhancement.js"
+      ]
+    },
+    {
+      "order": 18,
+      "module": "js/expedition/expedition-effects.js",
+      "provides": [],
+      "dependsOn": []
+    },
+    {
+      "order": 19,
+      "module": "js/expedition/expedition-render.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/crop-art.js",
+        "js/loadout-system.js",
+        "js/weather-system.js",
+        "js/pixi-renderer.js",
+        "js/combat-enhancement.js"
+      ]
+    },
+    {
+      "order": 20,
+      "module": "js/weather-system.js",
+      "provides": [
+        "showToast",
+        "WeatherFX",
+        "WeatherSystem"
+      ],
+      "dependsOn": [
+        "js/v5.js",
+        "js/farm-expansion.js"
+      ]
+    },
+    {
+      "order": 21,
+      "module": "js/world-fx.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/weather-system.js"
+      ]
+    },
+    {
+      "order": 22,
+      "module": "js/difficulty-system.js",
+      "provides": [
+        "DifficultySystem"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 23,
+      "module": "js/npc-system.js",
+      "provides": [
+        "NpcSystem"
+      ],
+      "dependsOn": [
+        "js/farm-expansion.js"
+      ]
+    },
+    {
+      "order": 24,
+      "module": "js/tech-system.js",
+      "provides": [
+        "TechSystem"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 25,
+      "module": "js/v080-ui.js",
+      "provides": [
+        "NpcSystemUI",
+        "TechSystemUI",
+        "DiaryUI"
+      ],
+      "dependsOn": [
+        "js/npc-system.js",
+        "js/tech-system.js"
+      ]
+    },
+    {
+      "order": 26,
+      "module": "js/crop-expansion.js",
+      "provides": [
+        "CropExpansion"
+      ],
+      "dependsOn": [
+        "js/v5.js",
+        "js/farm-expansion.js"
+      ]
+    },
+    {
+      "order": 27,
+      "module": "js/crop-render-ext.js",
+      "provides": [
+        "CropRenderExt"
+      ],
+      "dependsOn": [
+        "js/crop-expansion.js",
+        "js/weather-system.js",
+        "js/crop-art.js",
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 28,
+      "module": "js/combat-enhancement.js",
+      "provides": [
+        "CombatEnhancement"
+      ],
+      "dependsOn": [
+        "js/difficulty-system.js",
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 29,
+      "module": "js/achievement-system.js",
+      "provides": [
+        "AchievementSystem"
+      ],
+      "dependsOn": [
+        "js/npc-system.js"
+      ]
+    },
+    {
+      "order": 30,
+      "module": "js/loadout-system.js",
+      "provides": [
+        "LoadoutSystem"
+      ],
+      "dependsOn": [
+        "js/telemetry.js",
+        "js/v5.js",
+        "js/achievement-system.js"
+      ]
+    },
+    {
+      "order": 31,
+      "module": "js/v58/card-data.js",
+      "provides": [
+        "CARD_DATA"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 32,
+      "module": "js/v58/card-system.js",
+      "provides": [
+        "CardV58"
+      ],
+      "dependsOn": [
+        "js/v58/card-data.js"
+      ]
+    },
+    {
+      "order": 33,
+      "module": "js/v5.js",
+      "provides": [
+        "CONFIG",
+        "V5",
+        "getSkillStats",
+        "CharacterSystem",
+        "ResourceSystem",
+        "ArchiveSystem",
+        "CodexSystem"
+      ],
+      "dependsOn": [
+        "js/v58/card-system.js",
+        "js/farm-expansion.js",
+        "js/telemetry.js",
+        "js/achievement-system.js",
+        "js/tech-system.js",
+        "js/combat-enhancement.js",
+        "js/difficulty-system.js",
+        "js/crop-art.js"
+      ]
+    },
+    {
+      "order": 34,
+      "module": "js/game.js",
+      "provides": [],
+      "dependsOn": [
+        "js/npc-system.js",
+        "js/tech-system.js",
+        "js/crop-expansion.js",
+        "js/achievement-system.js",
+        "js/loadout-system.js",
+        "js/card.js",
+        "js/difficulty-system.js",
+        "js/v5.js",
+        "js/crop-art.js",
+        "js/farm-expansion.js",
+        "js/farm-ui.js",
+        "js/telemetry.js",
+        "js/pixi-renderer.js",
+        "js/combat-enhancement.js"
+      ]
+    },
+    {
+      "order": 35,
+      "module": "js/nebula.js",
+      "provides": [
+        "Nebula"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 36,
+      "module": "js/nebula-text.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js"
+      ]
+    },
+    {
+      "order": 37,
+      "module": "js/title-starfield.js",
+      "provides": [],
+      "dependsOn": []
+    },
+    {
+      "order": 38,
+      "module": "js/farm-panorama.js",
+      "provides": [
+        "FarmPanorama"
+      ],
+      "dependsOn": []
+    },
+    {
+      "order": 39,
+      "module": "js/farm-ui.js",
+      "provides": [
+        "__farmCmdInit",
+        "FarmUI"
+      ],
+      "dependsOn": [
+        "js/farm-expansion.js",
+        "js/v5.js",
+        "js/weather-system.js",
+        "js/achievement-system.js",
+        "js/farm-panorama.js"
+      ]
+    },
+    {
+      "order": 40,
+      "module": "js/expedition-layout.js",
+      "provides": [],
+      "dependsOn": [
+        "js/v5.js",
+        "js/loadout-system.js",
+        "js/v58/card-system.js"
+      ]
+    }
+  ]
+}

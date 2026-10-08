@@ -49,6 +49,7 @@ const Game = {
     AudioManager.setScene('menu');
     SaveSystem.save();
     clearInterval(this.farmInterval);
+    this.farmInterval = null;
     document.getElementById('farmScreen').classList.add('hidden');
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('mainMenu').classList.remove('hidden');
@@ -59,8 +60,37 @@ const Game = {
 
   showHelp() {
     AudioManager.start('menu');
-    showToast('WASD移动，左键攻击/交互，战利品会在近战范围内自动拾取，1-4技能', 'success');
-    setTimeout(() => showToast('搜物资、打怪物、找撤离点，活着回来！', 'gold'), 1000);
+    if (document.getElementById('gameHelpOverlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'gameHelpOverlay';
+    ov.className = 'v58-overlay';
+    ov.innerHTML = `<div class="v58-modal" style="max-width:780px;max-height:86vh;overflow-y:auto;text-align:left;">
+      <h3 class="v58-modal-title" style="text-align:center;">《农庄牌：荒野远征》新手指南</h3>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🎯 目标</b><br>
+      进入远征 → 搜集物资、击败怪物 → 找到<b>撤离点</b>并坚持读条完成撤离，把战利品带回家园；反复强化装备与卡牌，挑战更高层级。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🎮 操作</b><br>
+      <b>WASD</b> 移动　|　<b>鼠标瞄准 · 左键</b> 攻击 / 交互（开宝箱、占塔、进撤离点）<br>
+      <b>1–4</b> 释放技能　|　<b>Q / R</b> 使用消耗品　|　<b>Shift</b> 冲刺　|　<b>Esc</b> 暂停　|　<b>Tab</b> 背包<br>
+      战利品靠近后自动拾取。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🔄 核心循环</b><br>
+      家园（种作物 → 育种 / 锻造 / 配装）→ 远征（清怪 / 开箱 / 三选一夺卡）→ 撤离铭记卡牌（或失败：武器掉级但<b>不会销毁</b>）→ 反哺家园。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🧩 关键系统</b><br>
+      · <b>武器</b>：近战 / 远程，在锻造台用材料打造、升级（每级 +10% 伤害并解锁词条）。<br>
+      · <b>技能 / 卡牌</b>：8 大流派与元素克制环（克制 +25%），通过三选一夺卡构筑流派。<br>
+      · <b>种植</b>：家园种作物产出材料 / 食物；远征中可种「植物防线」协助作战。</div>
+
+      <div style="margin:10px 0;"><b style="color:#9be8ba;">💡 新手建议</b><br>
+      先打 T1「低危」图并跟着任务走；优先开宝箱、<b>占领防御塔</b>（塔下减伤）；残血及时用草药包；撤离读条时<b>待在圈内即可</b>（圈内会自动清怪）。不用怕失败——入门武器不会永久损毁。</div>
+
+      <button class="start-expedition-btn" id="gameHelpClose" style="margin-top:12px;width:100%;">我知道了，开始远征</button>
+    </div>`;
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+    document.getElementById('gameHelpClose').onclick = () => ov.remove();
   },
 
   openCardWorkshop() {
@@ -74,8 +104,16 @@ const Game = {
 
   openExpeditionPrep() {
     AudioManager.setScene('prep');
+    this.hideNebulaFX(true);   // 隐藏主菜单星云粒子层，避免其高 z-index 遮住准备大厅
+    // 兜底：武器实例为空时补发一把入门武器，防止任何路径导致的软锁死
+    if (!GameState.weaponInstances || GameState.weaponInstances.length === 0) {
+      const uid = LoadoutSystem._nextUid();
+      GameState.weaponInstances.push({ uid, weaponId: 'harvest_sickle', level: 0 });
+      showToast('已为你补发一把入门武器：收割镰刀', 'gold');
+    }
     SaveSystem.save();
     clearInterval(this.farmInterval);
+    this.farmInterval = null;
     document.getElementById('farmScreen').classList.add('hidden');
     document.getElementById('expeditionPrepScreen').classList.remove('hidden');
     GameState.screen = 'prep';
@@ -96,6 +134,7 @@ const Game = {
     // v1.0 渲染带入武器选择
     this.renderWeaponLoadout();
     this.renderSeedLoadout();
+    ExpeditionLayout.prepare();
   },
 
   renderSeedLoadout() {
@@ -185,6 +224,7 @@ const Game = {
       try {
         if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.tick(1);
         if (typeof FarmProcessingSystem !== 'undefined') FarmProcessingSystem.tick(1);
+        if (typeof FarmUI !== "undefined") FarmUI.refreshProcessing();
         if (typeof FarmDecorationSystem !== 'undefined') FarmDecorationSystem.tick(1);
         Farm.render();
       } catch (error) { console.error('[Farm] 定时渲染失败:', error); }
@@ -201,7 +241,8 @@ const Game = {
   },
 
   startExpedition() {
-    const map = CONFIG.maps.find(m => m.id === GameState.selectedMap);
+    const map = CONFIG.maps.find(m => m.id === GameState.selectedMap) || CONFIG.maps[0];
+    if (!map) { showToast('没有可进入的远征区域', 'warning'); return; }
     if (GameState.gold < map.entryFee) {
       showToast('金币不足，无法支付入场费', 'warning');
       return;
@@ -229,6 +270,7 @@ const Game = {
     SaveSystem.save();
     AudioManager.setScene('expedition');
     clearInterval(this.farmInterval);
+    this.farmInterval = null;
     document.getElementById('farmScreen').classList.add('hidden');
     document.getElementById('expeditionPrepScreen').classList.add('hidden');
     document.getElementById('expeditionHUD').classList.remove('hidden');
@@ -253,27 +295,31 @@ const Game = {
     const frameTime = Math.min((now - this.lastTime) / 1000, 0.25);
     this.lastTime = now;
 
-    if (this.expedition && !this.expedition.gameOver) {
-      if (this.expedition.hitStop > 0) {
-        this.expedition.hitStop = Math.max(0, this.expedition.hitStop - frameTime);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        this.expedition.render(ctx, 0);
-        PixiEffects.render(this.expedition);
-        this.animId = requestAnimationFrame(() => this.gameLoop());
-        return;
+    // 健壮性：单帧 update/render 出错不得杀死整条 RAF 链，否则游戏会永久卡死
+    try {
+      if (this.expedition && !this.expedition.gameOver) {
+        if (this.expedition.hitStop > 0) {
+          this.expedition.hitStop = Math.max(0, this.expedition.hitStop - frameTime);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          this.expedition.render(ctx, 0);
+          PixiEffects.render(this.expedition);
+        } else {
+          // Fixed 60 Hz simulation; rendering remains synchronized to the display refresh rate.
+          const fixedStep = 1 / 60;
+          this.accumulator = Math.min((this.accumulator || 0) + frameTime, fixedStep * 8);
+          let steps = 0;
+          while (this.accumulator >= fixedStep && steps < 8) {
+            this.expedition.update(fixedStep);
+            this.accumulator -= fixedStep;
+            steps++;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          this.expedition.render(ctx, this.accumulator / fixedStep);
+          PixiEffects.render(this.expedition);
+        }
       }
-      // Fixed 60 Hz simulation; rendering remains synchronized to the display refresh rate.
-      const fixedStep = 1 / 60;
-      this.accumulator = Math.min((this.accumulator || 0) + frameTime, fixedStep * 8);
-      let steps = 0;
-      while (this.accumulator >= fixedStep && steps < 8) {
-        this.expedition.update(fixedStep);
-        this.accumulator -= fixedStep;
-        steps++;
-      }
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      this.expedition.render(ctx, this.accumulator / fixedStep);
-      PixiEffects.render(this.expedition);
+    } catch (err) {
+      console.error('[gameLoop] 本帧出现错误，已跳过以保持游戏继续运行：', err);
     }
 
     if (GameState.screen === 'expedition') {
@@ -370,7 +416,7 @@ const Game = {
         plantHtml += `<div class="loot-item kept" style="margin-bottom:4px;"><span>${p.icon} ${p.name}</span><span style="color:${color};">${sign}${p.delta} 培育进度</span></div>`;
       });
     }
-    lootList.innerHTML = highlightHtml + '<div style="font-size:14px;color:#888;margin:12px 0 8px;">战利品清单</div>' + plantHtml;
+    lootList.innerHTML = '<div style="font-size:14px;color:#888;margin:12px 0 8px;">战利品清单</div>' + plantHtml;
     const lootIcon = (i) => (typeof CropArt !== 'undefined') ? CropArt.domFor(i, 20) : (i.icon || '📦');
     data.keptItems.forEach(i => {
       lootList.innerHTML += `<div class="loot-item kept"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
@@ -379,8 +425,10 @@ const Game = {
       lootList.innerHTML += `<div class="loot-item lost"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✗ 丢失</span></div>`;
     });
     if (data.keptItems.length === 0 && data.lostItems.length === 0) {
-      lootList.innerHTML += '<div style="color:#666;text-align:center;padding:20px;">本次远征没有获得物资</div>';
+      lootList.innerHTML += '<div class="empty-loot">本次没有保留或遗失物资</div>';
     }
+    if (data.success) lootList.innerHTML += '<details><summary>查看本局战斗记录</summary>' + highlightHtml + '</details>';
+    ExpeditionLayout.result(data);
   },
 
   returnToFarm() {
@@ -435,7 +483,7 @@ const Game = {
     let html = '<div style="width:640px;max-height:82vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
     html += '<h3 style="color:#ffd700;margin:0 0 8px;">🔨 武器锻造台</h3>';
     html += '<p style="color:#aaa;font-size:12px;margin-bottom:6px;">每把武器独立等级，死亡永久损失。升级单个实例，打造补充新武器。</p>';
-    html += '<p style="color:#ffcf8a;font-size:12px;margin:0 0 12px;">锻造与升级只消耗农作物产出的材料（Lv6+ 需要精炼/稀有材料，Lv7-10 需要温室/稀有作物材料）；修为仅用于修行台角色升级。</p>';
+    html += '<p style="color:#ffcf8a;font-size:12px;margin:0 0 12px;">材料均由农作物产出（Lv6+ 需精炼/稀有材料，Lv7-10 需温室/稀有作物材料）。升级可自主选择：「材料升级」纯付材料，或「修为抵扣」材料先用、缺口按比例用修为补上（凝气草产修为）。</p>';
 
     // 现有武器实例
     html += '<div style="margin-bottom:12px;"><div style="color:#8ecf9a;font-weight:bold;margin-bottom:6px;">仓库中的武器</div>';
@@ -446,6 +494,7 @@ const Game = {
       if (!wpn) return;
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
       const cost = LoadoutSystem.getUpgradeCost(inst.uid);
+      const plan = cost ? LoadoutSystem.getCultivationUpgradePlan(inst.uid) : null;
       html += '<div style="padding:8px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
       html += '<div style="display:flex;align-items:center;gap:10px;"><img src="' + wpn.img + '" style="width:40px;height:40px;object-fit:contain;border-radius:4px;" onerror="this.style.display=\'none\'">';
       html += '<div><span style="color:#e6bd54;font-weight:bold;">' + wpn.name + '</span>';
@@ -453,9 +502,12 @@ const Game = {
       html += '<span style="color:#888;font-size:11px;"> 伤害' + (stats?stats.damage:wpn.damage) + '</span></div></div>';
       if (cost) {
         html += '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;min-width:230px;">';
-        html += '<div style="color:#d8b46a;font-size:10px;">' + cost.gold + ' 金币</div>';
+        html += '<div style="color:#d8b46a;font-size:10px;">' + cost.gold + ' 金币（两种方式都需）</div>';
         html += '<div style="text-align:right;">' + matLines(cost.materials) + '</div>';
+        html += '<div style="display:flex;gap:6px;">';
         html += '<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.upgradeWeapon(\'' + inst.uid + '\');Game.openBlacksmith()">材料升级</button>';
+        html += '<button class="secondary-btn" style="font-size:11px;" title="材料先用，缺口按比例用修为抵扣" onclick="LoadoutSystem.upgradeWeaponWithCultivation(\'' + inst.uid + '\');Game.openBlacksmith()">修为抵扣（需' + (plan ? plan.needCultivation : 0) + '）</button>';
+        html += '</div>';
         html += '</div>';
       } else {
         html += '<span style="color:#ffd700;font-size:11px;">已满级</span>';

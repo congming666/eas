@@ -37,24 +37,33 @@
    * 每条 [材料id, 单株概率, 命中数量]；高品质收获有数量加成
    * -------------------------------------------------------- */
   const CROP_MATERIALS = {
-    pea_shooter:    [['wood', 0.5, 1]],
-    sunflower:      [['fiber', 0.4, 1]],
-    watermelon:     [['crystal', 0.25, 1]],
-    cabbage:        [['fiber', 0.5, 1]],
-    wheat:          [['fiber', 0.7, 1]],
-    carrot:         [['compost', 0.3, 1]],
-    chili:          [['venom', 0.3, 1]],
-    garlic:         [['fiber', 0.45, 1]],
-    mint:           [['fiber', 0.4, 1]],
-    cactus:         [['stone', 0.5, 1], ['carapace', 0.4, 1], ['iron', 0.28, 1]],
-    rice:           [['fiber', 0.8, 1]],
-    ginseng:        [['wood', 0.8, 2], ['bossFang', 0.25, 1]],
-    tomato:         [['fiber', 0.35, 1]],
-    rosemary:       [['fiber', 0.45, 1]],
-    frost_flower:   [['crystal', 0.45, 1]],
-    lightning_vine: [['iron', 0.55, 1], ['crystal', 0.2, 1], ['refined_iron', 0.12, 1]],
-    shadow_flower:  [['crystal', 0.5, 1], ['soul_ash', 0.45, 1]],
-    deathcap:       [['venom', 0.7, 1], ['soul_ash', 0.5, 1], ['bossFang', 0.12, 1]],
+    // —— 初始 7 作物（差异化副产物，不再 8 种挤 fiber）——
+    pea_shooter:    [['wood', 0.50, 1], ['herb', 0.20, 1], ['compost', 0.15, 1]],
+    sunflower:      [['wood', 0.40, 1], ['crystal', 0.15, 1], ['compost', 0.20, 1]],
+    watermelon:     [['crystal', 0.25, 1], ['water', 0.30, 1], ['herb', 0.15, 1]],
+    cabbage:        [['fiber', 0.50, 1], ['herb', 0.30, 1], ['compost', 0.20, 1]],
+    wheat:          [['fiber', 0.70, 1], ['wood', 0.20, 1], ['compost', 0.25, 1]],
+    tinder_grass:   [['wood', 0.45, 1], ['stone', 0.25, 1], ['compost', 0.15, 1]],
+    ningqi_grass:   [['crystal', 0.20, 1], ['soul_ash', 0.10, 1], ['herb', 0.15, 1]],
+    // —— 普通作物 ——
+    carrot:         [['compost', 0.30, 1], ['water', 0.25, 1], ['herb', 0.25, 1]],
+    corn:           [['fiber', 0.45, 1], ['water', 0.30, 1], ['compost', 0.20, 1]],
+    pumpkin:        [['fiber', 0.40, 1], ['wood', 0.30, 1], ['compost', 0.25, 1]],
+    moon_rice:      [['crystal', 0.30, 1], ['soul_ash', 0.20, 1], ['fiber', 0.35, 1]],
+    chili:          [['venom', 0.30, 1], ['wood', 0.20, 1], ['herb', 0.15, 1]],
+    garlic:         [['herb', 0.45, 1], ['fiber', 0.30, 1], ['venom', 0.15, 1]],
+    mint:           [['herb', 0.40, 1], ['water', 0.30, 1], ['fiber', 0.20, 1]],
+    cactus:         [['stone', 0.50, 1], ['carapace', 0.40, 1], ['iron', 0.28, 1]],
+    rice:           [['fiber', 0.50, 1], ['water', 0.30, 1], ['compost', 0.20, 1]],
+    ginseng:        [['wood', 0.80, 2], ['bossFang', 0.25, 1], ['herb', 0.40, 1]],
+    tomato:         [['water', 0.35, 1], ['herb', 0.25, 1], ['compost', 0.20, 1]],
+    rosemary:       [['herb', 0.45, 1], ['fiber', 0.30, 1], ['crystal', 0.15, 1]],
+    lingsui_wheat:  [['fiber', 0.40, 1], ['crystal', 0.20, 1], ['soul_ash', 0.12, 1]],
+    // —— 高级/稀有作物 ——
+    frost_flower:   [['crystal', 0.45, 1], ['water', 0.40, 1], ['refined_iron', 0.10, 1]],
+    lightning_vine: [['iron', 0.55, 1], ['crystal', 0.20, 1], ['refined_iron', 0.12, 1]],
+    shadow_flower:  [['crystal', 0.50, 1], ['soul_ash', 0.45, 1], ['bossFang', 0.10, 1]],
+    deathcap:       [['venom', 0.70, 1], ['soul_ash', 0.50, 1], ['bossFang', 0.12, 1]],
   };
   CONFIG.cropMaterials = CROP_MATERIALS;
 
@@ -143,7 +152,8 @@
       ? window.__v58Bridge.baseLevel(skill.id)
       : ((typeof GameState !== 'undefined' && GameState.skillLevels) ? (GameState.skillLevels[skill.id] || 1) : 1);
     const lvl = Math.max(1, Math.min(8, base + (extraLevels || 0)));
-    const s = scaleSkill(skill, Math.min(5, Math.max(1, base)));
+    // 技能等级上限统一为 8；精通基础等级和旧存档等级都必须真正影响 6-8 级数值。
+    const s = scaleSkill(skill, Math.min(8, Math.max(1, base)));
     s.level = lvl;
     s.extraLevels = extraLevels;
     if (extraLevels > 0) { // 卡牌临时等级也加成数值
@@ -318,7 +328,7 @@
     t1_quarry:      { id: 't1_quarry', name: '采石巨魔', tier: 1, hp: 3600, dmg: 26, speed: 64, radius: 50, emoji: '🗿', color: '#9b8b78', skill: '范围投石 + 岩石护甲减伤', loot: ['bossFang', 'stone', 'iron'] },
     t2_gargoyle_lord: { id: 't2_gargoyle_lord', name: '石像鬼王', tier: 2, hp: 8400, dmg: 28, speed: 104, radius: 46, emoji: '🦇', color: '#7d8a99', flying: true, skill: '石化凝视 + 俯冲 + 弹幕散射', loot: ['bossFang', 'carapace', 'stone'] },
     t2_ruin_golem:  { id: 't2_ruin_golem', name: '废墟魔像', tier: 2, hp: 8600, dmg: 30, speed: 60, radius: 52, emoji: '🗿', color: '#8d8578', skill: '血量分裂 + 反伤岩石护盾 + 碎石弹', loot: ['bossFang', 'refined_iron', 'crystal'] },
-    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 9800, dmg: 32, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼陷阱 + 召唤雾天 + 诅咒毒弹（远程风筝）', loot: ['bossFang', 'venom', 'soul_ash'] },
+    t3_swamp_hag:   { id: 't3_swamp_hag', name: '沼泽巫妪', tier: 3, hp: 17000, dmg: 32, speed: 82, radius: 46, emoji: '🧙‍♀️', color: '#7fae5a', ranged: true, skill: '毒沼陷阱 + 召唤雾天 + 诅咒毒弹（远程风筝）', loot: ['bossFang', 'venom', 'soul_ash'] },
     t3_brood_mother:{ id: 't3_brood_mother', name: '虫母', tier: 3, hp: 21000, dmg: 28, speed: 72, radius: 52, emoji: '🕷️', color: '#a06bb0', summoner: true, skill: '产卵虫潮 + 蛛网陷阱', loot: ['bossFang', 'carapace', 'venom'] },
     t3_scorch_demon:{ id: 't3_scorch_demon', name: '焦林炎魔', tier: 3, hp: 23000, dmg: 36, speed: 88, radius: 48, emoji: '🔥', color: '#ff6a3c', skill: '火雨陷阱 + 召唤雷暴 + 火焰连射', loot: ['bossFang', 'crystal', 'soul_ash'] },
     t4_abyss_lord:  { id: 't4_abyss_lord', name: '深渊领主', tier: 4, hp: 170000, dmg: 40, speed: 80, radius: 56, emoji: '👹', color: '#8a3bd8', skill: '复活尸体 + 深渊领域（雾天召唤）', loot: ['bossFang', 'soul_ash', 'crystal'] },
@@ -345,12 +355,12 @@
 
   // 每张地图：怪物池权重 + 专属精英 + Boss + 天气倾向
   const MAP_CFG = {
-    t1_1: { boss: 't1_boar_king', elite: 'boar_king', weather: '晴', pool: [['boar', 6], ['bat', 2], ['spider', 2], ['treant', 2]] },
-    t1_2: { boss: 't1_boar_king', elite: 'boar_king', weather: '晴', pool: [['boar', 5], ['bat', 4], ['spider', 1], ['treant', 1]] },
-    t1_3: { boss: 't1_withered', elite: 'withered_treant', weather: '多云', pool: [['boar', 3], ['bat', 2], ['treant', 5], ['spider', 2]] },
-    t1_4: { boss: 't1_withered', elite: 'withered_treant', weather: '多云', pool: [['boar', 3], ['treant', 4], ['spider', 3], ['bat', 2]] },
-    t1_5: { boss: 't1_quarry', elite: 'quarry_troll', weather: '晴', pool: [['boar', 3], ['treant', 3], ['spider', 2], ['bat', 2]] },
-    t1_6: { boss: 't1_quarry', elite: 'quarry_troll', weather: '晴', pool: [['boar', 4], ['spider', 3], ['bat', 3], ['treant', 2]] },
+    t1_1: { boss: 't1_boar_king', elite: null, weather: '晴', pool: [['boar', 8], ['bat', 2], ['spider', 2]] },
+    t1_2: { boss: 't1_boar_king', elite: null, weather: '晴', pool: [['boar', 6], ['bat', 4], ['spider', 2]] },
+    t1_3: { boss: 't1_withered', elite: 'withered_treant', weather: '多云', pool: [['boar', 6], ['bat', 4], ['spider', 2]] },
+    t1_4: { boss: 't1_withered', elite: 'withered_treant', weather: '多云', pool: [['boar', 5], ['spider', 5], ['bat', 2]] },
+    t1_5: { boss: 't1_quarry', elite: 'quarry_troll', weather: '晴', pool: [['boar', 5], ['spider', 2], ['bat', 3]] },
+    t1_6: { boss: 't1_quarry', elite: 'quarry_troll', weather: '晴', pool: [['boar', 6], ['spider', 3], ['bat', 3]] },
     t2_1: { boss: 't2_gargoyle_lord', elite: 'stone_golem', weather: '雾', pool: [['boar', 2], ['bat', 4], ['spider', 3], ['locust', 2], ['gargoyle', 3], ['wolf', 2], ['treant', 1]] },
     t2_2: { boss: 't2_gargoyle_lord', elite: 'stone_golem', weather: '雾', pool: [['boar', 2], ['bat', 3], ['spider', 4], ['gargoyle', 3], ['locust', 2], ['wolf', 2]] },
     t2_3: { boss: 't2_gargoyle_lord', elite: 'mill_wraith', weather: '阴', pool: [['spider', 5], ['gargoyle', 4], ['bat', 3], ['locust', 2], ['wolf', 1]] },
@@ -488,7 +498,7 @@
         const nextLv = lv + 1;
         if (GROWTH.slotLevels.includes(nextLv) || nextLv === 100) {
           if (!this.breakthroughMet(nextLv)) {
-            GameState.cultivation = need; // 卡在突破门槛
+            /* 保留突破前积累的修为 */ // 卡在突破门槛
             if (!silent) showToast(`已达 Lv${lv} 突破门槛，请完成远征档案：${this.breakthroughHint(nextLv)}`, 'warning');
             break;
           }
@@ -755,7 +765,11 @@
       if (r.safe) { GameState.safeSlots = Math.min(3, (GameState.safeSlots || 1) + r.safe); }
       if (r.rareSeed) Warehouse.addItem('seeds', 3 * r.rareSeed);
       if (r.legendarySeed) { GameState.legendarySeeds = (GameState.legendarySeeds || 0) + r.legendarySeed; }
-      if (r.blueprint) { GameState.blueprints = (GameState.blueprints || 0) + r.blueprint; }
+      if (r.blueprint) {
+        if (!Array.isArray(GameState.blueprints)) GameState.blueprints = [];
+        CONFIG.weapons.filter(w => w.blueprint && !GameState.blueprints.includes(w.id))
+          .slice(0, r.blueprint).forEach(w => GameState.blueprints.push(w.id));
+      }
       if (r.unlockSkill && !GameState.unlockedSkills.includes(r.unlockSkill)) {
         GameState.unlockedSkills.push(r.unlockSkill); GameState.skillLevels[r.unlockSkill] = 1;
       }
@@ -798,6 +812,15 @@
     let raw = w.damage * (1 + b / 50) + b * 0.2;
     raw *= (1 + this.attackBuffMult);
     raw *= (this.v5 ? this.v5.tempAtkMul : 1) || 1;
+    // v5.8 接线：科技树 combat 节点（武器伤害加成）
+    if (window.TechSystem) {
+      let techDmg = 0;
+      ['combat_1', 'combat_2', 'combat_3', 'combat_4', 'combat_5'].forEach(id => { techDmg += TechSystem.getTechBonus(id); });
+      if (techDmg) raw *= (1 + techDmg);
+    }
+    // v5.8 接线：温室武器强化石（weaponBonus）
+    const gb = (GameState.greenhouse && GameState.greenhouse.weaponBonus) || 0;
+    if (gb) raw *= (1 + gb);
     return raw;
   };
   // 技能伤害（技能威力 + 基础攻击加成 + 临时增益）
@@ -831,6 +854,7 @@
 
   // 覆写 useSkill —— 16 技能数据驱动
   E.useSkill = function (idx) {
+    this.lastTerrainAttackAt = this.elapsed;
     CharacterSystem.init();
     const equipped = this.equippedSkills || CharacterSystem.getEquipped();
     const id = equipped[idx];
@@ -1023,12 +1047,13 @@
   };
 
   V5.modifyIncomingDamage = function (exp, amount) {
+    amount = Number.isFinite(amount) ? Math.max(0, amount) : 0;
     const v = exp.v5 || {};
     if (v.shield > 0) { const absorbed = Math.min(v.shield, amount); v.shield -= absorbed; amount -= absorbed; }
     amount *= (1 - exp.playerDefMitigation());
     if (v.iron > 0) amount *= (1 - (v.ironReduce || 0.5));
     if (v.rage > 0) amount *= 1.15;
-    return amount;
+    return Math.max(0, amount);
   };
 
   // 每帧玩家侧 v5 状态（从 updateRunSystems 调用）
@@ -1229,7 +1254,8 @@
     const lootVal = exp.bag.reduce((s, it) => s + (exp.getLootValue ? exp.getLootValue(it) : 0), 0);
     st.bestLootValue = Math.max(st.bestLootValue || 0, Math.round(lootVal));
     // 修为：首通丰厚，重复少量（约占总修为 10%）
-    const cult = first ? 120 * tier : 30 * tier;
+    const cult = Math.round((first ? 120 * tier : 30 * tier) * (GameState.expBoost ? 1.5 : 1));
+    GameState.expBoost = false;
     CharacterSystem.addExp(cult, true);
     if (first) showToast(`首次撤离 ${map.name}！修为 +${cult}`, 'gold');
     CharacterSystem.checkUnlocks();
@@ -1922,7 +1948,7 @@
       }
     },
     open(html) { this.ensure(); document.getElementById('v5Modal').innerHTML = html + '<span class="v5-close" onclick="V5.ui.close()">✕ 关闭</span>'; document.getElementById('v5Overlay').classList.add('open'); },
-    close() { document.getElementById('v5Overlay').classList.remove('open'); },
+    close() { document.getElementById('v5Overlay')?.classList.remove('open'); },
 
     openCultivation() {
       CharacterSystem.init();
@@ -2059,9 +2085,9 @@
       grids[0].appendChild(mk('v5CultFacility', (function(){try{if(typeof CropArt!=='undefined'&&CropArt.map['cult_altar'])return '<img src="assets/'+CropArt.map['cult_altar']+'" alt="🧘" style="width:40px;height:40px;object-fit:contain;vertical-align:middle;" />';}catch(e){}return '🧘';})(), '修行台', '角色升级 · 技能装备', () => this.openCultivation()));
       grids[0].appendChild(mk('v5ArchFacility', (function(){try{if(typeof CropArt!=='undefined'&&CropArt.map['archive_book'])return '<img src="assets/'+CropArt.map['archive_book']+'" alt="📜" style="width:40px;height:40px;object-fit:contain;vertical-align:middle;" />';}catch(e){}return '📜';})(), '远征档案', '突破 · 战略物资', () => this.openArchive()));
       grids[1].appendChild(mk('v5CodexFacility', (function(){try{if(typeof CropArt!=='undefined'&&CropArt.map['codex_book'])return '<img src="assets/'+CropArt.map['codex_book']+'" alt="📖" style="width:40px;height:40px;object-fit:contain;vertical-align:middle;" />';}catch(e){}return '📖';})(), '荒野图鉴', '作物/怪物/Boss/武器/道具/资源', () => this.openCodex('crop')));
-      // 替换原“远征档案”占位按钮
+      // 移除原“远征档案”占位按钮（上方已加入功能完整的同名入口，避免重复）
       const ph = Array.from(document.querySelectorAll('.facility')).find(f => f.getAttribute('onclick') && f.getAttribute('onclick').includes("showToast('远征档案"));
-      if (ph) { ph.setAttribute('onclick', ''); ph.onclick = () => this.openArchive(); ph.querySelector('.facility-state').textContent = '突破 · 战略物资'; }
+      if (ph) ph.remove();
       // 建筑入口统一真实图标（按设施名映射，直接写 img，无需等图片解码）
       try {
         const FAC_ICON = {

@@ -5,6 +5,8 @@
   "description": "农庄牌：荒野远征（网页版）—— Canvas2D 原生 JS 双端卡牌生存游戏",
   "scripts": {
     "check": "node tools/syntax-check.js",
+    "audit:config": "node tools/config-audit.js",
+    "graph:runtime": "node tools/generate-runtime-graph.js",
     "test": "node smoke_test.js",
     "build": "node tools/build-dist.js",
     "version:sync": "node tools/bump-version.js",

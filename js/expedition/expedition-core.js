@@ -117,6 +117,9 @@ class Expedition {
     this.aoeTimers = [];
     this.particles = [];
     this.damageNumbers = [];
+    // 玩家可读的战斗反馈：短生命周期，不参与战斗逻辑
+    this.combatFeedback = [];
+    this.safeNode = null;
     this.particlePool = [];       // 粒子对象池（消灭每帧 filter 分配）
     this.projectilePool = [];     // 弹道对象池
     this.hudTimer = 0;            // HUD 重量更新节流计时
@@ -168,7 +171,7 @@ class Expedition {
     this.eventModifiers = { enemySpeed: 1, enemyDamage: 1, loot: 1, vision: 1 };
     this.beastWave = {
       wave: 0,
-      nextIn: (this.map && this.map.tier === 1) ? 45 : 20, // T1 教学图首波推迟到 45 秒
+      nextIn: 360, // T1 教学图首波推迟到 45 秒
       interval: 40,        // 之后每 40 秒一波（固定节奏）
       active: false,
       remaining: 0,
@@ -242,7 +245,7 @@ class Expedition {
     this.fxSprites.hitBlood = new Image(); this.fxSprites.hitBlood.src = 'docs/art/effects/hit_blood.png';
     this.fxSprites.playerHit = new Image(); this.fxSprites.playerHit.src = 'docs/art/effects/player_hit.png';
     this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
-    this.playerWalkSheet = new Image(); this.playerWalkSheet.src = 'docs/art/v2/player_walk.png';
+    this.playerWalkSheet = new Image(); this.playerWalkSheet.src = 'docs/art/v2/player_walk_transparent.png';
     this.weaponSheet = new Image(); this.weaponSheet.src = 'assets/weapons/weapon_sheet_t.png'; this.weaponSheetPrekeyed = true;
     const t1BossSprite = new Image();
     t1BossSprite.src = 'assets/bosses/t1-stone-maw.webp';
@@ -280,7 +283,7 @@ class Expedition {
       // v3.4 地图词条：视野修正
       if (this.map.visibilityBonus) this.visionRadius *= (1 + this.map.visibilityBonus);
       if (this.map.visionPenalty) this.visionRadius *= (1 - this.map.visionPenalty);
-      this.beastWave.nextIn = (this.map && this.map.tier === 1) ? 45 : 20; // v4.1 首波固定；T1 教学图推迟到 45 秒
+      this.beastWave.nextIn = 360; // v4.1 首波固定；T1 教学图推迟到 45 秒
       // v5.4 修复：难度/Heat 在此时才真正应用，必须重算 balance 快照，否则怪血/伤害恒为普通难度
       this.balance = this.getBalanceProfile();
     }
@@ -299,6 +302,7 @@ class Expedition {
     this.entitySpatialHash.rebuild([...this.monsters, ...this.raiders]);
     this.setupMission();
     this.spawnCardNodes();   // v5.8 篝火 / 商人世界交互物
+    this.initializeTerrainJourney();
     this.buildCardSynergy(); // v5.8 战斗层：按装载缓存协同 mod + 开战叠甲
     this.setupInput();
     this.updateVision();
@@ -309,11 +313,13 @@ class Expedition {
     const _ds = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.get() : {hpMul:1, dmgMul:1, rewardMul:1, speedMulExtra:1};
     const _tierM = (typeof DifficultySystem !== 'undefined') ? DifficultySystem.getTierMechanic(tier) : {eliteChanceBonus:0};
     return {
-      enemyHp: ([1.15, 1.5, 2.4, 3.8, 5.6][tier] || 5.6) * _ds.hpMul,
-      enemyDamage: ([1.1, 1.25, 1.95, 2.9, 4.0][tier] || 4.0) * _ds.dmgMul,
+      // Tier 使用 1-based 关卡编号，数组统一用 tier - 1 索引，避免 T1 误读第二项。
+      enemyHp: ([1.0, 1.5, 2.4, 3.8, 5.6][tier - 1] || 5.6) * _ds.hpMul,
+      enemyDamage: ([1.1, 1.25, 1.95, 2.9, 4.0][tier - 1] || 4.0) * _ds.dmgMul,
       enemySpeed: (1 + (tier - 1) * 0.06) * (_ds.speedMulExtra || 1),
       reward: (1 + (tier - 1) * 0.48) * _ds.rewardMul * ((typeof DifficultySystem !== 'undefined') ? DifficultySystem.getHeatRewardMultiplier() : 1),
       eliteChance: (tier < 3 ? 0 : 0.08 + tier * 0.025) + (_tierM.eliteChanceBonus || 0) + (this.map.eliteBonus || 0),
+      // Boss 主数据来自 CONFIG.bosses，由 V5.makeBoss 统一创建；此处仅保留兜底伤害参数。
       bossHp: (520 + tier * 320) * _ds.hpMul,
       bossDamage: (14 + tier * 7) * _ds.dmgMul,
     };
@@ -518,6 +524,7 @@ class Expedition {
     if (this.nextRoadCaptureAt <= 0 && !this.gameOver) {
       this.nextRoadCaptureAt = 120;
       this.offerCapture('road');
+      if (this.choiceOpen) return;
     }
     // v3.3 受击硬直期间禁止移动，时间整体减速（缩放后的 dt 作用于后续所有分段）
     if (this.player.hitStun > 0) {

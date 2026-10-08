@@ -349,15 +349,26 @@ Object.assign(Expedition.prototype, {
 
   renderHero(ctx, sx, sy) {
     const angle = this.player.angle || 0;
-    const moving = this.keys['w'] || this.keys['a'] || this.keys['s'] || this.keys['d'];
+    // 行走朝向必须来自移动方向，不能使用鼠标瞄准角度；否则玩家向上下左右走时始终播放右向帧。
+    const moveAngle = this.player.facing !== undefined ? this.player.facing : angle;
+    const horizontal = Math.abs(Math.cos(moveAngle)) >= Math.abs(Math.sin(moveAngle));
+    const facingLeft = horizontal && Math.cos(moveAngle) < 0;
+    const facingUp = !horizontal && Math.sin(moveAngle) < 0;
+    const moving = (this.player.moveSpeed || 0) > 10;
     const bob = moving ? Math.sin(this.elapsed * 12) * 2 : Math.sin(this.elapsed * 3) * 0.8;
     const swing = this.attackAnim > 0 ? Math.sin((1 - this.attackAnim / 0.24) * Math.PI) : 0;
-    const facingLeft = Math.cos(angle) < 0;
     const lift = this.player.visualZ || 0;
     const depthScale = this.getDepthScale(this.player.y);
     this.renderCastShadow(ctx, this.player.x, this.player.y, 34 * depthScale, 44 * depthScale, 0.42, lift);
     ctx.save();
     ctx.translate(sx, sy + bob - lift);
+    // 角色落地阴影与脚底接触光，避免立绘像悬浮贴纸。
+    ctx.save();
+    ctx.scale(1, .34);
+    const foot = ctx.createRadialGradient(0, 34, 3, 0, 34, 42);
+    foot.addColorStop(0, 'rgba(8,12,10,.58)'); foot.addColorStop(1, 'rgba(8,12,10,0)');
+    ctx.fillStyle = foot; ctx.beginPath(); ctx.ellipse(0, 34, 42, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
     if (this.player.invuln > 0) {
       ctx.save();
       ctx.scale(1 / (0.6 * depthScale), 1 / (0.6 * depthScale));
@@ -378,19 +389,19 @@ Object.assign(Expedition.prototype, {
       const _pbr = Math.sin(this.elapsed * 3);
       ctx.scale(1 + _pbr * 0.008, 1 - _pbr * 0.008);
     }
-    // v5.2 玩家 4 帧走路动画（移动时播放序列，静止用 idle 图）
-    const psz = 150;
-    if (moving && this.playerWalkSheet && this.playerWalkSheet.naturalWidth) {
+    if (horizontal && this.playerWalkSheet?.naturalWidth) {
       const fw = this.playerWalkSheet.naturalWidth / 4;
-      const fh = this.playerWalkSheet.naturalHeight;
-      const frame = Math.floor(this.elapsed * 10) % 4;
-      const pdraw = psz * fh / fw;
-      ctx.drawImage(this.playerWalkSheet, frame * fw, 0, fw, fh, -psz/2, -pdraw*0.82, psz, pdraw);
-    } else if (this.playerSprite && this.playerSprite.naturalWidth) {
-      const pdraw = psz * this.playerSprite.naturalHeight / this.playerSprite.naturalWidth;
-      ctx.drawImage(this.playerSprite, -psz/2, -pdraw*0.82, psz, pdraw);
-    } else {
-      ctx.fillStyle = '#c84e2f'; ctx.beginPath(); ctx.arc(0, -47, 30, 0, Math.PI * 2); ctx.fill();
+      const frame = moving ? Math.floor((this.player.walkDistance || 0) / 14) % 4 : 0;
+      const height = 140, sourceHeight = 1035, width = fw * height / sourceHeight;
+      ctx.drawImage(this.playerWalkSheet, frame * fw, 290, fw, sourceHeight,
+        -width / 2, -height, width, height);
+    } else if (this.playerSprite?.naturalWidth) {
+      // 现有资源没有独立的上下行走帧：上下移动使用正面立绘，避免继续显示右侧行走动作。
+      // 向上时略微压低并降低亮度，形成背向移动的层次感。
+      const pdraw = 140 * this.playerSprite.naturalHeight / this.playerSprite.naturalWidth;
+      if (facingUp) { ctx.globalAlpha = .88; ctx.scale(1, .96); }
+      ctx.drawImage(this.playerSprite, -70, -pdraw, 140, pdraw);
+      ctx.globalAlpha = 1;
     }
     this.renderHeroWeapon(ctx, angle, swing, this.attackCombo, this.weaponRecoil);
     ctx.restore();
@@ -432,7 +443,7 @@ Object.assign(Expedition.prototype, {
     const dir = combo === 1 ? -1 : 1;
     ctx.save();
     // v3.8 武器放大+放到手上（原来 24,-10 太小太靠下）
-    ctx.translate(28, -18 - recoil * 3);
+    ctx.translate(22, -64 - recoil * 3);
     const targetRot = Math.atan2(Math.sin(angle), Math.cos(angle));
     ctx.rotate(targetRot + swing * 0.3 * dir);
     if (this.weaponSheet && this.weaponSheet.naturalWidth) {
@@ -441,7 +452,7 @@ Object.assign(Expedition.prototype, {
       const rowMap = { harvest_sickle: 0, pea_repeater: 1, vine_staff: 2, throwing_knife: 3, flame_bow: 4 };
       const row = rowMap[this.weapon.id] || 0;
       const sw = this.weaponSheet.naturalWidth, sh = slotH;
-      const dw = 150, dh = dw * sh / sw;
+      const dw = 85, dh = dw * sh / sw;
       if (!this._weaponCache) this._weaponCache = {};
       let proc = this._weaponCache[this.weapon.id];
       if (!proc) {
@@ -551,11 +562,12 @@ Object.assign(Expedition.prototype, {
     const waveMarkup = this.beastWave.active
       ? `<div class="wave-status active"><b>⚠ 第 ${this.beastWave.wave} 波兽潮</b><span>剩余 ${this.beastWave.remaining} 只 · 下一波 ${Math.ceil(this.beastWave.nextIn)}s · ${protectedByTower ? '防御塔护盾生效' : '未受保护，伤害提升'}</span></div>`
       : `<div class="wave-status"><b>兽潮预警 ${Math.ceil(this.beastWave.nextIn)}s</b><span>已占塔 ${ownedTowers} · 提前进入绿色射程</span></div>`;
-    panel.innerHTML = `<div class="mission-label">远征任务</div><strong>${objective.title}${objective.complete ? ' · 已完成' : ''}</strong><span>${objective.description}</span><div class="mission-progress"><i style="width:${progress/objective.target*100}%"></i></div><small>${progress}/${objective.target}</small>${waveMarkup}${eventMarkup}${this.boss && this.boss.hp > 0 ? `<div class="boss-hud"><b>${this.boss.name}</b><span>阶段 ${this.boss.phase}</span><i style="width:${this.boss.hp/this.boss.maxHp*100}%"></i></div>` : ''}`;
+    panel.innerHTML = `<div class="mission-label">${this.phaseLabel || "低压探索"} · ${this.getTerrainAt(this.player.x,this.player.y).name}</div><span>${this.getTerrainAt(this.player.x,this.player.y).hint}</span><strong>${objective.title}${objective.complete ? ' · 已完成' : ''}</strong><span>${objective.description}</span><div class="mission-progress"><i style="width:${progress/objective.target*100}%"></i></div><small>${progress}/${objective.target}</small>${waveMarkup}${eventMarkup}${this.boss && this.boss.hp > 0 ? `<div class="boss-hud"><b>${this.boss.name}</b><span>阶段 ${this.boss.phase}</span><i style="width:${this.boss.hp/this.boss.maxHp*100}%"></i></div>` : ''}`;
   },
 
   updateHUD() {
     // 血条能量条
+    ExpeditionLayout.hud(this);
     document.getElementById('hpBar').style.width = (this.player.hp / this.player.maxHp * 100) + '%';
     document.getElementById('hpText').textContent = `${Math.ceil(this.player.hp)}/${this.player.maxHp}`;
     document.getElementById('energyBar').style.width = (this.player.energy / this.player.maxEnergy * 100) + '%';
@@ -573,6 +585,15 @@ Object.assign(Expedition.prototype, {
     timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     timerEl.className = 'timer-display' + (this.timeLeft < 30 ? ' critical' : (this.timeLeft < 180 ? ' pressure' : ''));
     document.getElementById('mapNameDisplay').textContent = `T${this.map.tier} · ${this.map.name} · ${this.map.danger}`;
+    const targetName = document.getElementById('targetName');
+    const targetProgress = document.getElementById('targetProgress');
+    const targetMeta = document.getElementById('targetMeta');
+    if (targetName && this.objective) {
+      targetName.textContent = this.boss && this.boss.hp > 0 ? `Boss：${this.boss.name || '区域首领'}` : this.objective.title;
+      const pct = this.boss && this.boss.hp > 0 ? this.boss.hp / this.boss.maxHp : (this.objective.progress || 0) / Math.max(1, this.objective.target || 1);
+      targetProgress.style.width = `${clamp(pct, 0, 1) * 100}%`;
+      targetMeta.textContent = this.beastWave?.active ? `兽潮第 ${this.beastWave.wave} 波 · 剩余 ${this.beastWave.remaining || 0}` : `${this.objective.progress || 0}/${this.objective.target || 1} · ${this.map.danger}`;
+    }
     document.getElementById('lowHealthVignette').classList.toggle('active', this.player.hp / this.player.maxHp <= 0.3);
 
     // 低频重量更新（250ms 节流）：任务面板/武器/技能/消耗品/背包/防线栏
@@ -704,9 +725,10 @@ Object.assign(Expedition.prototype, {
     this.renderScreenFlashes(ctx);
     this.renderFogAndCombatHUD(ctx, cam);
     this.renderExtractBar(ctx);
+    this.renderTerrainLandmarks(ctx, cam);
     this.renderWeather(ctx);
     this.renderDayNight(ctx);
-    this.renderHorizonSilhouettes(ctx);
+
     this.renderMinimap();
     this.renderInteractPrompt();
     // v3.9 前景草遮挡 + 全局后处理
@@ -725,6 +747,7 @@ Object.assign(Expedition.prototype, {
     }
     // v3.5 植物改由下方 Y-sort 统一绘制（避免双绘）
     // this.renderPlants(ctx, cam);
+    this.renderTerrain(ctx, cam);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (this.wildPlants) {
@@ -741,7 +764,7 @@ Object.assign(Expedition.prototype, {
     }
 
     // 分层地形：道路、水域、田块、树林和地图专属地标。
-    this.renderTerrain(ctx, cam);
+
     if (typeof WorldFX !== 'undefined') WorldFX.renderGround(ctx, this);
     if (window.WeatherFX) WeatherFX.renderGroundWet(ctx, this, cam); // v5.7 积水/反光/积雪/云影
     // v3.8 脚印
@@ -769,6 +792,7 @@ Object.assign(Expedition.prototype, {
     }
   },
   renderTraps(ctx, cam) {
+    if (this.elapsed < 120) return;
     // 环境陷阱
     this.traps.forEach(trap => {
       if (!this.isWorldVisible(trap.x, trap.y)) return;
@@ -794,7 +818,7 @@ Object.assign(Expedition.prototype, {
     if (!this.bossHazards || !this.bossHazards.length) return;
     this.bossHazards.forEach(h => {
       const sx = h.x - cam.x, sy = h.y - cam.y;
-      if (sx < -120 || sy < -120 || sx > this.canvas.width + 120 || sy > this.canvas.height + 120) return;
+      if (sx < -120 || sy < -120 || sx > CONFIG.canvas.width + 120 || sy > CONFIG.canvas.height + 120) return;
       const frac = Math.max(0, Math.min(1, h.t / h.delay));
       const r = h.r * (0.35 + 0.65 * frac);
       const blink = h.t < 0.45 ? (Math.floor(h.t * 12) % 2 === 0 ? 1 : 0.45) : 0.85;
@@ -1077,7 +1101,7 @@ Object.assign(Expedition.prototype, {
         const pr = d.obj;
         const prsx = pr.x - cam.x, prsy = pr.y - cam.y;
         if (pr.kind !== 'grass') self._drawShadow(prsx, prsy, pr.size * 0.4, 0.25);
-        if (pr.kind === 'grass' && pr.used === false) {
+        if (pr.kind === 'grass' && !pr.used) {
           const img = this.propImgs && this.propImgs.grass;
           const sx = pr.x - cam.x, sy = pr.y - cam.y;
           if (img && img.complete && img.naturalWidth > 0) {
@@ -1421,7 +1445,7 @@ Object.assign(Expedition.prototype, {
       const alpha = clamp(number.life / number.maxLife, 0, 1);
       const crit = number.crit;
       const scale = crit ? 1 + (1 - alpha) * 0.15 : 1;
-      const label = (crit ? '✧ ' : '') + `-${number.value}`;
+      const label = (crit ? '✧ ' : '') + (typeof number.value === 'number' ? `-${number.value}` : number.value);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(sx, sy);
@@ -1434,6 +1458,11 @@ Object.assign(Expedition.prototype, {
       ctx.fillText(label, 0, 0);
       if (crit) { ctx.strokeStyle = 'rgba(255,240,180,.6)'; ctx.lineWidth = 1.5; ctx.strokeText(label, 0, 0); }
       ctx.restore();
+    });
+    (this.combatFeedback || []).forEach(f => {
+      const sx = f.x - cam.x, sy = f.y - cam.y, a = clamp(f.life / f.maxLife, 0, 1);
+      ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(10,12,18,.9)'; ctx.strokeText(f.text, sx, sy); ctx.fillStyle = f.color; ctx.fillText(f.text, sx, sy); ctx.restore();
     });
   },
   renderScreenFlashes(ctx) {
@@ -1495,6 +1524,7 @@ Object.assign(Expedition.prototype, {
   },
   updateWorldSystems(dt) {
     this.elapsed += dt;
+    this.updateTerrainJourney(dt);
     // v4.1 固定节奏兽潮：倒计时始终走，当前波没清完下一波照样刷（波次叠加、强度滚大）
     const aliveByWave = {};
     for (let i = 0; i < this.monsters.length; i++) {
@@ -1515,7 +1545,7 @@ Object.assign(Expedition.prototype, {
     }
     this.beastWave.nextIn -= dt;
     if (this.beastWave.nextIn <= 0) this.spawnBeastWave();
-    if (this.elapsed >= this.nextEventAt && !this.activeEvent) {
+    if (this.elapsed >= 360 && this.elapsed >= this.nextEventAt && !this.activeEvent) {
       this.startMapEvent();
       this.nextEventAt += 90 + rand(0, 35);
     }
@@ -1535,7 +1565,7 @@ Object.assign(Expedition.prototype, {
     this.monsters.forEach(monster => {
       monster.abilityCd = Math.max(0, (monster.abilityCd || 0) - dt);
       const d = dist(monster, this.player);
-      if (this.player.stealth > 0 || monster.stunned > 0 || (d > 430 && monster.type !== 'boss')) return;
+      if (!this.terrainCanDetect(monster, d) || monster.stunned > 0) return;
       const angle = Math.atan2(this.player.y - monster.y, this.player.x - monster.x);
       if (monster.type === 'locust' && d < 115) {
         monster.x -= Math.cos(angle) * monster.speed * .42 * dt;
@@ -1602,7 +1632,7 @@ Object.assign(Expedition.prototype, {
   // v3.7 昼夜光照循环
   // 周期 180s：day(0-60) -> dusk(60-90) -> night(90-150) -> dawn(150-180)
   renderDayNight(ctx) {
-    const t = (this.elapsed || 0) % 180;
+    const t = this.elapsed < 360 ? 0 : (this.elapsed - 300) % 180;
     let phase, overlayAlpha, tint;
     if (t < 60) {
       phase = 'day'; overlayAlpha = 0; tint = null;
@@ -1712,7 +1742,7 @@ Object.assign(Expedition.prototype, {
     // v3.7 战争迷雾：记录已探索格子（32px 一格）
     if (!this.exploredSet) this.exploredSet = new Set();
     const TILE = 64;
-    const viewR = 180; // 视野半径（世界坐标）
+    const viewR = this.visionRadius * this.getTerrainAt(this.player.x,this.player.y).visionMul; // 视野半径（世界坐标）
     const px = this.player.x, py = this.player.y;
     for (let dy = -viewR; dy <= viewR; dy += TILE) {
       for (let dx = -viewR; dx <= viewR; dx += TILE) {
@@ -1727,6 +1757,12 @@ Object.assign(Expedition.prototype, {
     mctx.fillRect(0, 0, 160, 160);
 
     // 地形斑块（只画已探索的）
+    const terrainColors={water:'#397c87',mud:'#715c42',forest:'#294b32',ruins:'#696a53',highland:'#99ab70',grass:'#405638'};
+    for(const key of this.exploredSet) {
+      const [tx,ty]=key.split(',').map(Number);
+      mctx.fillStyle=terrainColors[this.getTerrainAt((tx+.5)*TILE,(ty+.5)*TILE).id];
+      mctx.fillRect(tx*TILE*scale,ty*TILE*scale,TILE*scale+1,TILE*scale+1);
+    }
     this.terrainPatches.forEach(patch => {
       const key = Math.floor(patch.x / TILE) + ',' + Math.floor(patch.y / TILE);
       if (!this.exploredSet.has(key)) return;

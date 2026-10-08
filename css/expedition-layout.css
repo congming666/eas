@@ -1,0 +1,98 @@
+/* Final layout layer. Scoped selectors take precedence over legacy cosmetic rules. */
+#expeditionPrepScreen, #resultScreen {background:#101e19 !important;color:#e5eee6;}
+#expeditionPrepScreen::before,#resultScreen::before {display:none;}
+#expeditionPrepScreen {display:flex;flex-direction:column;overflow:hidden;}
+#expeditionPrepScreen .prep-header {flex:0 0 65px;padding:10px 18px;height:auto;}
+#expeditionPrepScreen .prep-content {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);width:100%;padding:12px;gap:12px;flex:1;min-height:0;overflow:auto;align-items:start;}
+#expeditionPrepScreen .prep-column:nth-child(n) {grid-column:auto;min-width:0;gap:12px;}
+.prep-column-title {font-size:14px;color:#ddc48a;padding:4px 3px;}
+#expeditionPrepScreen .prep-panel,#resultScreen .result-card,#expeditionHUD .hud-panel {background:#172a22 !important;border:1px solid #45604e !important;border-radius:10px !important;box-shadow:0 5px 14px #0003 !important;}
+#expeditionPrepScreen .prep-panel {padding:12px;}
+#expeditionPrepScreen .panel-title {font-size:14px;}
+#expeditionPrepScreen .loadout-grid,#expeditionPrepScreen .defense-loadout-grid,#expeditionPrepScreen .prep-skill-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#expeditionPrepScreen .loadout-slot {min-width:0;width:auto;background:#122119 !important;opacity:1;font-size:12px;}
+#expeditionPrepScreen .loadout-effect {font-size:12px;color:#b8c9be;line-height:1.5;}
+#expeditionPrepScreen .loadout-slot.muted {opacity:.8;}
+#weaponLoadoutSelect > div {flex:1 1 105px;max-width:160px;}
+.supply-filter {grid-column:1/-1;padding:10px;border:1px solid #536d59;border-radius:6px;background:#20382b;color:#e1e9df;cursor:pointer;}
+#expeditionPrepScreen .prep-footer {flex:none;z-index:7;display:flex;align-items:center;gap:16px;padding:12px 18px;border-top:1px solid #526448;background:#122018;}
+#prepSummary {flex:1;color:#d5dfcc;font-size:13px;line-height:1.6;}
+#expeditionPrepScreen .prep-actions {position:static;display:flex;flex-direction:row;padding:0;margin:0;background:none;gap:8px;flex:none;}
+#expeditionPrepScreen .prep-actions .secondary-btn {width:auto;}
+#expeditionPrepScreen .prep-actions .start-expedition-btn {width:210px;margin:0;font-size:16px;}
+#expeditionPrepScreen button,#resultScreen button {background:#294535 !important;border-color:#789267 !important;letter-spacing:0;}
+#expeditionPrepScreen #startExpeditionBtn:not(:disabled),#resultScreen .menu-btn {background:#bba16b !important;color:#172319 !important;}
+#expeditionPrepScreen button:disabled {opacity:.55;cursor:not-allowed;}
+#resultScreen {padding:16px;}
+#resultScreen .result-card {width:min(860px,100%);max-height:100%;min-width:0;display:flex;flex-direction:column;padding:20px;overflow:auto;}
+#resultScreen .result-title {font-size:30px;}
+#resultScreen .result-stats {flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0;}
+#resultScreen .result-stat {padding:10px;}
+#resultScreen .result-stat-value {font-size:21px;}
+#resultScreen .loot-list {display:block;flex:1;min-height:80px;overflow:auto;max-height:none;text-align:left;}
+#resultScreen .loot-list h3 {font-size:15px;color:#d3bb84;margin-bottom:12px;}
+#resultScreen details {margin-top:20px;}
+.result-actions {display:flex;flex:none;gap:10px;padding-top:16px;justify-content:center;}
+#resultScreen .result-actions button {width:auto;flex:1;font-size:15px;margin:0;padding:12px;}
+#expeditionHUD .hud-top {display:contents;}
+#expeditionHUD .player-stats {position:absolute;left:12px;top:12px;width:220px;min-height:0;padding:10px;}
+#expeditionHUD .hud-top > .hud-panel:nth-child(2) {position:absolute;top:12px;right:158px;padding:8px;min-height:0;width:125px;text-align:center;}
+#expeditionHUD .timer-display {font-size:20px;}
+#expeditionHUD .hud-target {position:absolute;left:50%;top:12px;transform:translateX(-50%);width:280px;min-height:0;}
+#expeditionHUD #playerConditions {position:absolute;left:14px;top:106px;font-size:12px;color:#add1e1;}
+#expeditionHUD .minimap {right:12px;top:12px;bottom:auto;width:132px;height:132px;}
+#nodeDirection {position:absolute;right:12px;top:151px;width:180px;text-align:right;font-size:12px;color:#d7cba1;}
+#expeditionHUD #missionHud {left:12px;top:auto;bottom:26px;width:190px;max-height:180px;overflow:hidden;font-size:12px;}
+#expeditionHUD #missionHud .boss-hud,#expeditionHUD #missionHud .wave-hud {display:none;}
+#expeditionHUD .bag-display {position:absolute;right:12px;top:auto;bottom:22px;width:160px;display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+#expeditionHUD .bag-item {font-size:12px;padding:6px;}
+#expeditionHUD .hud-bottom {bottom:61px;left:50%;transform:translateX(-50%);padding:5px;gap:6px;max-width:54%;}
+#expeditionHUD .skill-slot {width:76px;height:57px;border-radius:7px;min-width:0;background:#14271de8;}
+#expeditionHUD .skill-name {font-size:10px;}
+#expeditionHUD .skill-meta {display:none;}
+#expeditionHUD .skill-icon {font-size:20px;}
+#expeditionHUD .consumable-bar {position:absolute;bottom:10px;left:50%;right:auto;transform:translateX(-50%);display:flex;flex-wrap:nowrap;gap:4px;max-width:54%;padding:0;}
+#expeditionHUD .consumable-bar .skill-slot {width:74px;height:49px;flex-shrink:1;padding:2px;}
+#expeditionHUD .consumable-bar .skill-icon {height:23px;line-height:23px;}
+#expeditionHUD .consumable-bar .skill-icon img {max-height:22px;max-width:22px;}
+#expeditionHUD .consumable-bar .skill-name {font-size:10px;line-height:14px;}
+#expeditionHUD .cons-more {display:none;}
+#expeditionHUD #weaponDisplay {left:50%;bottom:130px;transform:translateX(-50%);padding:4px 8px;min-width:180px;}
+#expeditionHUD .defense-bar {bottom:170px;max-width:48%;padding:3px;}
+#expeditionHUD .defense-slot {min-height:30px;}
+#expeditionHUD .controls-hint,#expeditionHUD .weapon-controls-tip {display:none;}
+#hudDetailsToggle {display:none;}
+#gameContainer:has(#expeditionPrepScreen:not(.hidden)) #audioControl,
+#gameContainer:has(#expeditionHUD:not(.hidden)) #audioControl,
+#gameContainer:has(#resultScreen:not(.hidden)) #audioControl {display:none;}
+@media(max-width:1050px) {
+ #expeditionHUD .hud-target {width:220px;}
+ #expeditionHUD .hud-top > .hud-panel:nth-child(2) {display:none;}
+ #expeditionHUD .skill-slot {width:62px;}
+ #expeditionPrepScreen .prep-content {gap:8px;padding:8px;}
+ #expeditionPrepScreen .prep-map-panel .map-select {grid-template-columns:1fr;}
+}
+@media(max-width:760px) {
+ #expeditionPrepScreen .prep-content {grid-template-columns:1fr;}
+ #expeditionPrepScreen .prep-map-panel .map-select {grid-template-columns:repeat(2,minmax(0,1fr));}
+ #expeditionPrepScreen .prep-header {padding:8px;flex-basis:54px;}
+ #expeditionPrepScreen .prep-title h2 {font-size:17px;}
+ #expeditionPrepScreen .prep-title p {display:none;}
+ #expeditionPrepScreen .prep-footer {flex-direction:column;gap:6px;padding:8px;}
+ #expeditionPrepScreen .prep-actions {width:100%;}
+ #expeditionPrepScreen .prep-actions .start-expedition-btn {flex:1;}
+ #expeditionHUD .player-stats {width:155px;left:6px;top:6px;}
+ #expeditionHUD .hud-target {left:auto;right:6px;transform:none;top:6px;width:180px;}
+ #expeditionHUD .minimap,#expeditionHUD #missionHud,#expeditionHUD .bag-display,#expeditionHUD .defense-bar,#nodeDirection {display:none;}
+ #expeditionHUD .details-open {display:block;}
+ #hudDetailsToggle {display:block;position:absolute;right:6px;top:93px;pointer-events:auto;padding:7px;background:#1c3529;color:#e1e9df;border:1px solid #66816c;border-radius:6px;}
+ #expeditionHUD.details-open .minimap {display:block;top:132px;width:100px;height:100px;}
+ #expeditionHUD.details-open .bag-display {display:grid;bottom:160px;}
+ #expeditionHUD.details-open #missionHud {display:block;bottom:160px;width:160px;}
+ #expeditionHUD #playerConditions {top:100px;left:8px;font-size:10px;}
+ #expeditionHUD .hud-bottom {max-width:96%;left:50%;right:auto;bottom:62px;transform:translateX(-50%);}
+ #expeditionHUD .consumable-bar {max-width:96%;}
+ #resultScreen .result-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
+ #resultScreen .result-card {padding:12px;}
+ #resultScreen .result-actions {flex-wrap:wrap;gap:6px;}
+}

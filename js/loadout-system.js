@@ -141,7 +141,57 @@ const LoadoutSystem = {
     const src = this.matSources(mat);
     return src.length ? ('来源作物：' + src.join('、')) : '来源：远征掉落/工坊精炼';
   },
-  getCultivationCost() { return 0; }, // v5.4 已废除，保留空壳避免旧调用报错
+  // v5.8 材料 ↔ 修为转化：1 个材料等价多少修为（依据产出速率：凝气草约 0.5 修为/秒）
+  // 基础材料（木材/泥土/清水/堆肥/石料/纤维/药草）≈20；进阶（铁矿/毒腺/甲壳/晶核）≈55-60；稀有 ≈120-200
+  CULTIVATION_VALUE: {
+    wood: 20, soil: 20, water: 20, compost: 20, stone: 20, fiber: 20, herb: 20,
+    iron: 55, venom: 55, carapace: 55, crystal: 60,
+    soul_ash: 120, refined_iron: 180, bossFang: 200
+  },
+  matCultivationValue(mat) { return this.CULTIVATION_VALUE[mat] || 20; },
+
+  // v5.8「修为抵扣升级」方案：材料先用库存，缺口按单价折算成修为（用多少修为就少用多少材料）
+  getCultivationUpgradePlan(uid) {
+    const inst = this.getWeaponInstance(uid);
+    if (!inst || inst.level >= 10) return null;
+    const cost = this.UPGRADE_COSTS[inst.level];
+    const useMaterials = {};
+    let needCultivation = 0;
+    for (const [mat, need] of Object.entries(cost.materials)) {
+      const have = (GameState.warehouse.materials && GameState.warehouse.materials[mat]) || 0;
+      const used = Math.min(have, need);
+      if (used > 0) useMaterials[mat] = used;
+      const gap = need - used;
+      if (gap > 0) needCultivation += gap * this.matCultivationValue(mat);
+    }
+    return {
+      gold: cost.gold, useMaterials, needCultivation,
+      canGold: GameState.gold >= cost.gold,
+      canCult: (GameState.cultivation || 0) >= needCultivation
+    };
+  },
+
+  // v5.8 修为抵扣升级（玩家自主选择的支付方式：材料 + 修为混合，系统自动转化）
+  upgradeWeaponWithCultivation(uid) {
+    const inst = this.getWeaponInstance(uid);
+    if (!inst) { showToast('武器不存在', 'warning'); return; }
+    const plan = this.getCultivationUpgradePlan(uid);
+    if (!plan) { showToast('已满级(10级)', 'warning'); return; }
+    if (!plan.canGold) { showToast('金币不足', 'warning'); return; }
+    if (!plan.canCult) { showToast(`修为不足：还需 ${plan.needCultivation} 修为（去种凝气草）`, 'warning'); return; }
+    for (const [mat, n] of Object.entries(plan.useMaterials)) {
+      GameState.warehouse.materials[mat] -= n;
+    }
+    GameState.gold -= plan.gold;
+    GameState.cultivation = (GameState.cultivation || 0) - plan.needCultivation;
+    inst.level++;
+    if (window.Telemetry) Telemetry.track('weapon_upgrade', { weaponId: inst.weaponId, level: inst.level, paid: 'cultivation', cult: plan.needCultivation });
+    const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+    if (!GameState.forgedWeapons.includes(inst.weaponId)) GameState.forgedWeapons.push(inst.weaponId);
+    showToast(`🔨 ${wpn ? wpn.name : inst.weaponId} 升至 Lv.${inst.level}${plan.needCultivation ? `（修为抵扣 ${plan.needCultivation}）` : ''}`, 'gold');
+    if (typeof AchievementSystem !== 'undefined') AchievementSystem.checkAll();
+    if (typeof SaveSystem !== 'undefined') SaveSystem.save();
+  },
 
   craftWeapon(weaponId) {
     const wpn = CONFIG.weapons.find(w => w.id === weaponId);
@@ -168,16 +218,19 @@ const LoadoutSystem = {
     if (typeof SaveSystem !== 'undefined') SaveSystem.save();
   },
 
-  // 死亡时损失所有带入的武器实例
+  // 死亡时带入武器受损：有等级则掉 1 级；0 级入门武器保留不销毁（杜绝软锁死）
   loseBroughtWeapon() {
     const uids = GameState.loadoutWeaponUids || [];
     uids.forEach(uid => {
-      const idx = (GameState.weaponInstances || []).findIndex(w => w.uid === uid);
-      if (idx >= 0) {
-        const inst = GameState.weaponInstances[idx];
-        const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
-        GameState.weaponInstances.splice(idx, 1);
-        showToast(`💀 永久失去武器：${wpn ? wpn.name : inst.weaponId}`, 'warning');
+      const inst = this.getWeaponInstance(uid);
+      if (!inst) return;
+      const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+      const name = wpn ? wpn.name : inst.weaponId;
+      if (inst.level > 0) {
+        inst.level -= 1;
+        showToast(`💥 武器受损：${name} 降至 Lv.${inst.level}`, 'warning');
+      } else {
+        showToast(`🛡️ ${name} 受损但仍可使用（入门武器不会永久损毁）`, 'info');
       }
     });
     GameState.loadoutWeaponUids = [];
