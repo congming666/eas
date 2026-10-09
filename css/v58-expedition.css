@@ -20,10 +20,12 @@
 .v58-mrow { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; font-size: 13px; color: #dfe2d2; }
 .v58-mrow .secondary-btn { margin: 0; }
 
-/* ===== 荒野图鉴固定大小网格：固定4列/固定行高/顶部对齐，条目始终落在同一格，少条目不居中塌陷 ===== */
+/* ===== 荒野图鉴网格：固定4列/最小行高118px/顶部对齐，条目始终落在同一格，少条目不居中塌陷；
+   行高用 minmax(118px, auto)：图鉴卡保持 118 整齐，修行台/档案等内容更高的面板行高自动增高，
+   避免技能按钮溢出卡片被下一行锁定卡片遮挡（修复“稻草猛击无法装备/卸下”）。 ===== */
 .v5-modal .v5-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  grid-auto-rows: 118px;
+  grid-auto-rows: minmax(118px, auto);
   align-content: start;
   justify-content: start;
   min-height: 472px;
