@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>农庄牌：荒野远征 v5.8.0</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta name="game-version" content="5.8.0">
+<link rel="stylesheet" href="css/style.css?v=ux20-20261016">
+<link rel="stylesheet" href="css/v58-title.css?v=keyart-v4-20261016&homestead-20261009">
+<link rel="stylesheet" href="css/v58-card.css?v=codex-20261015">
+<link rel="stylesheet" href="css/v58-farm.css?v=ux15-20261016">
+<link rel="stylesheet" href="css/v58-expedition.css?v=combatfx-20261015">
+<link rel="stylesheet" href="css/expedition-fx.css?v=combatfx-20261015">
+<link rel="stylesheet" href="css/expedition-layout.css?v=layout-review-20261010">
+<link rel="stylesheet" href="css/farm-comfort.css?v=fxconf-20261015">
+<link rel="stylesheet" href="css/codex.css?v=codex-20261015">
+<link rel="stylesheet" href="css/cinema-ui.css?v=cinema-20261016">
+</head>
+<body>
+<div id="gameContainer">
+  <div id="nebulaBg"></div>
+  <canvas id="nebulaCanvas"></canvas>
+  <canvas id="gameCanvas" width="1280" height="720"></canvas>
+  <div id="audioControl">
+    <button id="musicToggle" type="button" onclick="AudioManager.toggle()">♫ 音乐：开</button>
+    <details class="title-settings"><summary>设置</summary><div class="title-settings-panel"><label for="musicVolume">音乐音量</label><input id="musicVolume" type="range" min="0" max="100" value="24" aria-label="背景音乐音量" oninput="AudioManager.setVolume(this.value)"><label class="title-motion-option"><input id="titleReduceMotion" type="checkbox">减少首页动效</label></div></details>
+  </div>
+
+  <!-- 主菜单 · 星云序章 -->
+  <div id="mainMenu" class="overlay">
+    <div class="nebula-topbar">
+      <div class="nebula-brand">农庄牌 <span>／</span> 荒野远征</div>
+      <div class="nebula-brand-meta nebula-glow-soft">星云序章 · 拖拽旋转 · 悬浮聚光</div>
+    </div>
+    <div class="title-scene" aria-hidden="true"><img src="assets/title/keyart-night.png?v=title-v4" class="title-landscape" alt="" onerror="this.onerror=null;this.src='assets/title/homestead-night.svg?v=title-v3';"><div class="title-smoke"></div><div class="title-fireflies"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="nebula-card">
+      <div class="nebula-eyebrow nebula-glow">FARMBOUND EXPEDITION</div>
+      <div class="title-series">农庄牌</div>
+      <h1 class="nebula-title nebula-glow">荒野远征</h1>
+      <p class="nebula-sub nebula-glow-soft">种下补给，深入荒野，<br class="title-mobile-break">把战利品带回家。</p>
+      <button id="titleStart" class="menu-btn nebula-btn title-primary" onclick="TitleEntry.start()"><span id="titleStartLabel">开始游戏</span><span aria-hidden="true" class="title-arrow">↗</span></button>
+      <p id="titleSaveSummary" class="title-save-summary" hidden></p>
+      <button class="menu-btn nebula-btn title-secondary" onclick="Game.showHelp()"><span class="nebula-glow">玩法指南</span></button>
+
+    </div>
+    <span class="title-version" id="titleVersion"></span>
+    <div class="nebula-hint nebula-glow-soft">🖱 拖拽旋转星云 · 鼠标悬浮聚拢星光</div>
+  </div>
+
+  <!-- 农场界面 -->
+  <div id="farmScreen" class="overlay hidden">
+    <div class="farm-top-bar">
+      <div class="farm-title">🌾 我的家园农场</div>
+      <div class="resource-display">
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#ffd700;">💰</span>
+          <span id="goldDisplay">500</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#7fff7f;">🌱</span>
+          <span id="seedDisplay">3</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon" style="background:#ff8800;">📦</span>
+          <span id="materialDisplay">0</span>
+        </div>
+        <div class="resource-item" id="weatherDisplay" style="cursor:default;" title="当前天气">
+          <span class="resource-icon" style="background:#88ccff;">☀️</span>
+          <span id="weatherText">晴朗</span>
+        </div>
+        <div class="resource-item" id="seasonDisplay" style="cursor:default;" title="当前季节">
+          <span class="resource-icon" style="background:#ffaa88;">🌸</span>
+          <span id="seasonText">春季</span>
+        </div>
+        <div class="resource-item" id="beautyDisplay" style="cursor:default;" title="农场美观度">
+          <span class="resource-icon" style="background:#ddaaff;">✨</span>
+          <span id="beautyText">0</span>
+        </div>
+      </div>
+      <button class="menu-btn" style="width:auto;padding:8px 20px;font-size:14px;" onclick="Game.backToMenu()">返回菜单</button>
+    </div>
+    <div class="farm-content">
+      <div class="farm-left">
+        <div class="farm-grid-container">
+          <div class="farm-grid-title">农田（点击空地播种，点击成熟作物收获）</div>
+          <div class="crop-selector" id="cropSelector" style="display:none;"></div>
+          <div class="farm-grid" id="farmGrid"></div>
+        </div>
+        <div class="crop-detail-panel" id="cropDetailPanel"></div>
+      </div>
+      <div class="farm-right">
+        <div class="panel">
+          <div class="panel-title">🏡 家园设施</div>
+          <div class="facility-grid">
+            <div class="facility" onclick="Warehouse.open()"><div class="facility-icon">🏚️</div><div class="facility-name">物资仓库</div><div class="facility-state" id="warehouseState">容量充足 · 点击查看</div></div>
+            <div class="facility" onclick="Game.openCardWorkshop()"><div class="facility-icon">🛠️</div><div class="facility-name">卡牌工坊</div><div class="facility-state">强化基础技能 · 查看掉落卡</div></div>
+            <div class="facility" onclick="Greenhouse.open()"><div class="facility-icon">🏡</div><div class="facility-name">育种温室</div><div class="facility-state">种植稀有植物 · 获取道具</div></div>
+            <div class="facility" onclick="showToast('远征档案记录不同地区情报', 'gold')"><div class="facility-icon">📜</div><div class="facility-name">远征档案</div><div class="facility-state">T1–T4 情报已登记</div></div>
+            <div class="facility" onclick="Game.openAchievements()"><div class="facility-icon">🏆</div><div class="facility-name">成就殿堂</div><div class="facility-state" id="achievementState">查看成就进度</div></div>
+            <div class="facility" onclick="Game.openBlacksmith()"><div class="facility-icon">🔨</div><div class="facility-name">武器锻造台</div><div class="facility-state" id="blacksmithState">升级武器 · 配件管理</div></div>
+            <div class="facility" onclick="Game.openSafeBox()"><div class="facility-icon">🔐</div><div class="facility-name">安全箱</div><div class="facility-state" id="safeBoxState">死亡必保留 · 升级格位</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">🌱 农场新功能</div>
+          <div class="facility-grid">
+            <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">🏭</div><div class="facility-name">加工工坊</div><div class="facility-state" id="workshopLevelState">Lv.1 · 作物加工</div></div>
+            <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">📖</div><div class="facility-name">作物图鉴</div><div class="facility-state">收集品质 · 全局buff</div></div>
+            <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">🎨</div><div class="facility-name">装饰商店</div><div class="facility-state">美观度 · 金币加成</div></div>
+            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">👥</div><div class="facility-name">NPC访客</div><div class="facility-state" id="npcCountState">4位访客 · 对话/送礼</div></div>
+            <div class="facility" onclick="TechSystemUI.open()"><div class="facility-icon">🏗️</div><div class="facility-name">建筑科技</div><div class="facility-state" id="techPointState">0科技点 · 升级建筑</div></div>
+            <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">🚶</div><div class="facility-name" id="visitorName">访客</div><div class="facility-state">点击互动获得奖励</div></div>
+          </div>
+        </div>
+        <div class="panel support-panel">
+          <div class="panel-title">🎁 家园补给站</div>
+          <div class="supply-card" style="margin-bottom:9px;">
+            <div class="supply-icon">⏳</div>
+            <div><div class="supply-name">生长催化剂 ×<span id="growthCatalystCount">0</span></div><div class="supply-desc">对剩余时间最长的生长中作物使用，立即减少其总种植时间的10%。</div><button class="supply-btn" onclick="Farm.useGrowthCatalyst()">使用道具</button></div>
+          </div>
+          <div class="daily-strip" id="dailyRewardStrip"></div>
+          <div class="supply-actions">
+            <div class="supply-card">
+              <div class="supply-icon">📅</div>
+              <div><div class="supply-name" id="dailyRewardTitle">每日签到</div><div class="supply-desc" id="dailyRewardDesc"></div><button class="supply-btn" id="dailyRewardButton" onclick="RewardSystem.claimDaily()">领取</button></div>
+            </div>
+            <div class="supply-card relief">
+              <div class="supply-icon">🧺</div>
+              <div><div class="supply-name">开荒保障</div><div class="supply-desc" id="reliefRewardDesc"></div><button class="supply-btn" id="reliefRewardButton" onclick="RewardSystem.claimRelief()">申请救济</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="expedition-gate">
+          <div class="expedition-gate-title">荒野远征站</div>
+          <p>地图选择、技能确认和携带物配置已移至独立准备大厅。家园不会受到远征战斗影响。</p>
+          <button class="start-expedition-btn gate-btn" onclick="Game.openExpeditionPrep()">进入远征准备大厅 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 独立远征准备大厅 -->
+  <div id="expeditionPrepScreen" class="overlay hidden">
+    <div class="prep-header">
+      <div class="prep-title"><h2>荒野远征准备大厅</h2><p>SELECT REGION · CHECK SKILLS · PACK SUPPLIES</p></div>
+      <div class="resource-display">
+        <div class="resource-item"><span class="resource-icon" style="background:#ffd700;">💰</span><span id="prepGoldDisplay">500</span></div>
+        <button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回家园</button>
+      </div>
+    </div>
+<div class="prep-content"><section class="prep-column"><h3 class="prep-column-title">角色与装备</h3><div class="prep-panel">
+          <div class="panel-title">带入武器（死亡永久失去！）</div>
+          <div id="weaponLoadoutSelect" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+          <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">⚠️ 失败将永久失去此武器，成功撤离自动回仓</div>
+        </div><div class="prep-panel">
+          <div class="panel-title">🃏 本次常驻技能</div>
+          <div class="prep-skill-grid" id="prepSkillGrid"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">作物 buff（收获作物获得，带入远征）</div>
+          <div id="cropBuffsDisplay" style="font-size:12px;color:#9fb5aa;line-height:1.8;">暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得</div>
+        </div></section><section class="prep-column"><h3 class="prep-column-title">卡牌与补给</h3><div class="prep-panel prep-loadout">
+          <div class="panel-title">携带消耗品</div>
+          <div class="loadout-grid" id="loadoutGrid"></div>
+        </div><div class="prep-panel prep-loadout">
+          <div class="panel-title">携带植物防线（培育满100可部署）</div>
+          <div class="defense-loadout-grid" id="defenseLoadoutGrid"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">🌱 携带种子（进图按 F1-F5 种在地上）</div>
+          <div id="seedLoadoutSelect" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          <div style="font-size:11px;color:#d88;font-style:italic;margin-top:4px;">最多5个，种在地上整局作战，撤离后消失</div>
+        </div></section><section class="prep-column"><h3 class="prep-column-title">地图与风险</h3><div class="prep-panel prep-map-panel">
+          <div class="panel-title">选择远征区域</div>
+          <div class="map-select" id="mapSelect"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">⚙️ 难度选择</div>
+          <div id="difficultySelect" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">🔥 Heat 修改器（可选，增加奖励）</div>
+          <div id="heatSelect" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div><div class="prep-panel">
+          <div class="panel-title">📡 区域提示</div>
+          <div id="regionBrief" style="font-size:12px;color:#9fb5aa;line-height:1.8;">选择地图后查看地形、环境和陷阱情报。</div>
+        </div></section></div>
+    <footer class="prep-footer"><div id="prepSummary" role="status"></div><div class="prep-actions"><button class="secondary-btn" onclick="Game.closeExpeditionPrep()">返回农场</button><button class="start-expedition-btn" id="startExpeditionBtn" onclick="Game.startExpedition()" aria-describedby="prepSummary">确认配置并出发</button></div></footer>
+  </div>
+
+  <!-- 远征HUD -->
+  <div id="expeditionHUD" class="hidden">
+    <div class="hud-top">
+      <div class="hud-panel player-stats">
+        <div class="stat-bar">
+          <span class="stat-label">生命</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill hp-fill" id="hpBar" style="width:100%"></div>
+            <span class="stat-value" id="hpText">100/100</span>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <span class="stat-label">能量</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill energy-fill" id="energyBar" style="width:100%"></div>
+            <span class="stat-value" id="energyText">100/100</span>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <span class="stat-label">养分</span>
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill nutrient-fill" id="nutrientBar" style="width:100%"></div>
+            <span class="stat-value" id="nutrientText">30/200</span>
+          </div>
+        </div>
+      </div>
+      <div id="torchStatus" class="torch-status" role="status" hidden></div>
+      <div class="hud-panel">
+        <div class="timer-display" id="timerDisplay">12:00</div>
+        <div class="map-badge" id="mapNameDisplay">T1 · 荒废野田</div>
+      </div>
+      <div class="hud-panel hud-target" id="targetPanel">
+        <div class="target-label">当前目标</div>
+        <div class="target-name" id="targetName">探索区域</div>
+        <div class="target-progress"><i id="targetProgress" style="width:0%"></i></div>
+        <div class="target-meta" id="targetMeta">准备行动</div>
+      </div>
+
+    </div>
+    <div class="hud-bottom" id="skillBar"></div>
+    <div id="weaponDisplay"></div>
+    <div class="consumable-bar" id="consumableBar"></div>
+    <div class="defense-bar" id="defenseBar"></div>
+    <div class="bag-display" id="bagDisplay"></div><div id="playerConditions"></div><div id="nodeDirection"></div><button id="hudDetailsToggle" type="button" aria-expanded="false">展开信息</button><canvas id="minimapCanvas" class="minimap" width="160" height="160"></canvas>
+    <div class="weapon-controls-tip"><kbd>Tab / 滚轮</kbd> 切换武器 · <kbd>1-4</kbd> 技能 · <kbd>Q/R/E</kbd> 道具</div>
+    <div class="controls-hint">
+      <kbd>WASD</kbd> 移动 | <kbd>鼠标左键</kbd> 攻击/交互 | 战利品自动拾取<br>
+      <kbd>1-4</kbd> 常驻技能 | <kbd>Q/R/E</kbd> 消耗品<br>
+      <kbd>Shift</kbd> 冲刺 | <kbd>ESC</kbd> 暂停
+    </div>
+  </div>
+
+  <!-- 结算界面 -->
+  <div id="resultScreen" class="overlay hidden">
+    <div class="result-card" id="resultCard">
+      <div class="result-title" id="resultTitle">远征成功</div>
+      <div class="result-subtitle" id="resultSubtitle">你成功带着战利品撤离了荒野</div>
+      <div class="result-stats" id="resultStats"></div>
+      <div class="loot-list" id="lootList"></div>
+      <div class="result-actions"><button class="menu-btn" onclick="Game.returnToFarm();Game.openExpeditionPrep()">再次远征</button><button class="secondary-btn" onclick="Game.returnToFarm()">返回农场</button><button class="secondary-btn" onclick="ExpeditionLayout.openCollection()">查看卡牌收藏</button></div>
+    </div>
+  </div>
+
+  <!-- 卡牌工坊弹窗 -->
+  <div id="cardWorkshopModal" class="overlay modal-overlay hidden" onclick="if(event.target===this) Game.closeCardWorkshop()">
+    <div class="workshop-window">
+      <div class="workshop-header">
+        <div><h2>卡牌工坊</h2><p>收获作物有概率掉落强化卡，使用后永久提升基础技能。</p></div>
+        <button class="secondary-btn" onclick="Game.closeCardWorkshop()">关闭</button>
+      </div>
+      <div class="workshop-section"><div class="panel-title">基础技能等级</div><div class="workshop-skills" id="workshopSkills"></div></div>
+      <div class="workshop-section workshop-inventory"><div class="panel-title">作物卡牌库存（点击卡片＝永久升级技能）</div><div class="workshop-cards" id="workshopCards"></div></div>
+      <div class="workshop-section workshop-synth"><div class="panel-title">强化卡合成（5 张同品质 → 1 张更高品质）</div><div class="workshop-synth-grid" id="workshopSynth"></div></div>
+    </div>
+  </div>
+
+  <div id="cardDropContainer"></div>
+  <div id="signalFlash"></div>
+  <div id="lowHealthVignette"></div>
+
+  <!-- 物资仓库弹窗 -->
+  <div id="warehouseModal" class="overlay hidden">
+    <div class="warehouse-modal">
+      <div class="warehouse-modal-header">
+        <h2>📦 物资仓库</h2>
+        <button class="close-btn" onclick="Warehouse.close()">✕</button>
+      </div>
+      <div id="warehouseContent" class="warehouse-content"></div>
+    </div>
+  </div>
+
+  <!-- 育种温室弹窗 -->
+  <div id="greenhouseModal" class="overlay hidden">
+    <div class="greenhouse-modal">
+      <div class="greenhouse-modal-header">
+        <h2>🏡 育种温室</h2>
+        <button class="close-btn" onclick="Greenhouse.close()">✕</button>
+      </div>
+      <div class="greenhouse-content">
+        <div class="greenhouse-left">
+          <div class="greenhouse-grid-title">温室 4/16</div>
+          <div class="greenhouse-plant-selector" id="greenhousePlantSelector"></div>
+          <div class="greenhouse-grid" id="greenhouseGrid"></div>
+        </div>
+        <div class="greenhouse-right">
+          <div class="greenhouse-drops" id="greenhouseDrops"></div>
+          <div class="greenhouse-tips">
+            <div class="tips-title">💡 温室提示</div>
+            <ul>
+              <li>种植稀有植物需要消耗金币购买种子</li>
+              <li>稀有植物成熟后可收获各种道具</li>
+              <li>传说植物有概率解锁新的稀有植物</li>
+              <li>温室格子需要金币和材料解锁</li>
+              <li>作物转化卡可将普通作物变为稀有作物</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示消息容器 -->
+  <div id="toastContainer"></div>
+</div>
+
+  <script src="js/config.js?v=ux18-20261016"></script>
+  <script src="js/crop-art.js?v=farmfx-20261015"></script>
+  <script src="js/save.js?v=layout-20261008"></script>
+  <script src="js/telemetry.js?v=title-20261008b"></script>
+  <script src="js/ui.js?v=ux18-20261016"></script>
+  <script src="js/card.js?v=layout-20261008"></script>
+  <script src="js/farm.js?v=fxconf-20261015"></script>
+  <script src="js/farm-fx.js?v=fxconf-20261015"></script>
+  <script src="js/farm-expansion.js?v=farm-20261008"></script>
+  <script src="js/warehouse.js?v=weapon-icons-20261008"></script>
+  <script src="js/gm.js?v=gm-20261015"></script>
+  <script src="js/greenhouse.js?v=layout-20261008"></script>
+  <script src="js/performance.js?v=layout-20261008"></script>
+  <script src="vendor/pixi.min.js"></script>
+  <script src="js/art-textures.js?v=ux20-20261016"></script>
+  <script src="js/npc-portraits.js?v=npc3d-20261016"></script>
+  <script src="js/pixi-renderer.js?v=pixi-20261016"></script>
+  <script src="js/pixi-terrain.js?v=ux18-20261016"></script>
+  <script src="js/expedition/expedition-types.js?v=layout-20261008"></script>
+  <script src="js/expedition/expedition-director.js?v=combatfx-20261015"></script>
+  <script src="js/expedition/expedition-core.js?v=ux19-20261016"></script>
+  <script src="js/expedition/expedition-terrain.js?v=ux18-20261016"></script>
+  <script src="js/expedition/expedition-world.js?v=ux18-20261016"></script>
+  <script src="js/expedition/expedition-combat.js?v=ux19-20261016"></script>
+  <script src="js/expedition/expedition-allies.js?v=npc3d-20261016"></script>
+  <script src="js/expedition/expedition-effects.js?v=ux18-20261016"></script>
+  <script src="js/expedition/expedition-render.js?v=ux19-20261016"></script>
+  <script src="js/weather-system.js?v=layout-20261008"></script>
+  <script src="js/world-fx.js?v=mapdetail-20261016"></script>
+  <script src="js/difficulty-system.js?v=layout-20261008"></script>
+  <script src="js/npc-system.js?v=ux20-20261016"></script>
+  <script src="js/npc-ai.js?v=ux20-20261016"></script>
+  <script src="js/tech-system.js?v=farm-20261008-layout-20261008"></script>
+  <script src="js/economy-loop.js?v=wloop-20261015"></script>
+  <script src="js/v080-ui.js?v=npc3d-20261016"></script>
+  <script src="js/crop-expansion.js?v=layout-20261008"></script>
+  <script src="js/crop-render-ext.js?v=plotstatus-20261016"></script>
+  <script src="js/combat-enhancement.js?v=ux18-20261016"></script>
+  <script src="js/achievement-system.js?v=layout-20261008"></script>
+  <script src="js/loadout-system.js?v=layout-20261008"></script>
+  <script src="js/v58/card-data.js?v=layout-20261008"></script>
+  <script src="js/v58/card-system.js?v=layout-20261008"></script>
+  <script src="js/v58/collection-ui.js?v=codex-20261015"></script>
+  <script src="js/v5.js?v=fxconf-20261015"></script>
+  <script src="js/game.js?v=ux16-20261016"></script>
+
+  <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/Pass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/nebula.js?v=layout-20261008"></script>
+  <script src="js/nebula-text.js?v=title-20261008b"></script>
+  <script src="js/title-starfield.js?v=homestead-20261009"></script>
+  <script src="js/title-entry.js?v=homestead-20261009"></script>
+
+  <!-- v2.0 农场大更新弹窗 -->
+  <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">🏭 加工工坊 <span id="processingLevel" style="font-size:14px;color:#ffd700;">Lv.1</span>
+        <button class="modal-close" onclick="FarmUI.closeModal('processingModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="processingQueue" style="margin-bottom:12px;padding:8px;background:#1a2a1a;border-radius:6px;min-height:36px;color:#aaccaa;font-size:13px;">加工队列：空闲</div>
+        <div id="recipeList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="margin-top:12px;text-align:center;">
+          <button class="supply-btn" onclick="FarmProcessingSystem.upgradeWorkshop();FarmUI.renderProcessing();" style="padding:8px 20px;">升级工坊 (<span id="workshopUpgradeCost">100</span>金)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="collectionModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('collectionModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">📖 作物图鉴
+        <button class="modal-close" onclick="FarmUI.closeModal('collectionModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="collectionProgress" style="margin-bottom:12px;color:#aaccaa;font-size:14px;"></div>
+        <div id="collectionGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="decorationModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('decorationModal')">
+    <div class="modal-panel" style="max-width:680px;">
+      <div class="modal-title">🎨 装饰商店
+        <button class="modal-close" onclick="FarmUI.closeModal('decorationModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="decorationBeauty" style="margin-bottom:12px;color:#ffd700;font-size:14px;"></div>
+        <div id="decorationGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="js/farm-panorama.js?v=pano-v3-20261016"></script>
+  <script src="js/pixi-farm.js?v=farmpixi-20261016"></script>
+  <script src="js/farm-ui.js?v=ux15-20261016"></script>
+<script src="js/expedition-layout.js?v=skill-torch-20261009"></script>
+
+  <!-- v0.8.0 NPC模态 -->
+  <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">
+    <div class="modal-window npc-modal">
+      <div class="modal-header"><span>👥 NPC 访客</span><button onclick="NpcSystemUI.close()" class="modal-close">✕</button></div>
+      <div class="npc-modal-body">
+        <div class="npc-list" id="npcList"></div>
+        <div class="npc-detail" id="npcDetail"><div style="color:#888;text-align:center;padding:40px;">选择左侧 NPC 开始对话</div></div>
+      </div>
+      <div class="modal-footer"><button onclick="DiaryUI.open()" class="modal-btn">📜 日记残页 (0/5)</button></div>
+    </div>
+  </div>
+
+  <!-- v0.8.0 建筑科技模态 -->
+  <div id="techModal" class="modal-overlay hidden" onclick="if(event.target===this)TechSystemUI.close()">
+    <div class="modal-window tech-modal">
+      <div class="modal-header"><span>🏗️ 建筑升级 + 科技树</span><button onclick="TechSystemUI.close()" class="modal-close">✕</button></div>
+      <div class="tech-modal-body">
+        <div class="building-list" id="buildingList"></div>
+        <div class="tech-tree-container" id="techTreeContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.8.0 日记模态 -->
+  <div id="diaryModal" class="modal-overlay hidden" onclick="if(event.target===this)DiaryUI.close()">
+    <div class="modal-window diary-modal">
+      <div class="modal-header"><span>📜 日记残页 - 荒野之谜</span><button onclick="DiaryUI.close()" class="modal-close">✕</button></div>
+      <div class="diary-container" id="diaryContainer"></div>
+    </div>
+  </div>
+
+</body>
+</html>

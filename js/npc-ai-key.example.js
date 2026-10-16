@@ -1,0 +1,1 @@
+window.NPC_AI_KEY="sk-你的key填这里";

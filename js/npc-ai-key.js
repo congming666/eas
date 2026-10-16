@@ -1,0 +1,1 @@
+window.NPC_AI_KEY="sk-0ad252660dcd4c4eace5f1d7290cc8b2";
