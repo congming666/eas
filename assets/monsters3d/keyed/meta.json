@@ -1,0 +1,44 @@
+{
+ "boar": {
+  "w": 899,
+  "h": 796,
+  "aspect": 1.1294,
+  "coverage": 0.354
+ },
+ "wolf": {
+  "w": 944,
+  "h": 733,
+  "aspect": 1.2879,
+  "coverage": 0.276
+ },
+ "bat": {
+  "w": 955,
+  "h": 916,
+  "aspect": 1.0426,
+  "coverage": 0.351
+ },
+ "spider": {
+  "w": 929,
+  "h": 699,
+  "aspect": 1.329,
+  "coverage": 0.227
+ },
+ "locust": {
+  "w": 820,
+  "h": 865,
+  "aspect": 0.948,
+  "coverage": 0.25
+ },
+ "herbivore": {
+  "w": 748,
+  "h": 971,
+  "aspect": 0.7703,
+  "coverage": 0.268
+ },
+ "armored_boar": {
+  "w": 895,
+  "h": 746,
+  "aspect": 1.1997,
+  "coverage": 0.359
+ }
+}

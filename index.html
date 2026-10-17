@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>农庄牌：荒野远征 v5.8.0</title>
+<title>农庄牌：荒野远征 v5.8.7</title>
 <link rel="icon" type="image/png" href="assets/favicon.png">
-<meta name="game-version" content="5.8.0">
-<link rel="stylesheet" href="css/style.css?v=ux20-20261016">
-<link rel="stylesheet" href="css/v58-title.css?v=keyart-v4-20261016&homestead-20261009">
-<link rel="stylesheet" href="css/v58-card.css?v=codex-20261015">
-<link rel="stylesheet" href="css/v58-farm.css?v=ux15-20261016">
-<link rel="stylesheet" href="css/v58-expedition.css?v=combatfx-20261015">
-<link rel="stylesheet" href="css/expedition-fx.css?v=combatfx-20261015">
-<link rel="stylesheet" href="css/expedition-layout.css?v=layout-review-20261010">
-<link rel="stylesheet" href="css/farm-comfort.css?v=fxconf-20261015">
-<link rel="stylesheet" href="css/codex.css?v=codex-20261015">
-<link rel="stylesheet" href="css/cinema-ui.css?v=cinema-20261016">
+<meta name="game-version" content="5.8.7">
+<link rel="stylesheet" href="css/style.css?v=5.8.7">
+<link rel="stylesheet" href="css/v58-title.css?v=5.8.7">
+<link rel="stylesheet" href="css/v58-card.css?v=5.8.7">
+<link rel="stylesheet" href="css/v58-farm.css?v=5.8.7">
+<link rel="stylesheet" href="css/v58-expedition.css?v=5.8.7">
+<link rel="stylesheet" href="css/expedition-fx.css?v=5.8.7">
+<link rel="stylesheet" href="css/expedition-layout.css?v=5.8.7">
+<link rel="stylesheet" href="css/farm-comfort.css?v=5.8.7">
+<link rel="stylesheet" href="css/codex.css?v=5.8.7">
+<link rel="stylesheet" href="css/cinema-ui.css?v=5.8.7">
 </head>
 <body>
 <div id="gameContainer">
@@ -33,7 +33,7 @@
       <div class="nebula-brand">农庄牌 <span>／</span> 荒野远征</div>
       <div class="nebula-brand-meta nebula-glow-soft">星云序章 · 拖拽旋转 · 悬浮聚光</div>
     </div>
-    <div class="title-scene" aria-hidden="true"><img src="assets/title/keyart-night.png?v=title-v4" class="title-landscape" alt="" onerror="this.onerror=null;this.src='assets/title/homestead-night.svg?v=title-v3';"><div class="title-smoke"></div><div class="title-fireflies"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="title-scene" aria-hidden="true"><img src="assets/title/keyart-night.png?v=5.8.7" class="title-landscape" alt="" onerror="this.onerror=null;this.src='assets/title/homestead-night.svg?v=title-v3';"><div class="title-smoke"></div><div class="title-fireflies"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
     <div class="nebula-card">
       <div class="nebula-eyebrow nebula-glow">FARMBOUND EXPEDITION</div>
       <div class="title-series">农庄牌</div>
@@ -108,7 +108,7 @@
             <div class="facility" onclick="FarmUI.openProcessing()"><div class="facility-icon">🏭</div><div class="facility-name">加工工坊</div><div class="facility-state" id="workshopLevelState">Lv.1 · 作物加工</div></div>
             <div class="facility" onclick="FarmUI.openCollection()"><div class="facility-icon">📖</div><div class="facility-name">作物图鉴</div><div class="facility-state">收集品质 · 全局buff</div></div>
             <div class="facility" onclick="FarmUI.openDecoration()"><div class="facility-icon">🎨</div><div class="facility-name">装饰商店</div><div class="facility-state">美观度 · 金币加成</div></div>
-            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">👥</div><div class="facility-name">NPC访客</div><div class="facility-state" id="npcCountState">4位访客 · 对话/送礼</div></div>
+            <div class="facility" onclick="NpcSystemUI.open()"><div class="facility-icon">👥</div><div class="facility-name">NPC访客</div><div class="facility-state" id="npcCountState">常驻居民 · 对话/送礼/任务</div></div>
             <div class="facility" onclick="TechSystemUI.open()"><div class="facility-icon">🏗️</div><div class="facility-name">建筑科技</div><div class="facility-state" id="techPointState">0科技点 · 升级建筑</div></div>
             <div class="facility" id="visitorFacility" style="display:none;" onclick="FarmDecorationSystem.interactVisitor()"><div class="facility-icon">🚶</div><div class="facility-name" id="visitorName">访客</div><div class="facility-state">点击互动获得奖励</div></div>
           </div>
@@ -310,51 +310,53 @@
   <div id="toastContainer"></div>
 </div>
 
-  <script src="js/config.js?v=ux18-20261016"></script>
-  <script src="js/crop-art.js?v=farmfx-20261015"></script>
-  <script src="js/save.js?v=layout-20261008"></script>
-  <script src="js/telemetry.js?v=title-20261008b"></script>
-  <script src="js/ui.js?v=ux18-20261016"></script>
-  <script src="js/card.js?v=layout-20261008"></script>
-  <script src="js/farm.js?v=fxconf-20261015"></script>
-  <script src="js/farm-fx.js?v=fxconf-20261015"></script>
-  <script src="js/farm-expansion.js?v=farm-20261008"></script>
-  <script src="js/warehouse.js?v=weapon-icons-20261008"></script>
-  <script src="js/gm.js?v=gm-20261015"></script>
-  <script src="js/greenhouse.js?v=layout-20261008"></script>
-  <script src="js/performance.js?v=layout-20261008"></script>
+  <script src="js/config.js?v=5.8.7"></script>
+  <script src="js/crop-art.js?v=5.8.7"></script>
+  <script src="js/save.js?v=5.8.7"></script>
+  <script src="js/telemetry.js?v=5.8.7"></script>
+  <script src="js/ui.js?v=5.8.7"></script>
+  <script src="js/card.js?v=5.8.7"></script>
+  <script src="js/farm.js?v=5.8.7"></script>
+  <script src="js/farm-fx.js?v=5.8.7"></script>
+  <script src="js/farm-expansion.js?v=5.8.7"></script>
+  <script src="js/warehouse.js?v=5.8.7"></script>
+  <script src="js/gm.js?v=5.8.7"></script>
+  <script src="js/greenhouse-visual.js?v=5.8.7"></script>
+  <script src="js/greenhouse.js?v=5.8.7"></script>
+  <script src="js/performance.js?v=5.8.7"></script>
   <script src="vendor/pixi.min.js"></script>
-  <script src="js/art-textures.js?v=ux20-20261016"></script>
-  <script src="js/npc-portraits.js?v=npc3d-20261016"></script>
-  <script src="js/pixi-renderer.js?v=pixi-20261016"></script>
-  <script src="js/pixi-terrain.js?v=ux18-20261016"></script>
-  <script src="js/expedition/expedition-types.js?v=layout-20261008"></script>
-  <script src="js/expedition/expedition-director.js?v=combatfx-20261015"></script>
-  <script src="js/expedition/expedition-core.js?v=ux19-20261016"></script>
-  <script src="js/expedition/expedition-terrain.js?v=ux18-20261016"></script>
-  <script src="js/expedition/expedition-world.js?v=ux18-20261016"></script>
-  <script src="js/expedition/expedition-combat.js?v=ux19-20261016"></script>
-  <script src="js/expedition/expedition-allies.js?v=npc3d-20261016"></script>
-  <script src="js/expedition/expedition-effects.js?v=ux18-20261016"></script>
-  <script src="js/expedition/expedition-render.js?v=ux19-20261016"></script>
-  <script src="js/weather-system.js?v=layout-20261008"></script>
-  <script src="js/world-fx.js?v=mapdetail-20261016"></script>
-  <script src="js/difficulty-system.js?v=layout-20261008"></script>
-  <script src="js/npc-system.js?v=ux20-20261016"></script>
-  <script src="js/npc-ai.js?v=ux20-20261016"></script>
-  <script src="js/tech-system.js?v=farm-20261008-layout-20261008"></script>
-  <script src="js/economy-loop.js?v=wloop-20261015"></script>
-  <script src="js/v080-ui.js?v=npc3d-20261016"></script>
-  <script src="js/crop-expansion.js?v=layout-20261008"></script>
-  <script src="js/crop-render-ext.js?v=plotstatus-20261016"></script>
-  <script src="js/combat-enhancement.js?v=ux18-20261016"></script>
-  <script src="js/achievement-system.js?v=layout-20261008"></script>
-  <script src="js/loadout-system.js?v=layout-20261008"></script>
-  <script src="js/v58/card-data.js?v=layout-20261008"></script>
-  <script src="js/v58/card-system.js?v=layout-20261008"></script>
-  <script src="js/v58/collection-ui.js?v=codex-20261015"></script>
-  <script src="js/v5.js?v=fxconf-20261015"></script>
-  <script src="js/game.js?v=ux16-20261016"></script>
+  <script src="js/art-textures.js?v=5.8.7"></script>
+  <script src="js/npc-portraits.js?v=5.8.7"></script>
+  <script src="js/monsters3d.js?v=5.8.7"></script>
+  <script src="js/pixi-renderer.js?v=5.8.7"></script>
+  <script src="js/pixi-terrain.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-types.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-director.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-core.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-terrain.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-world.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-combat.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-allies.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-effects.js?v=5.8.7"></script>
+  <script src="js/expedition/expedition-render.js?v=5.8.7"></script>
+  <script src="js/weather-system.js?v=5.8.7"></script>
+  <script src="js/world-fx.js?v=5.8.7"></script>
+  <script src="js/difficulty-system.js?v=5.8.7"></script>
+  <script src="js/npc-system.js?v=5.8.7"></script>
+  <script src="js/npc-ai.js?v=5.8.7"></script>
+  <script src="js/tech-system.js?v=5.8.7"></script>
+  <script src="js/economy-loop.js?v=5.8.7"></script>
+  <script src="js/v080-ui.js?v=5.8.7"></script>
+  <script src="js/crop-expansion.js?v=5.8.7"></script>
+  <script src="js/crop-render-ext.js?v=5.8.7"></script>
+  <script src="js/combat-enhancement.js?v=5.8.7"></script>
+  <script src="js/achievement-system.js?v=5.8.7"></script>
+  <script src="js/loadout-system.js?v=5.8.7"></script>
+  <script src="js/v58/card-data.js?v=5.8.7"></script>
+  <script src="js/v58/card-system.js?v=5.8.7"></script>
+  <script src="js/v58/collection-ui.js?v=5.8.7"></script>
+  <script src="js/v5.js?v=5.8.7"></script>
+  <script src="js/game.js?v=5.8.7"></script>
 
   <!-- 星云序章：WebGL 粒子开场（CDN 加载失败时自动降级为静态背景） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -365,10 +367,11 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <script src="js/nebula.js?v=layout-20261008"></script>
-  <script src="js/nebula-text.js?v=title-20261008b"></script>
-  <script src="js/title-starfield.js?v=homestead-20261009"></script>
-  <script src="js/title-entry.js?v=homestead-20261009"></script>
+  <script src="js/nebula.js?v=5.8.7"></script>
+  <script src="js/nebula-text.js?v=5.8.7"></script>
+  <script src="js/title-starfield.js?v=5.8.7"></script>
+  <script src="js/title-moon-fx.js?v=5.8.7"></script>
+  <script src="js/title-entry.js?v=5.8.7"></script>
 
   <!-- v2.0 农场大更新弹窗 -->
   <div id="processingModal" class="modal-overlay hidden" onclick="if(event.target===this)FarmUI.closeModal('processingModal')">
@@ -411,10 +414,10 @@
   </div>
 
 
-  <script src="js/farm-panorama.js?v=pano-v3-20261016"></script>
-  <script src="js/pixi-farm.js?v=farmpixi-20261016"></script>
-  <script src="js/farm-ui.js?v=ux15-20261016"></script>
-<script src="js/expedition-layout.js?v=skill-torch-20261009"></script>
+  <script src="js/farm-panorama.js?v=5.8.7"></script>
+  <script src="js/pixi-farm.js?v=5.8.7"></script>
+  <script src="js/farm-ui.js?v=5.8.7"></script>
+<script src="js/expedition-layout.js?v=5.8.7"></script>
 
   <!-- v0.8.0 NPC模态 -->
   <div id="npcModal" class="modal-overlay hidden" onclick="if(event.target===this)NpcSystemUI.close()">
