@@ -1,1 +1,1 @@
-window.NPC_AI_KEY = '';
+﻿window.NPC_AI_KEY = '';

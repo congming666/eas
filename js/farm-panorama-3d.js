@@ -115,117 +115,272 @@
     }, [4, 4]);
   }
 
-  /* ---------- 作物几何体 ---------- */
+
+  /* ---------- 程序化材质纹理 ---------- */
+  const TEXCACHE = {};
+  function texCanvas(name, fn, w, h) {
+    if (!TEXCACHE[name]) TEXCACHE[name] = canvasTex(w || 256, h || 256, fn);
+    return TEXCACHE[name];
+  }
+  function woodTex() {
+    return texCanvas('wood', (c, w, h) => {
+      c.fillStyle = '#8a6a4a'; c.fillRect(0, 0, w, h);
+      // 木板条
+      for (let row = 0; row < 4; row++) {
+        const y = row * (h / 4);
+        c.fillStyle = row % 2 ? 'rgba(60,40,24,.18)' : 'rgba(230,200,160,.07)';
+        c.fillRect(0, y, w, h / 4);
+        c.fillStyle = 'rgba(30,20,12,.45)'; c.fillRect(0, y + h / 4 - 2, w, 2);
+        // 木纹
+        for (let i = 0; i < 40; i++) {
+          c.strokeStyle = 'rgba(70,48,28,.20)'; c.lineWidth = 1;
+          const yy = y + 4 + Math.random() * (h / 4 - 8);
+          c.beginPath(); c.moveTo(Math.random() * w, yy);
+          c.bezierCurveTo(w * .3, yy + 2, w * .6, yy - 2, w, yy + 1); c.stroke();
+        }
+        // 节疤
+        if (row % 2 === 0) {
+          const bx = Math.random() * w;
+          c.fillStyle = 'rgba(40,26,14,.5)'; c.beginPath(); c.ellipse(bx, y + h / 8, 4, 2.4, .2, 0, 7); c.fill();
+        }
+      }
+      // 风化白斑
+      for (let i = 0; i < 300; i++) {
+        c.fillStyle = Math.random() > .5 ? 'rgba(220,210,190,.05)' : 'rgba(20,14,8,.06)';
+        c.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 6, 1);
+      }
+    });
+  }
+  function rustTex() {
+    return texCanvas('rust', (c, w, h) => {
+      c.fillStyle = '#7a6a58'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2600; i++) {
+        const x = Math.random() * w, y = Math.random() * h;
+        const r = Math.random();
+        c.fillStyle = r > .62 ? 'rgba(150,80,40,.30)' : r > .3 ? 'rgba(90,50,30,.22)' : 'rgba(210,190,160,.08)';
+        c.beginPath(); c.arc(x, y, 1 + Math.random() * 7, 0, 7); c.fill();
+      }
+      // 锈水流痕
+      for (let i = 0; i < 16; i++) {
+        const x = Math.random() * w;
+        c.strokeStyle = 'rgba(130,64,30,.18)'; c.lineWidth = 1 + Math.random() * 3;
+        c.beginPath(); c.moveTo(x, Math.random() * h * .4); c.lineTo(x + 2, h); c.stroke();
+      }
+      // 铆钉
+      for (let i = 0; i < 22; i++) {
+        const x = (i % 6) * (w / 6) + 8, y = Math.floor(i / 6) * (h / 4) + 10;
+        c.fillStyle = 'rgba(40,34,28,.55)'; c.beginPath(); c.arc(x, y, 2.4, 0, 7); c.fill();
+        c.fillStyle = 'rgba(220,210,190,.20)'; c.beginPath(); c.arc(x - .7, y - .7, 1.1, 0, 7); c.fill();
+      }
+    });
+  }
+  function shingleTex() {
+    return texCanvas('shingle', (c, w, h) => {
+      c.fillStyle = '#6a4a3a'; c.fillRect(0, 0, w, h);
+      const rows = 8, cols = 6;
+      for (let r = 0; r < rows; r++) {
+        for (let k = 0; k < cols; k++) {
+          const x = k * (w / cols) + (r % 2 ? w / cols / 2 : 0);
+          const y = r * (h / rows);
+          c.fillStyle = 'rgba(' + (120 + Math.random() * 40 | 0) + ',' + (70 + Math.random() * 30 | 0) + ',' + (50 + Math.random() * 25 | 0) + ',.55)';
+          c.fillRect(x, y, w / cols - 2, h / rows - 2);
+          c.strokeStyle = 'rgba(20,12,8,.5)'; c.lineWidth = 1.5;
+          c.strokeRect(x, y, w / cols - 2, h / rows - 2);
+        }
+      }
+      for (let i = 0; i < 120; i++) {
+        c.fillStyle = 'rgba(180,160,120,.08)';
+        c.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+      }
+    });
+  }
+  function clampedTexMat(name, color, repeat, rough, metal) {
+    const base = { wood: woodTex, rust: rustTex, shingle: shingleTex }[name];
+    const src = base();
+    const tex = src.clone();
+    tex.needsUpdate = true;
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.repeat.set(repeat[0], repeat[1]);
+    return new T.MeshStandardMaterial({ map: tex, color: color, roughness: rough == null ? 1 : rough, metalness: metal || 0 });
+  }
+
+  /* ---------- 作物几何体（v2：细节加强） ---------- */
   function cropGroup(kind) {
     const g = new T.Group();
     const mat = (col, rough = .9, metal = 0) => new T.MeshStandardMaterial({ color: col, roughness: rough, metalness: metal });
+    const leafGeo = (w, l) => new T.PlaneGeometry(w, l);
+    const addLeaf = (parent, x, y, z, w, l, rz, ry) => {
+      const leaf = new T.Mesh(leafGeo(w, l), mat('#7a8442', .95));
+      leaf.material.side = T.DoubleSide;
+      leaf.position.set(x, y, z);
+      leaf.rotation.z = rz; leaf.rotation.y = ry;
+      parent.add(leaf);
+    };
     if (kind === 'wheat' || kind === 'moon_rice') {
       const isRice = kind === 'moon_rice';
       const stalkMat = mat(isRice ? '#a9b5a2' : '#b89a44');
       const earMat = mat(isRice ? '#c8d0bc' : '#c8a850', .75);
-      const leafMat = mat(isRice ? '#8a9878' : '#7a7a3a', .95);
-      if (isRice && earMat.emissive) earMat.emissive = new T.Color('#4a5a80');
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2, r = .04 + hash(i) * .13;
-        const h = .42 + hash(i + 3) * .2;
-        const stalk = new T.Mesh(new T.CylinderGeometry(.02, .03, h, 4), stalkMat);
+      const awnMat = mat(isRice ? '#d8dcd0' : '#d8c070', .7);
+      if (isRice) earMat.emissive = new T.Color('#4a5a80'), earMat.emissiveIntensity = .5;
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2, r = .04 + hash(i) * .14;
+        const h = .4 + hash(i + 3) * .24;
+        const stalk = new T.Mesh(new T.CylinderGeometry(.012, .018, h, 4), stalkMat);
         stalk.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r);
-        stalk.rotation.z = (hash(i + 5) - .5) * .35;
+        stalk.rotation.z = (hash(i + 5) - .5) * .3;
         g.add(stalk);
-        const ear = new T.Mesh(new T.ConeGeometry(.05, .18, 5), earMat);
-        ear.position.set(stalk.position.x, h + .05, stalk.position.z);
+        const ex = stalk.position.x, ez = stalk.position.z;
+        const ear = new T.Mesh(new T.ConeGeometry(.045, .17, 6), earMat);
+        ear.position.set(ex, h + .05, ez);
         g.add(ear);
-        // 宽叶片：远处也能看出"一片庄稼"
-        for (let b = 0; b < 2; b++) {
-          const leaf = new T.Mesh(new T.PlaneGeometry(.16, .5), leafMat);
-          leaf.position.set(stalk.position.x, h * .55, stalk.position.z);
-          leaf.rotation.z = a + b * 1.2; leaf.rotation.y = a;
-          leaf.material.side = T.DoubleSide;
-          g.add(leaf);
+        // 麦芒
+        for (let k = 0; k < 4; k++) {
+          const awn = new T.Mesh(new T.CylinderGeometry(.003, .006, .12, 3), awnMat);
+          awn.position.set(ex + (hash(i + k) - .5) * .05, h + .13, ez + (hash(i * 2 + k) - .5) * .05);
+          awn.rotation.z = (hash(i + k) - .5) * .5;
+          g.add(awn);
         }
+        addLeaf(g, ex + .07, h * .45, ez, .14, .42, .5, a);
       }
     } else if (kind === 'corn') {
       const stalkMat = mat('#6f8a3a'), leafMat = mat('#7c9a42', .95);
-      const stalk = new T.Mesh(new T.CylinderGeometry(.055, .07, 1.25, 6), stalkMat);
-      stalk.position.y = .575; g.add(stalk);
-      for (let i = 0; i < 6; i++) {
-        const y = .3 + i * .14;
-        const leaf = new T.Mesh(new T.PlaneGeometry(.55, .16), leafMat);
-        leaf.position.set(0, y, 0);
-        leaf.rotation.y = i * 1.1; leaf.rotation.z = .45;
-        leaf.material.side = T.DoubleSide;
-        g.add(leaf);
+      const stalk = new T.Mesh(new T.CylinderGeometry(.055, .075, 1.35, 7), stalkMat);
+      stalk.position.y = .675; g.add(stalk);
+      for (let i = 0; i < 9; i++) {
+        const y = .25 + i * .13;
+        for (let b = 0; b < 2; b++) {
+          const leaf = new T.Mesh(leafGeo(.5, .18), leafMat);
+          leaf.material.side = T.DoubleSide;
+          leaf.position.set(0, y, 0);
+          leaf.rotation.y = i * 1.4 + b * 2.2;
+          leaf.rotation.z = .5;
+          leaf.position.x = Math.cos(i * 1.4 + b * 2.2) * .16;
+          leaf.position.z = Math.sin(i * 1.4 + b * 2.2) * .16;
+          g.add(leaf);
+        }
       }
+      // 雄穗
+      const tassel = new T.Mesh(new T.ConeGeometry(.05, .28, 6), mat('#c8b060', .8));
+      tassel.position.y = 1.45; g.add(tassel);
+      for (let i = 0; i < 5; i++) {
+        const t2 = new T.Mesh(new T.CylinderGeometry(.006, .012, .18, 3), mat('#d8c070'));
+        t2.position.set((hash(i) - .5) * .18, 1.5 + hash(i) * .06, (hash(i + 1) - .5) * .18);
+        t2.rotation.z = (hash(i) - .5) * .9; t2.rotation.x = (hash(i + 2) - .5) * .9;
+        g.add(t2);
+      }
+      // 雌穗 + 苞叶 + 玉米须
       for (let i = 0; i < 2; i++) {
-        const ear = new T.Mesh(new T.CylinderGeometry(.045, .02, .3, 6), mat('#d9b84a', .7));
-        ear.position.set(i ? .12 : -.12, .72 + i * .06, i ? .06 : -.06);
-        ear.rotation.z = i ? -.2 : .2;
-        g.add(ear);
+        const ex = i ? .13 : -.13, ez = i ? .06 : -.06;
+        const ear = new T.Mesh(new T.CylinderGeometry(.05, .03, .32, 6), mat('#d9b84a', .7));
+        ear.position.set(ex, .78 + i * .05, ez); ear.rotation.z = i ? -.2 : .2; g.add(ear);
+        const husk = new T.Mesh(new T.ConeGeometry(.075, .36, 6), mat('#8a9a4a', .95));
+        husk.position.set(ex, .82 + i * .05, ez); husk.rotation.z = i ? -.2 : .2; husk.material.side = T.DoubleSide; g.add(husk);
+        for (let k = 0; k < 6; k++) {
+          const silk = new T.Mesh(new T.CylinderGeometry(.004, .004, .18, 3), mat('#c87a40', .8));
+          silk.position.set(ex + (hash(i + k) - .5) * .06, 1.0 + i * .05, ez + (hash(i + k + 2) - .5) * .06);
+          silk.rotation.z = (hash(i + k) - .5) * .8; g.add(silk);
+        }
       }
     } else if (kind === 'sunflower') {
-      const stalk = new T.Mesh(new T.CylinderGeometry(.03, .045, 1.2, 6), mat('#7c8a42'));
-      stalk.position.y = .6; g.add(stalk);
-      const head = new T.Group();
-      const disc = new T.Mesh(new T.CylinderGeometry(.16, .13, .06, 14), mat('#6a4a24', .95));
-      disc.rotation.x = Math.PI / 2; head.add(disc);
-      const petalMat = mat('#e8c83e', .7);
-      for (let i = 0; i < 14; i++) {
-        const a = i / 14 * Math.PI * 2;
-        const p = new T.Mesh(new T.BoxGeometry(.11, .02, .05), petalMat);
-        p.position.set(Math.cos(a) * .2, Math.sin(a) * .2, 0);
-        p.rotation.z = a;
-        head.add(p);
+      const stalk = new T.Mesh(new T.CylinderGeometry(.035, .05, 1.35, 6), mat('#7c8a42'));
+      stalk.position.y = .675; g.add(stalk);
+      for (let i = 0; i < 4; i++) {
+        addLeaf(g, (i % 2 ? .1 : -.1), .4 + i * .22, (i % 2 ? .06 : -.06), .32, .22, (i % 2 ? .6 : -.6), i * 1.2);
       }
-      head.position.set(0, 1.2, 0);
-      head.rotation.y = .4; head.rotation.x = -.35;
+      const head = new T.Group();
+      // 花盘（程序化籽粒贴图）
+      const discTex = texCanvas('sunflower-disc', (c, w, h) => {
+        c.fillStyle = '#4a3218'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 900; i++) {
+          const a = i * 2.399, r = Math.sqrt(i / 900) * (w / 2);
+          c.fillStyle = i % 3 ? 'rgba(120,86,40,.9)' : 'rgba(70,50,24,.9)';
+          c.beginPath(); c.arc(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r, 1.6, 0, 7); c.fill();
+        }
+      });
+      const disc = new T.Mesh(new T.CircleGeometry(.17, 20), new T.MeshStandardMaterial({ map: discTex, roughness: .8, side: T.DoubleSide }));
+      disc.position.z = .02; head.add(disc);
+      const petalMat = mat('#e8c83e', .7);
+      for (let ring = 0; ring < 2; ring++) {
+        const n = ring ? 10 : 16, rr = ring ? .14 : .18;
+        for (let i = 0; i < n; i++) {
+          const a = i / n * Math.PI * 2 + ring * .2;
+          const p = new T.Mesh(new T.BoxGeometry(.14, .035, .02), petalMat);
+          p.position.set(Math.cos(a) * rr, Math.sin(a) * rr, 0);
+          p.rotation.z = a; p.rotation.y = ring ? .4 : .8;
+          head.add(p);
+        }
+      }
+      head.position.set(0, 1.35, .02); head.rotation.y = .35; head.rotation.x = -.4;
       g.add(head);
     } else if (kind === 'pumpkin') {
-      const body = new T.Mesh(new T.SphereGeometry(.21, 14, 10), mat('#c8752c', .85));
-      body.scale.set(1, .72, 1); body.position.y = .15; g.add(body);
-      for (let i = 0; i < 6; i++) {
-        const rib = new T.Mesh(new T.TorusGeometry(.19, .018, 6, 14, Math.PI), mat('#a85a20', .9));
-        rib.position.y = .15; rib.rotation.set(Math.PI / 2, 0, i / 6 * Math.PI * 2);
+      const body = new T.Mesh(new T.SphereGeometry(.26, 16, 12), mat('#c8752c', .85));
+      body.scale.set(1.1, .72, 1.1); body.position.y = .18; g.add(body);
+      for (let i = 0; i < 8; i++) {
+        const rib = new T.Mesh(new T.TorusGeometry(.245, .022, 6, 18, Math.PI), mat('#a85a20', .9));
+        rib.position.y = .18; rib.rotation.set(Math.PI / 2, 0, i / 8 * Math.PI * 2);
         g.add(rib);
       }
-      const stem = new T.Mesh(new T.CylinderGeometry(.02, .03, .12, 5), mat('#4a5a2a'));
-      stem.position.y = .34; g.add(stem);
+      const stem = new T.Mesh(new T.CylinderGeometry(.025, .045, .16, 5), mat('#4a5a2a'));
+      stem.position.y = .42; g.add(stem);
+      // 卷须
+      for (let i = 0; i < 3; i++) {
+        const vine = new T.Mesh(new T.TorusGeometry(.12, .012, 4, 10, Math.PI * .9), mat('#5a6a32'));
+        vine.position.set(.32, .05, .1); vine.rotation.x = -Math.PI / 2; vine.rotation.y = i * 1.4; g.add(vine);
+      }
+      for (let i = 0; i < 3; i++) addLeaf(g, (hash(i) - .5) * .5, .12, -0.3 - hash(i) * .2, .3, .22, .4, i);
     } else if (kind === 'watermelon') {
       const tex = canvasTex(128, 128, (c, w, h) => {
         c.fillStyle = '#4e7a3a'; c.fillRect(0, 0, w, h);
-        c.strokeStyle = '#2e5226'; c.lineWidth = 9;
-        for (let i = -2; i < 6; i++) { c.beginPath(); c.moveTo(i * 26, 0); c.quadraticCurveTo(i * 26 + 22, h / 2, i * 26, h); c.stroke(); }
+        c.strokeStyle = '#2e5226'; c.lineWidth = 10;
+        for (let i = -2; i < 6; i++) { c.beginPath(); c.moveTo(i * 24, 0); c.quadraticCurveTo(i * 24 + 22, h / 2, i * 24, h); c.stroke(); }
       });
-      const body = new T.Mesh(new T.SphereGeometry(.24, 16, 12), new T.MeshStandardMaterial({ map: tex, roughness: .75 }));
-      body.scale.set(1.15, .8, 1); body.position.y = .18; g.add(body);
-      const stem = new T.Mesh(new T.CylinderGeometry(.015, .02, .1, 5), mat('#5a6a32'));
-      stem.position.y = .4; g.add(stem);
+      const body = new T.Mesh(new T.SphereGeometry(.28, 16, 12), new T.MeshStandardMaterial({ map: tex, roughness: .75 }));
+      body.scale.set(1.2, .85, 1); body.position.y = .2; g.add(body);
+      const stem = new T.Mesh(new T.CylinderGeometry(.018, .025, .12, 5), mat('#5a6a32')); stem.position.y = .44; g.add(stem);
+      for (let i = 0; i < 4; i++) addLeaf(g, (hash(i) - .5) * .55, .1, (hash(i + 1) - .5) * .5, .3, .2, .3, i);
     } else if (kind === 'cabbage') {
-      const mat1 = mat('#7ca850', .9), mat2 = mat('#8fbc5e', .9), mat3 = mat('#a2cc6e', .9);
-      [[.22, .0, mat1], [.17, .05, mat2], [.12, .1, mat3]].forEach(([r, y, m]) => {
-        const ball = new T.Mesh(new T.SphereGeometry(r, 12, 9), m);
-        ball.scale.set(1, .8, 1); ball.position.y = y + r * .7; g.add(ball);
-      });
-    } else if (kind === 'carrot') {
-      const root = new T.Mesh(new T.ConeGeometry(.07, .26, 7), mat('#d07a2e', .8));
-      root.position.y = -.04; root.rotation.x = Math.PI; g.add(root);
-      const leafMat = mat('#6f8a3a', .95);
+      // 外叶
       for (let i = 0; i < 6; i++) {
         const a = i / 6 * Math.PI * 2;
-        const leaf = new T.Mesh(new T.ConeGeometry(.02, .34, 4), leafMat);
-        leaf.position.set(Math.cos(a) * .04, .2, Math.sin(a) * .04);
-        leaf.rotation.z = Math.cos(a) * .3; leaf.rotation.x = Math.sin(a) * .3;
+        const outer = new T.Mesh(new T.SphereGeometry(.2, 8, 6, 0, Math.PI), mat('#7ca850', .95));
+        outer.scale.set(1, .5, 1.2);
+        outer.position.set(Math.cos(a) * .14, .1, Math.sin(a) * .14);
+        outer.rotation.y = a; outer.rotation.z = .3;
+        g.add(outer);
+      }
+      const mat1 = mat('#7ca850', .9), mat2 = mat('#8fbc5e', .9), mat3 = mat('#a2cc6e', .9);
+      [[.2, .06, mat1], [.15, .12, mat2], [.1, .17, mat3]].forEach(([r, y, m]) => {
+        const ball = new T.Mesh(new T.SphereGeometry(r, 12, 9), m);
+        ball.scale.set(1, .85, 1); ball.position.y = y + r * .7; g.add(ball);
+      });
+    } else if (kind === 'carrot') {
+      const root = new T.Mesh(new T.ConeGeometry(.075, .3, 8), mat('#d07a2e', .8));
+      root.position.y = -.06; root.rotation.x = Math.PI; g.add(root);
+      const leafMat = mat('#6f8a3a', .95);
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2;
+        const leaf = new T.Mesh(new T.ConeGeometry(.018, .42, 4), leafMat);
+        leaf.position.set(Math.cos(a) * .05, .24, Math.sin(a) * .05);
+        leaf.rotation.z = Math.cos(a) * .35; leaf.rotation.x = Math.sin(a) * .35;
         g.add(leaf);
+        // 小叶
+        const sub = new T.Mesh(new T.ConeGeometry(.012, .2, 3), leafMat);
+        sub.position.set(Math.cos(a) * .11, .3, Math.sin(a) * .11);
+        sub.rotation.z = Math.cos(a) * .8; sub.rotation.x = Math.sin(a) * .8;
+        g.add(sub);
       }
     }
     return g;
   }
 
   /* ---------- 建筑 ---------- */
+
   function houseModel(level) {
     const g = new T.Group();
-    const wall = new T.MeshStandardMaterial({ color: '#6f5a45', roughness: .95 });
-    const wood = new T.MeshStandardMaterial({ color: '#4e3c2c', roughness: 1 });
-    const roof = new T.MeshStandardMaterial({ color: '#5e4634', roughness: 1 });
+    const wall = clampedTexMat('wood', '#a08060', [2, 2], .95);
+    const wood = clampedTexMat('wood', '#7a5a40', [1, 1], 1);
+    const roof = clampedTexMat('shingle', '#8a6050', [2, 2], 1);
     const body = new T.Mesh(new T.BoxGeometry(3.4, 2.0, 2.6), wall); body.position.y = 1.0; g.add(body);
     // 屋顶：三棱柱
     const shape = new T.Shape();
@@ -260,8 +415,8 @@
 
   function barnModel() {
     const g = new T.Group();
-    const wall = new T.MeshStandardMaterial({ color: '#5e4432', roughness: 1 });
-    const roof = new T.MeshStandardMaterial({ color: '#7a3a2a', roughness: 1 });
+    const wall = clampedTexMat('wood', '#b06a4a', [2, 2], 1);
+    const roof = clampedTexMat('rust', '#9a4a34', [2, 2], .9, .2);
     const body = new T.Mesh(new T.BoxGeometry(3.2, 1.7, 2.2), wall); body.position.y = .85; g.add(body);
     const shape = new T.Shape();
     shape.moveTo(-1.9, 0); shape.lineTo(0, .95); shape.lineTo(1.9, 0); shape.lineTo(-1.9, 0);
@@ -271,7 +426,7 @@
     const door = new T.Mesh(new T.BoxGeometry(1.0, 1.1, .08), new T.MeshStandardMaterial({ color: '#3a2a1c', roughness: 1 }));
     door.position.set(0, .55, 1.12); g.add(door);
     // 围栏
-    const fenceMat = new T.MeshStandardMaterial({ color: '#6a563c', roughness: 1 });
+    const fenceMat = clampedTexMat('wood', '#7a5e40', [2, 1], 1);
     for (let i = 0; i < 7; i++) {
       const p = new T.Mesh(new T.BoxGeometry(.07, .5, .07), fenceMat);
       p.position.set(-2.4 + i * .35, .25, 1.9); g.add(p);
@@ -295,7 +450,7 @@
   function greenhouseModel(level) {
     const g = new T.Group();
     const glass = new T.MeshPhysicalMaterial({ color: '#9fd8c8', transparent: true, opacity: .32, roughness: .15, metalness: 0, side: T.DoubleSide, depthWrite: false });
-    const frame = new T.MeshStandardMaterial({ color: '#8a8478', roughness: .8, metalness: .2 });
+    const frame = clampedTexMat('rust', '#8a8478', [2, 1], .8, .2);
     const dome = new T.Mesh(new T.SphereGeometry(1.25, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), glass);
     dome.scale.set(1, .85, 1.6); dome.position.y = 0; g.add(dome);
     // 底框
@@ -314,9 +469,9 @@
 
   function workshopModel(level) {
     const g = new T.Group();
-    const wall = new T.MeshStandardMaterial({ color: '#5a5044', roughness: 1 });
+    const wall = clampedTexMat('rust', '#8a7a68', [2, 2], .9, .2);
     const body = new T.Mesh(new T.BoxGeometry(2.0, 1.5, 1.8), wall); body.position.y = .75; g.add(body);
-    const roof = new T.Mesh(new T.BoxGeometry(2.2, .16, 2.0), new T.MeshStandardMaterial({ color: '#46403a', roughness: 1 }));
+    const roof = new T.Mesh(new T.BoxGeometry(2.2, .16, 2.0), clampedTexMat('rust', '#6a6058', [2, 2], .85, .25));
     roof.position.y = 1.58; g.add(roof);
     const chim = new T.Mesh(new T.BoxGeometry(.26, .9, .26), new T.MeshStandardMaterial({ color: '#3e3a34', roughness: 1 }));
     chim.position.set(-.55, 1.95, -.3); g.add(chim);
@@ -340,7 +495,7 @@
 
   function labModel(level) {
     const g = new T.Group();
-    const body = new T.Mesh(new T.BoxGeometry(1.6, 1.8, 1.6), new T.MeshStandardMaterial({ color: '#55524a', roughness: 1 }));
+    const body = new T.Mesh(new T.BoxGeometry(1.6, 1.8, 1.6), clampedTexMat('rust', '#7a7a72', [2, 2], .8, .3));
     body.position.y = .9; g.add(body);
     const roof = new T.Mesh(new T.BoxGeometry(1.8, .14, 1.8), new T.MeshStandardMaterial({ color: '#46443c' })); roof.position.y = 1.87; g.add(roof);
     const mast = new T.Mesh(new T.CylinderGeometry(.025, .025, 1.2, 5), new T.MeshStandardMaterial({ color: '#8a8478', metalness: .3 }));
@@ -464,6 +619,17 @@
       cam.position.set(-1.0, 4.2, 21.0);
       cam.lookAt(-0.5, 1.2, -1.0);
       this._scene = scene; this._camera = cam;
+      // Bloom 后处理（泛光：窗光/灯光/月光溢出）
+      this._composer = null; this._bloom = null;
+      try {
+        if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
+          const comp = new T.EffectComposer(r);
+          comp.addPass(new T.RenderPass(scene, cam));
+          const bloom = new T.UnrealBloomPass(new T.Vector2(w, h), .5, .65, .82);
+          comp.addPass(bloom);
+          this._composer = comp; this._bloom = bloom;
+        }
+      } catch (e) { console.warn('[Pano3D] bloom disabled', e); }
 
       // 雾/天空
       scene.fog = new T.FogExp2(0x6a7280, 0.016);
@@ -489,7 +655,7 @@
       // 地面
       const groundTex = this._texCache.soil || (this._texCache.soil = dirtTexture());
       const fieldTex = this._texCache.field || (this._texCache.field = furrowTexture());
-      fieldTex.repeat.set(1, 1);
+      fieldTex.repeat.set(7, 6);
       groundTex.repeat.set(30, 20);
       const ground = new T.Mesh(new T.PlaneGeometry(90, 60), new T.MeshStandardMaterial({ map: groundTex, roughness: 1 }));
       ground.rotation.x = -Math.PI / 2; ground.position.y = 0; ground.receiveShadow = true;
@@ -500,7 +666,7 @@
 
       // 耕地（前景，明显抬高的田块）
       this._field = new T.Group(); scene.add(this._field);
-      const fieldBed = new T.Mesh(new T.PlaneGeometry(21, 14), new T.MeshStandardMaterial({ map: fieldTex, roughness: 1, color: 0xb89a74 }));
+      const fieldBed = new T.Mesh(new T.PlaneGeometry(21, 14), new T.MeshStandardMaterial({ map: fieldTex, roughness: 1, color: 0xb09068 }));
       fieldBed.rotation.x = -Math.PI / 2; fieldBed.position.set(-3.0, .02, 6.2); fieldBed.receiveShadow = true;
 
       this._field.add(fieldBed);
@@ -572,8 +738,21 @@
         rk.rotation.y = hash(i) * 6.28;
         scene.add(rk);
       }
+      // 草丛（散布，增加细节）
+      const grassMat = new T.MeshStandardMaterial({ color: '#6a7440', roughness: 1 });
+      for (let i = 0; i < 140; i++) {
+        const tuft = new T.Group();
+        for (let k = 0; k < 3; k++) {
+          const blade = new T.Mesh(new T.ConeGeometry(.035, .22 + hash(i + k) * .16, 3), grassMat);
+          blade.position.set((hash(i * 3 + k) - .5) * .18, .12, (hash(i * 5 + k) - .5) * .18);
+          blade.rotation.z = (hash(i + k) - .5) * .5;
+          tuft.add(blade);
+        }
+        tuft.position.set(-24 + hash(i * 2.3) * 46, 0, -12 + hash(i * 6.1) * 24);
+        this._scene.add(tuft);
+      }
       // 栅栏沿田边
-      const fenceMat = new T.MeshStandardMaterial({ color: '#7a6244', roughness: 1 });
+      const fenceMat = clampedTexMat('wood', '#7a6244', [3, 1], 1);
       for (let i = 0; i < 26; i++) {
         const post = new T.Mesh(new T.BoxGeometry(.09, .9, .09), fenceMat);
         post.position.set(-11 + i * .9, .45, 11.4); scene.add(post);
@@ -601,6 +780,18 @@
         this._mouse.ty = ((e.clientY - r.top) / r.height - .5) * 2;
       });
       wrap.addEventListener('mouseleave', () => { this._mouse.tx = 0; this._mouse.ty = 0; });
+      // 镜头轨道：自动缓慢环绕 + 拖拽微调
+      this._orbit = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0, idle: 0 };
+      wrap.style.cursor = 'grab';
+      wrap.addEventListener('pointerdown', (e) => { this._orbit.dragging = true; this._orbit.lastX = e.clientX; this._orbit.lastY = e.clientY; wrap.style.cursor = 'grabbing'; });
+      window.addEventListener('pointerup', () => { this._orbit.dragging = false; wrap.style.cursor = 'grab'; });
+      wrap.addEventListener('pointermove', (e) => {
+        const o = this._orbit;
+        if (!o.dragging) return;
+        o.yaw -= (e.clientX - o.lastX) * .003;
+        o.pitch = Math.max(-.35, Math.min(.35, o.pitch + (e.clientY - o.lastY) * .002));
+        o.lastX = e.clientX; o.lastY = e.clientY; o.idle = 0;
+      });
       this._clock = new T.Clock();
       this._lastState = '';
       this._syncState(true);
@@ -788,7 +979,7 @@
         const x = -10.2 + c * 2.85;
         const z = 2.0 + r * 2.55;
         // 地块：薄土面（垄沟贴图），避免厚板感
-        const plotSoil = new T.Mesh(new T.PlaneGeometry(2.5, 2.3), new T.MeshStandardMaterial({ map: this._texCache.field, color: 0xb08a5c, roughness: 1 }));
+        const plotSoil = new T.Mesh(new T.PlaneGeometry(2.5, 2.3), new T.MeshStandardMaterial({ map: this._texCache.field, color: 0xb08c60, roughness: 1 }));
         plotSoil.rotation.x = -Math.PI / 2; plotSoil.position.set(x, .035, z); plotSoil.receiveShadow = true;
         this._scene.add(plotSoil); this._cropMeshes.push(plotSoil);
         const plot = plots[i];
@@ -844,6 +1035,8 @@
           this._rw = cw; this._rh = ch;
           this._renderer.setSize(cw, ch, false);
           this._camera.aspect = cw / ch; this._camera.updateProjectionMatrix();
+          if (this._composer) this._composer.setSize(cw, ch);
+          if (this._bloom) this._bloom.setSize(cw, ch);
         }
       }
       const G = (typeof GameState !== 'undefined' && GameState) ? GameState : (window.GameState || {});
@@ -867,8 +1060,8 @@
       // 光照强度
       const weatherDim = { clear: 1, cloud: .82, rain: .62, heavy_rain: .5, storm: .38, fog: .72, snow: .85 }[wk] || 1;
       const dayLight = Math.max(0, Math.sin(sunAngle)) * weatherDim;
-      this._sun.intensity = .15 + dayLight * 1.5;
-      this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffe0b0);
+      this._sun.intensity = .2 + dayLight * 1.85;
+      this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffd8a8);
       this._moon.intensity = nightF * .5;
       this._hemi.intensity = .18 + dayLight * .55;
       this._hemi.color.setHex(ph.night ? 0x55688f : ph.dusk ? 0xc09070 : 0x9fb4d0);
@@ -910,17 +1103,27 @@
       // 火焰/灰烬轻飘
       this._animateParticles(dt, t, wk, ph, dayLight);
 
-      // 相机视差 + 轻微呼吸
+      // 相机轨道：自动环绕 + 鼠标视差 + 拖拽偏移
       this._mouse.x = lerp(this._mouse.x, this._mouse.tx, .04);
       this._mouse.y = lerp(this._mouse.y, this._mouse.ty, .04);
-      const camX = this._mouse.x * 1.1 + Math.sin(t * .12) * .18;
-      const camY = 2.6 - this._mouse.y * .35;
-      this._camera.position.x = lerp(this._camera.position.x, camX, .05);
-      this._camera.position.y = lerp(this._camera.position.y, camY, .05);
-      this._camera.lookAt(0, 1.55, -4);
+      const o = this._orbit || { yaw: 0, pitch: 0, idle: 99 };
+      o.idle = (o.idle || 0) + dt;
+      const autoYaw = -0.10 + Math.sin(t * .05) * .20 + Math.sin(t * .019) * .08;
+      const yaw = autoYaw + o.yaw;
+      const pitch = Math.max(-.35, Math.min(.35, o.pitch + Math.sin(t * .03) * .015));
+      const center = new T.Vector3(0.8, 1.05, -2.5);
+      const R = 22.5;
+      const targetX = center.x + Math.sin(yaw) * R * Math.cos(pitch * .6) + this._mouse.x * 1.0;
+      const targetZ = center.z + Math.cos(yaw) * R * Math.cos(pitch * .6);
+      const targetY = center.y + 3.3 + Math.sin(pitch) * 9 - this._mouse.y * .7;
+      this._camera.position.x = lerp(this._camera.position.x, targetX, .06);
+      this._camera.position.y = lerp(this._camera.position.y, targetY, .06);
+      this._camera.position.z = lerp(this._camera.position.z, targetZ, .06);
+      this._camera.lookAt(center);
       // 水面微波
       if (this._water) { this._water.material.roughness = .16 + Math.sin(t * .8) * .04; }
-      this._renderer.render(this._scene, this._camera);
+      if (this._composer) this._composer.render();
+      else this._renderer.render(this._scene, this._camera);
       return true;
     },
 
