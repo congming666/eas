@@ -804,7 +804,7 @@
       scene.fog = new T.FogExp2(0x6a7280, 0.011);
       this._buildSky(scene);
       // 灯光
-      this._hemi = new T.HemisphereLight(0x9fb4d0, 0x33291e, .20);
+      this._hemi = new T.HemisphereLight(0x9fb4d0, 0x33291e, .24);
       scene.add(this._hemi);
       const sun = new T.DirectionalLight(0xffd2a0, 2.2);
       sun.castShadow = true;
@@ -850,11 +850,11 @@
       }
 
       // 建筑
-      this._buildings.house = houseModel(0); this._buildings.house.position.set(4.2, 0, -8.5); scene.add(this._buildings.house);
-      this._buildings.barn = barnModel(); this._buildings.barn.position.set(-7.5, 0, -5.5); scene.add(this._buildings.barn);
-      this._buildings.greenhouse = greenhouseModel(0); this._buildings.greenhouse.position.set(8.6, 0, -1.0); this._buildings.greenhouse.rotation.y = -.25; scene.add(this._buildings.greenhouse);
-      this._buildings.workshop = workshopModel(0); this._buildings.workshop.position.set(.2, 0, -10.5); scene.add(this._buildings.workshop);
-      this._buildings.lab = labModel(0); this._buildings.lab.position.set(11.5, 0, -9.0); scene.add(this._buildings.lab);
+      this._buildings.house = houseModel(0); this._buildings.house.position.set(3.8, 0, -7.0); scene.add(this._buildings.house);
+      this._buildings.barn = barnModel(); this._buildings.barn.position.set(-6.6, 0, -4.4); scene.add(this._buildings.barn);
+      this._buildings.greenhouse = greenhouseModel(0); this._buildings.greenhouse.position.set(8.4, 0, -0.6); this._buildings.greenhouse.rotation.y = -.25; scene.add(this._buildings.greenhouse);
+      this._buildings.workshop = workshopModel(0); this._buildings.workshop.position.set(.6, 0, -9.2); scene.add(this._buildings.workshop);
+      this._buildings.lab = labModel(0); this._buildings.lab.position.set(11.0, 0, -7.8); scene.add(this._buildings.lab);
 
       // 接触阴影（弥补实时阴影不足，给建筑落地感）
       const shadowTex = canvasTex(128, 64, (c, w, h) => {
@@ -960,6 +960,24 @@
         }
         scene.add(mergeMeshes(rockRoot));
       }
+      // 地面污渍贴片（草皮/泥泞/干草堆）
+      try {
+        const patchTex = canvasTex(128, 128, (c, w, h) => {
+          const g = c.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2);
+          g.addColorStop(0, 'rgba(60,48,28,.55)'); g.addColorStop(.7, 'rgba(60,48,28,.25)'); g.addColorStop(1, 'rgba(60,48,28,0)');
+          c.fillStyle = g; c.fillRect(0, 0, w, h);
+          for (let i = 0; i < 120; i++) {
+            c.fillStyle = 'rgba(110,90,50,.35)';
+            c.fillRect(Math.random() * w, Math.random() * h, 2, 1);
+          }
+        });
+        for (let i = 0; i < 14; i++) {
+          const m = new T.Mesh(new T.PlaneGeometry(1.5 + hash(i) * 2.2, 1.1 + hash(i + 2) * 1.8), new T.MeshBasicMaterial({ map: patchTex, transparent: true, depthWrite: false }));
+          m.rotation.x = -Math.PI / 2;
+          m.position.set(-14 + hash(i * 3.1) * 26, .03, -8 + hash(i * 5.7) * 20);
+          this._scene.add(m);
+        }
+      } catch (e) {}
       // 草丛（散布，增加细节）
       const grassMat = new T.MeshStandardMaterial({ color: '#6a7440', roughness: 1 });
       const grassRoot = new T.Group();
@@ -987,12 +1005,14 @@
           ring.rotation.x = Math.PI / 2; ring.position.y = y * s; g.add(ring);
         }
         g.position.set(x, 0, z); g.rotation.y = hash(x + z) * 6.28;
+        g.userData.prop = 'barrel';
         g.traverse(o => { if (o.isMesh) o.castShadow = true; });
         this._scene.add(g);
       };
       const addCrate = (x, z, s, ry) => {
         const c = new T.Mesh(new T.BoxGeometry(.6 * s, .5 * s, .6 * s), propWood);
         c.position.set(x, .25 * s, z); c.rotation.y = ry; c.castShadow = true;
+        c.userData.prop = 'crate';
         this._scene.add(c);
       };
       addBarrel(-4.6, -3.2, 1); addBarrel(-4.1, -3.6, .85); addBarrel(5.6, -6.4, 1.1);
@@ -1019,13 +1039,15 @@
         const cap = new T.Mesh(new T.ConeGeometry(1.0, .45, 12), propDark);
         cap.position.y = 4.55; tower.add(cap);
         tower.position.set(-15.5, 0, -5.5);
+        tower.userData.prop = 'watertower';
         tower.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         this._scene.add(tower);
       }
       // 筒仓
       {
         const silo = new T.Mesh(new T.CylinderGeometry(1.1, 1.1, 4.2, 14), clampedTexMat('rust', '#9a8a70', [2, 2], .8, .2));
-        silo.position.set(-18.5, 2.1, -9.5); silo.castShadow = true; this._scene.add(silo);
+        silo.position.set(-18.5, 2.1, -9.5); silo.castShadow = true; silo.userData.prop = 'silo';
+        this._scene.add(silo);
         const dome = new T.Mesh(new T.SphereGeometry(1.12, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), propDark);
         dome.position.set(-18.5, 4.2, -9.5); this._scene.add(dome);
       }
@@ -1042,6 +1064,7 @@
           wheel.position.set(-.2, .42, side * .55); wheel.rotation.y = Math.PI / 2; cart.add(wheel);
         }
         cart.position.set(-5.6, 0, 2.6); cart.rotation.y = .35;
+        cart.userData.prop = 'cart';
         cart.traverse(o => { if (o.isMesh) o.castShadow = true; });
         this._scene.add(cart);
       }
@@ -1145,6 +1168,8 @@
       });
       this._renderer.shadowMap.autoUpdate = false;
       this._renderer.shadowMap.needsUpdate = true;
+      this._models = {};
+      this._loadModels();
       this._clock = new T.Clock();
       this._lastState = '';
       this._syncState(true);
@@ -1268,6 +1293,247 @@
       return p;
     },
 
+    /* ================= Blender GLB 模型 ================= */
+    _models: {}, _modelsReady: false, _modelsLoading: false,
+    _loadModels() {
+      if (this._modelsReady || this._modelsLoading) return;
+      if (!T.GLTFLoader || !window.FARM_MODELS) { this._modelsReady = true; return; }
+      this._modelsLoading = true;
+      const loader = new T.GLTFLoader();
+      const names = Object.keys(window.FARM_MODELS);
+      const decode = (b64) => {
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return arr.buffer;
+      };
+      let pending = names.length;
+      const finish = () => { if (--pending <= 0) this._onModelsReady(); };
+      names.forEach(name => {
+        try {
+          loader.parse(decode(window.FARM_MODELS[name]), '', (gltf) => {
+            try {
+              const root = gltf.scene;
+              this._applyModelMaterials(root);
+              root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+              this._models[name] = root;
+            } catch (e) { console.warn('[Pano3D] model prep fail', name, String(e).slice(0, 120)); }
+            finish();
+          }, (err) => { console.warn('[Pano3D] glb parse fail', name, String(err).slice(0, 120)); finish(); });
+        } catch (e) { finish(); }
+      });
+    },
+    _onModelsReady() {
+      this._modelsReady = true; this._modelsLoading = false;
+      try { this._replacePropsWithModels(); } catch (e) {}
+      try { this._addModelDecor(); } catch (e) {}
+      try { this._syncState(true); } catch (e) {}
+    },
+    _addModelDecor() {
+      const add = (name, x, z, ry, s) => {
+        const root = this._models[name];
+        if (!root) return null;
+        const inst = root.clone(true);
+        inst.position.set(x, 0, z);
+        inst.rotation.y = ry || 0;
+        inst.scale.setScalar(s || 1);
+        inst.userData.isModelProp = '1';
+        inst.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        this._scene.add(inst);
+        return inst;
+      };
+      // 土路两侧栅栏段
+      for (let i = 0; i < 5; i++) {
+        add('fence', 2.0, 1.2 + i * 2.1, Math.PI / 2, 1.0);
+        add('fence', 5.4, 1.2 + i * 2.1, Math.PI / 2, 1.0);
+      }
+      // 场景边缘枯树模型
+      add('deadtree', -14.5, 3.5, .6, 1.15);
+      add('deadtree', 13.5, -2.5, 2.1, 1.25);
+      add('deadtree', -10.5, 9.5, 1.2, .95);
+      // 原有补充
+      add('barrel', 7.6, -5.2, .4, 1.0);
+      add('crate', 4.8, -4.6, .3, 1.0);
+
+      // ===== 细节道具 =====
+      add('well', -4.4, 3.2, .3, 1.0);
+      add('wheelbarrow', 2.2, .9, .8, 1.0);
+      add('powerpole', -13.5, 6.0, 0, 1.1);
+      add('powerpole', 11.6, 4.2, 0, 1.05);
+      add('roadsign', 6.0, 7.0, .35, 1.0);
+      add('junkcar', -11.5, 2.2, .9, 1.05);
+      add('haybale', -6.9, -3.6, .4, 1.0);
+      add('haybale', -7.6, -2.9, 1.1, .9);
+      add('pallet', 5.0, -6.2, .2, 1.0);
+      add('tire', 7.0, -4.2, 0, 1.0);
+      add('tire', 7.45, -3.65, .5, .9);
+      add('bucket', 2.8, -3.2, 0, 1.0);
+      add('bucket', -3.4, -3.0, .3, 1.0);
+      add('firewood', -3.4, -6.4, .3, 1.0);
+      add('bench', 3.6, -2.0, 2.4, 1.0);
+      add('waterpump', -2.6, 4.4, .5, 1.0);
+      add('toolshed', -10.4, -2.4, .2, 1.0);
+      // 风车（叶片单独旋转）
+      this._decor = { blades: [], chickens: [], smoke: [], chickens0: [] };
+      const wm = add('windmill', -9.5, -6.0, .6, 1.0);
+      if (wm) wm.traverse(o => { if (o.name && o.name.toLowerCase().indexOf('blades') >= 0) this._decor.blades.push(o); });
+      // 鸡群
+      const chickenSpots = [[-5.9, 1.1, .4], [-5.1, .5, 2.2], [-6.5, .3, 4.0], [-5.5, 1.7, 1.2]];
+      chickenSpots.forEach(([cx, cz, ry], i) => {
+        const ch = add('chicken', cx, cz, ry, 1.0);
+        if (ch) { ch.userData.home = { x: cx, z: cz, phase: i * 1.7 }; this._decor.chickens.push(ch); }
+      });
+      // 烟囱炊烟
+      this._makeSmoke(5.05, 3.6, -7.6, 34);
+      this._makeSmoke(-0.2, 2.05, -9.9, 18);
+      this._renderer.shadowMap.needsUpdate = true;
+    },
+    _makeSmoke(x, y, z, n) {
+      const N = n || 30;
+      const geo = new T.BufferGeometry();
+      const pos = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - .5) * .2; pos[i * 3 + 1] = Math.random() * 2; pos[i * 3 + 2] = (Math.random() - .5) * .2; }
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+      const mat = new T.PointsMaterial({ color: 0xd8d2c6, size: .16, transparent: true, opacity: .35, depthWrite: false });
+      const pts = new T.Points(geo, mat);
+      pts.position.set(x, y, z);
+      this._scene.add(pts);
+      this._decor.smoke.push({ pts: pts, data: Array.from({ length: N }, () => ({ t: Math.random(), dx: (Math.random() - .5) * .2, dz: (Math.random() - .5) * .2 })) });
+    },
+    _animateDecor(dt, t) {
+      const d = this._decor;
+      if (!d) return;
+      // 风车叶片
+      d.blades.forEach(b => { b.rotation.z += dt * 1.4; });
+      // 鸡群慢走
+      d.chickens.forEach((ch, i) => {
+        const h = ch.userData.home;
+        h.phase = (h.phase || 0) + dt * .35;
+        const r = 1.1;
+        ch.position.x = h.x + Math.cos(h.phase) * r;
+        ch.position.z = h.z + Math.sin(h.phase * .8) * r * .6;
+        ch.rotation.y = -h.phase + Math.PI / 2;
+        if (Math.sin(h.phase * 3 + i) > .9) ch.position.y = Math.abs(Math.sin(t * 8 + i)) * .06;
+      });
+      // 炊烟
+      d.smoke.forEach(S => {
+        const arr = S.pts.geometry.attributes.position.array;
+        S.data.forEach((p, i) => {
+          p.t += dt * .1;
+          if (p.t > 1) p.t -= 1;
+          arr[i * 3] = p.dx + p.t * .6;
+          arr[i * 3 + 1] = p.t * 2.2;
+          arr[i * 3 + 2] = p.dz + p.t * .3;
+        });
+        S.pts.geometry.attributes.position.needsUpdate = true;
+      });
+    },
+    _replacePropsWithModels() {
+      const marks = [];
+      this._scene.traverse(o => { if (o.userData && o.userData.prop) marks.push(o); });
+      marks.forEach(old => {
+        const name = old.userData.prop;
+        const root = this._models[name];
+        if (!root) return;
+        const inst = root.clone(true);
+        inst.position.set(old.position.x, 0, old.position.z);
+        inst.rotation.y = old.rotation.y || 0;
+        inst.userData.isModelProp = '1';
+        if (old.parent) old.parent.remove(old);
+        this._scene.add(inst);
+      });
+      this._renderer.shadowMap.needsUpdate = true;
+    },
+    _modelClone(name) {
+      const root = this._models && this._models[name];
+      if (!root) return null;
+      const c = root.clone(true);
+      c.scale.setScalar(1.15);
+      return c;
+    },
+    _modelTexture(key) {
+      let src = null;
+      try {
+        if (key === 'wood') src = woodTex();
+        else if (key === 'rust') src = rustTex();
+        else if (key === 'shingle') src = shingleTex();
+        else if (key === 'stone') src = this._texCache.soil || (this._texCache.soil = dirtTexture());
+        else if (key === 'grass') src = this._texCache.grass || (this._texCache.grass = grassTexture());
+      } catch (e) { src = null; }
+      if (!src) return null;
+      const t = src.clone();
+      t.needsUpdate = true;
+      t.wrapS = t.wrapT = T.RepeatWrapping;
+      t.repeat.set(3, 3);
+      return t;
+    },
+    _modelNormal(key) {
+      try {
+        if (!NORMALCACHE[key]) return null;
+        const n = NORMALCACHE[key].clone();
+        n.needsUpdate = true;
+        n.wrapS = n.wrapT = T.RepeatWrapping;
+        n.repeat.set(3, 3);
+        return n;
+      } catch (e) { return null; }
+    },
+    _modelMat(src) {
+      const name = (src.name || '').toLowerCase();
+      const m = src.clone();
+      m.side = T.FrontSide;
+      if (name.indexOf('glass') >= 0) {
+        m.transparent = true;
+        m.opacity = name.indexOf('warm') >= 0 ? .82 : .4;
+        m.roughness = .15; m.metalness = 0; m.depthWrite = false;
+        if (name.indexOf('warm') >= 0) { m.emissive = new T.Color(0xffb060); m.emissiveIntensity = 0; }
+        return m;
+      }
+      if (name.indexOf('emissive') >= 0) {
+        m.emissive = new T.Color(name.indexOf('cyan') >= 0 ? 0x7fdcff : 0xffb45a);
+        m.emissiveIntensity = name.indexOf('cyan') >= 0 ? .7 : .5;
+        return m;
+      }
+      const TABLE = {
+        wood_siding: ['wood', 0xc8a878], wood_dark: ['wood', 0x8a6a4c], wood_red: ['wood', 0xb06040],
+        wood_light: ['wood', 0xd8b888], roof_shingle: ['shingle', 0xb09080],
+        metal_rust: ['rust', 0xb08968], metal_dark: ['rust', 0x9a9a96],
+        stone: ['stone', 0xcfc6b4], bark: ['wood', 0x8a6a4c], hay: ['grass', 0xd8c080],
+        plaster: [null, 0xd8d0c0]
+      };
+      const cfg = TABLE[name] || ['wood', 0xbfa080];
+      if (cfg[0]) {
+        const tex = this._modelTexture(cfg[0]);
+        if (tex) { m.map = tex; m.color = new T.Color(cfg[1]); }
+        const nrm = this._modelNormal(cfg[0]);
+        if (nrm) { m.normalMap = nrm; m.normalScale = new T.Vector2(.8, .8); }
+      } else {
+        m.color = new T.Color(cfg[1]);
+      }
+      if (name.indexOf('metal') >= 0) { m.metalness = .35; m.roughness = Math.min(m.roughness == null ? .7 : m.roughness, .7); }
+      return m;
+    },
+    _applyModelMaterials(root) {
+      root.traverse(o => {
+        if (!o.isMesh) return;
+        if (Array.isArray(o.material)) o.material = o.material.map(x => this._modelMat(x));
+        else if (o.material) o.material = this._modelMat(o.material);
+      });
+    },
+    _applyModelNight(night) {
+      const keys = ['house', 'barn', 'greenhouse', 'workshop', 'lab'];
+      keys.forEach(k => {
+        const root = this._buildings[k];
+        if (!root) return;
+        root.traverse(o => {
+          if (!o.isMesh || !o.material) return;
+          const n = (o.material.name || '').toLowerCase();
+          if (n.indexOf('glass_warm') >= 0) o.material.emissiveIntensity = night ? 1.1 : 0;
+          else if (n.indexOf('emissive_cyan') >= 0) o.material.emissiveIntensity = night ? 2.2 : .6;
+          else if (n.indexOf('emissive') >= 0) o.material.emissiveIntensity = night ? 2.4 : .35;
+        });
+      });
+    },
+
     _resize() {
       if (!this._wrap || !this._renderer) return;
       const w = Math.max(320, this._wrap.clientWidth), h = Math.max(200, this._wrap.clientHeight);
@@ -1295,13 +1561,14 @@
       const h = new T.Group();
       // 主屋等级 = 四建筑总级
       const total = lv('workshop') + lv('greenhouse') + lv('barn') + lv('lab');
-      this._swapBuilding('house', houseModel(total));
-      if (lv('barn') > 0) this._swapBuilding('barn', barnModel());
-      if (lv('greenhouse') > 0) this._swapBuilding('greenhouse', greenhouseModel(lv('greenhouse')));
-      if (lv('workshop') > 0) this._swapBuilding('workshop', workshopModel(lv('workshop')));
-      if (lv('lab') > 0) this._swapBuilding('lab', labModel(lv('lab')));
+      this._swapBuilding('house', this._modelClone('farmhouse') || houseModel(total));
+      if (lv('barn') > 0) this._swapBuilding('barn', this._modelClone('barn') || barnModel());
+      if (lv('greenhouse') > 0) this._swapBuilding('greenhouse', this._modelClone('greenhouse') || greenhouseModel(lv('greenhouse')));
+      if (lv('workshop') > 0) this._swapBuilding('workshop', this._modelClone('workshop') || workshopModel(lv('workshop')));
+      if (lv('lab') > 0) this._swapBuilding('lab', this._modelClone('lab') || labModel(lv('lab')));
       // 作物重建
       this._rebuildCrops(plots, n);
+      try { this._applyModelNight(night); } catch (e) {}
       // 季节地面色
       const seasonCol = { spring: 0xa89272, summer: 0x9a8a62, autumn: 0xb08a5a, winter: 0xc8d0d8 }[G.season] || 0xa89272;
       if (this._field) this._field.children[0].material.color.setHex(seasonCol);
@@ -1415,7 +1682,7 @@
       // 光照强度
       const weatherDim = { clear: 1, cloud: .82, rain: .62, heavy_rain: .5, storm: .38, fog: .72, snow: .85 }[wk] || 1;
       const dayLight = Math.max(0, Math.sin(sunAngle)) * weatherDim;
-      this._sun.intensity = .18 + dayLight * 2.15;
+      this._sun.intensity = .2 + dayLight * 2.3;
       this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffd8a8);
       this._moon.intensity = nightF * .5;
       this._hemi.intensity = .18 + dayLight * .55;
@@ -1473,8 +1740,8 @@
       const autoYaw = -0.04 + Math.sin(t * .045) * .16 + Math.sin(t * .021) * .06;
       const yaw = autoYaw + o.yaw;
       const pitch = Math.max(-.35, Math.min(.35, o.pitch + Math.sin(t * .03) * .015));
-      const center = new T.Vector3(1.0, 1.15, -3.2);
-      const R = 20.5;
+      const center = new T.Vector3(0.9, 1.2, -2.6);
+      const R = 19.2;
       const targetX = center.x + Math.sin(yaw) * R * Math.cos(pitch * .6) + this._mouse.x * 1.0;
       const targetZ = center.z + Math.cos(yaw) * R * Math.cos(pitch * .6);
       const targetY = center.y + 2.9 + Math.sin(pitch) * 8 - this._mouse.y * .6;
@@ -1501,6 +1768,7 @@
           m.material.opacity = m.userData.op * fogOp * nightF2;
         });
       }
+      try { this._animateDecor(dt, t); } catch (e) {}
       // 水面微波
       if (this._water) { this._water.material.roughness = .16 + Math.sin(t * .8) * .04; }
       if (this._composer) this._composer.render();
