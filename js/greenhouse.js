@@ -1,0 +1,509 @@
+// ==================== 育种温室系统 ====================
+// v5.8：注册制卡材料资源 + 4 种温室新作物（墨铃花/符文藤/灵光菇/彩果）
+(function () {
+  // 制卡材料资源（v5.js 已把 CONFIG.resources 指向 RESOURCES 对象，这里追加同对象即被 ResourceSystem 识别）
+  function registerV58Resources() {
+    try {
+      if (!window.CONFIG) return;
+      CONFIG.resources = CONFIG.resources || {};
+      const R = CONFIG.resources;
+      if (!R.enchant_essence) R.enchant_essence = { name: '附魔精华', icon: '✨', kind: 'craft', from: '温室：灵光菇 + 符文藤', to: '卡牌附魔工位' };
+      if (!R.pigment) R.pigment = { name: '颜料', icon: '🎨', kind: 'craft', from: '温室：彩果', to: '卡牌印制工位' };
+      if (!R.ink) R.ink = { name: '墨汁', icon: '🖋️', kind: 'craft', from: '温室：墨铃花', to: '卡牌印制工位' };
+      // 追加新作物到温室植物表（幂等）
+      CONFIG.greenhousePlants = CONFIG.greenhousePlants || [];
+      const have = id => CONFIG.greenhousePlants.some(p => p.id === id);
+      const add = p => { if (!have(p.id)) CONFIG.greenhousePlants.push(p); };
+      add({ id: 'inkbell', name: '墨铃花', icon: '🔔', growTime: 120, rarity: 'rare', seedPrice: 60,
+        desc: '铃瓣渗出浓墨，是卡牌印制的墨汁来源。',
+        drops: [ { id: 'ink', chance: 0.7, amount: [1, 2] }, { id: 'gold', chance: 0.5, amount: [40, 90] } ] });
+      add({ id: 'runevine', name: '符文藤', icon: '🪢', growTime: 210, rarity: 'epic', seedPrice: 150,
+        desc: '藤脉刻满古符文，与灵光菇同产附魔精华。',
+        drops: [ { id: 'enchant_essence', chance: 0.5, amount: [1, 2] }, { id: 'gold', chance: 0.4, amount: [80, 160] } ] });
+      add({ id: 'glowshroom', name: '灵光菇', icon: '🍄', growTime: 220, rarity: 'epic', seedPrice: 150,
+        desc: '伞盖流淌灵光，与符文藤同产附魔精华。',
+        drops: [ { id: 'enchant_essence', chance: 0.55, amount: [1, 2] }, { id: 'gold', chance: 0.4, amount: [80, 160] } ] });
+      add({ id: 'colorfruit', name: '彩果', icon: '🫐', growTime: 130, rarity: 'rare', seedPrice: 80,
+        desc: '果皮可榨出鲜艳颜料，用于卡牌印制。',
+        drops: [ { id: 'pigment', chance: 0.7, amount: [1, 2] }, { id: 'gold', chance: 0.6, amount: [50, 110] } ] });
+    } catch (e) { console.warn('[gh] registerV58Resources', e); }
+  }
+  window.__ghRegisterV58 = registerV58Resources;
+  registerV58Resources();
+})();
+
+const Greenhouse = {
+  // v5.8 新作物默认解锁（不依赖旧存档 unlockedPlants 数组）
+  V58_PLANTS: ['inkbell', 'runevine', 'glowshroom', 'colorfruit'],
+  isV58Plant(id){ return this.V58_PLANTS.indexOf(id) >= 0; },
+  // 初始化温室格子（4x4 = 16格）
+  init() {
+    if (window.__ghRegisterV58) window.__ghRegisterV58();
+    if (GameState.greenhouse.plots.length === 16) return;
+    GameState.greenhouse.plots = [];
+    for (let i = 0; i < 16; i++) {
+      GameState.greenhouse.plots.push({ plant: null, plantedAt: 0, ready: false, status: null });
+    }
+    // 初始种一些
+    for (let i = 0; i < 2; i++) {
+      const idx = randInt(0, GameState.greenhouse.unlockedPlots - 1);
+      if (!GameState.greenhouse.plots[idx].plant) {
+        const plant = CONFIG.greenhousePlants[0];
+        GameState.greenhouse.plots[idx].plant = plant;
+        GameState.greenhouse.plots[idx].plantedAt = Date.now() - rand(10000, 60000);
+      }
+    }
+    SaveSystem.save();
+  },
+
+  // 打开温室
+  open() {
+    this.init();
+    const modal = document.getElementById('greenhouseModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      // v5.8.6：默认选中第一个已解锁植物（避免「请先选择」的困惑）
+      const sel = GameState.greenhouse.selectedPlant;
+      const valid = sel && CONFIG.greenhousePlants.some(p => p.id === sel) &&
+        (this.isV58Plant(sel) || (GameState.greenhouse.unlockedPlants || []).includes(sel));
+      if (!valid) {
+        const first = CONFIG.greenhousePlants.find(p => this.isV58Plant(p.id) || (GameState.greenhouse.unlockedPlants || []).includes(p.id));
+        if (first) GameState.greenhouse.selectedPlant = first.id;
+      }
+      this.render();
+      this._startLiveTick();
+    }
+  },
+
+  // 关闭温室
+  close() {
+    const modal = document.getElementById('greenhouseModal');
+    if (modal) modal.classList.add('hidden');
+    this._stopLiveTick();
+  },
+
+  // v5.8.6 实时滴答：弹窗打开期间进度条/倒计时/植株摇曳持续更新
+  _liveTimer: 0,
+  _startLiveTick() {
+    this._stopLiveTick();
+    let last = 0;
+    const step = () => {
+      const modal = document.getElementById('greenhouseModal');
+      if (!modal || modal.classList.contains('hidden')) { this._liveTimer = 0; return; }
+      const now = performance.now();
+      if (now - last > 450) { last = now; this._liveUpdate(); }
+      this._liveTimer = requestAnimationFrame(step);
+    };
+    this._liveTimer = requestAnimationFrame(step);
+  },
+  _stopLiveTick() { if (this._liveTimer) cancelAnimationFrame(this._liveTimer); this._liveTimer = 0; },
+  _liveUpdate() {
+    const now = Date.now(), t = now / 1000;
+    const _ghSlot = (window.EconLoop && EconLoop.slotBonus) ? EconLoop.slotBonus('greenhouse', 'grow') : 0;
+    GameState.greenhouse.plots.forEach((plot, idx) => {
+      const cell = document.querySelector(`#greenhouseGrid .greenhouse-cell[data-idx="${idx}"]`);
+      if (!cell) return;
+      const cv = cell.querySelector('canvas');
+      if (plot.plant && idx < GameState.greenhouse.unlockedPlots) {
+        const progress = clamp((now - plot.plantedAt) / 1000 * (1 + _ghSlot) / plot.plant.growTime, 0, 1);
+        const wasReady = plot.ready;
+        plot.ready = progress >= 1;
+        if (cv && window.GreenhouseVisual) GreenhouseVisual.draw(cv, plot.plant.id, progress, plot.ready, t);
+        const bar = cell.querySelector('.gh-progress-fill');
+        const txt = cell.querySelector('.gh-progress-text');
+        if (bar) bar.style.width = Math.floor(progress * 100) + '%';
+        if (txt) {
+          const remain = Math.max(0, Math.ceil(plot.plant.growTime - (now - plot.plantedAt) / 1000 * (1 + _ghSlot)));
+          txt.textContent = plot.ready ? '' : (remain >= 60 ? Math.floor(remain / 60) + '分' + (remain % 60) + '秒' : remain + '秒');
+        }
+        if (plot.ready && !wasReady) { /*  matured 瞬间：整格变可收获态 */
+          cell.classList.remove('planted'); cell.classList.add('ready');
+          const tag = cell.querySelector('.gh-ready-tag');
+          if (!tag) { const d = document.createElement('div'); d.className = 'gh-ready-tag'; d.textContent = '✨ 点击收获'; cell.appendChild(d); }
+          const tp = cell.querySelector('.gh-progress'); if (tp) tp.remove();
+          if (typeof AudioManager !== 'undefined' && AudioManager.playPickup) AudioManager.playPickup();
+        }
+      } else if (!plot.plant && cv && window.GreenhouseVisual) {
+        /* 空地：选中植物的半透明预览 */
+        const selId = GameState.greenhouse.selectedPlant;
+        if (selId) GreenhouseVisual.draw(cv, selId, 1, false, t);
+      }
+    });
+  },
+
+  // 渲染温室
+  render() {
+    this.init();
+    const grid = document.getElementById('greenhouseGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const now = Date.now();
+
+    // 更新标题（v5.8.6：≥2 格成熟时提供一键收获）
+    const title = document.querySelector('.greenhouse-grid-title');
+    const readyCount = GameState.greenhouse.plots.filter((p, i) => i < GameState.greenhouse.unlockedPlots && p.ready && p.plant).length;
+    if (title) title.innerHTML = `温室 ${GameState.greenhouse.unlockedPlots}/16（点击空地播种，点击成熟植物收获）`
+      + (readyCount >= 2 ? ` <button id="ghHarvestAll" style="margin-left:10px;background:#5a7a3a;border:1px solid #8aba5a;color:#eef6e0;border-radius:6px;padding:2px 10px;font-size:12px;cursor:pointer;" onclick="Greenhouse.harvestAll()">🌾 一键收获 ×${readyCount}</button>` : '');
+
+    GameState.greenhouse.plots.forEach((plot, idx) => {
+      const cell = document.createElement('div');
+      cell.className = 'greenhouse-cell';
+      cell.dataset.idx = idx;
+
+      // 锁定的格子
+      if (idx >= GameState.greenhouse.unlockedPlots) {
+        const cost = this.getUnlockCost(idx);
+        cell.classList.add('locked');
+        if (idx === GameState.greenhouse.unlockedPlots) cell.classList.add('next-unlock');
+        cell.innerHTML = `<div class="plot-lock">🔒<div class="plot-cost">💰${cost.gold} · 🔧${cost.materials}</div></div>`;
+        cell.onclick = () => this.unlockPlot(idx);
+        grid.appendChild(cell);
+        return;
+      }
+
+      // 有植物的格子
+      if (plot.plant) {
+        const elapsed = (now - plot.plantedAt) / 1000;
+        // W8 建筑配装：聚光透镜插入温室 → 生长 +10%
+        const _ghSlot = (window.EconLoop && EconLoop.slotBonus) ? EconLoop.slotBonus('greenhouse', 'grow') : 0;
+        const progress = clamp(elapsed * (1 + _ghSlot) / plot.plant.growTime, 0, 1);
+        plot.ready = progress >= 1;
+        cell.classList.add(plot.ready ? 'ready' : 'planted');
+        cell.classList.add(`rarity-${plot.plant.rarity || 'common'}`);
+        const progressPct = Math.floor(progress * 100);
+        const remain = Math.max(0, Math.ceil(plot.plant.growTime - elapsed * (1 + _ghSlot)));
+        const remainText = remain >= 60 ? Math.floor(remain / 60) + '分' + (remain % 60) + '秒' : remain + '秒';
+        cell.innerHTML = `
+          <canvas class="gh-plant-canvas" width="128" height="128"></canvas>
+          <div class="gh-plant-name">${plot.plant.name}</div>
+          ${plot.ready ? '<div class="gh-ready-tag">✨ 点击收获</div>' : `<div class="gh-progress"><div class="gh-progress-fill" style="width:${progressPct}%"></div></div><div class="gh-progress-text">${remainText}</div>`}
+        `;
+        const cv = cell.querySelector('canvas');
+        if (cv && window.GreenhouseVisual) GreenhouseVisual.draw(cv, plot.plant.id, progress, plot.ready, now / 1000);
+        cell.onclick = () => this.harvest(idx);
+        cell.title = plot.ready ? '点击收获' : `${plot.plant.name} · ${plot.plant.desc || ''}`;
+      } else {
+        // 空地：显示选中植物的幽灵预览 + 种子价格
+        cell.classList.add('empty');
+        const selId = GameState.greenhouse.selectedPlant;
+        const selPlant = selId && CONFIG.greenhousePlants.find(p => p.id === selId);
+        const afford = selPlant && GameState.gold >= selPlant.seedPrice;
+        cell.innerHTML = selPlant
+          ? `<canvas class="gh-plant-canvas gh-ghost" width="128" height="128"></canvas>
+             <div class="gh-empty-text">播种 ${selPlant.name}</div>
+             <div class="gh-seed-cost ${afford ? '' : 'cant'}">💰${selPlant.seedPrice}</div>`
+          : `<div class="gh-empty-icon">➕</div><div class="gh-empty-text">先在下方选种</div>`;
+        const cv = cell.querySelector('canvas');
+        if (cv && window.GreenhouseVisual) GreenhouseVisual.draw(cv, selId, 1, false, now / 1000);
+        cell.onclick = () => this.plant(idx);
+      }
+      grid.appendChild(cell);
+    });
+
+    this.renderPlantSelector();
+    this.renderDrops();
+  },
+
+  // 渲染植物选择器（v5.8.6：带产出预览 + 种子价格可负担态）
+  renderPlantSelector() {
+    const container = document.getElementById('greenhousePlantSelector');
+    if (!container) return;
+    container.innerHTML = '';
+    CONFIG.greenhousePlants.forEach(plant => {
+      const unlocked = this.isV58Plant(plant.id) ||
+        (Array.isArray(GameState.greenhouse.unlockedPlants) && GameState.greenhouse.unlockedPlants.includes(plant.id));
+      const afford = GameState.gold >= plant.seedPrice;
+      const dropsPreview = (plant.drops || []).slice(0, 3).map(d => {
+        const di = (CONFIG.greenhouseDrops && CONFIG.greenhouseDrops[d.id]) || (CONFIG.warehouseItems && CONFIG.warehouseItems[d.id]) || (CONFIG.resources && CONFIG.resources[d.id]);
+        return d.id === 'gold' ? '💰' : (di ? di.icon : '✨');
+      }).join('');
+      const button = document.createElement('div');
+      button.className = `gh-plant-choice ${plant.rarity} ${GameState.greenhouse.selectedPlant === plant.id ? 'selected' : ''} ${!unlocked ? 'locked' : ''} ${unlocked && !afford ? 'cant-afford' : ''}`;
+      button.innerHTML = `
+        <div class="gh-plant-icon">${unlocked ? ((typeof CropArt!=="undefined")?CropArt.dom(plant.id,plant.icon,34):plant.icon) : '🔒'}</div>
+        <div class="gh-plant-name">${plant.name}</div>
+        <div class="gh-plant-time">${plant.growTime}秒 · 💰${plant.seedPrice}</div>
+        ${unlocked ? `<div class="gh-plant-drops">${dropsPreview}</div>` : ''}
+      `;
+      button.title = unlocked ? `${plant.desc || ''}\n种子价 ${plant.seedPrice} 金币` : `${plant.name}尚未解锁`;
+      if (unlocked) {
+        button.onclick = () => {
+          GameState.greenhouse.selectedPlant = plant.id;
+          this.render();
+        };
+      } else {
+        button.onclick = () => showToast(`${plant.name}尚未解锁，通过收获传说植物或稀有种子包获取`, 'warning');
+      }
+      container.appendChild(button);
+    });
+  },
+
+  // 渲染掉落道具栏
+  renderDrops() {
+    const container = document.getElementById('greenhouseDrops');
+    if (!container) return;
+    container.innerHTML = '<div class="gh-drops-title">🧪 温室道具</div>';
+
+    const dropItems = Object.keys(CONFIG.greenhouseDrops);
+    let hasItems = false;
+    dropItems.forEach(itemId => {
+      const count = Warehouse.getCount(itemId);
+      if (count <= 0) return;
+      hasItems = true;
+      const item = CONFIG.greenhouseDrops[itemId];
+      const div = document.createElement('div');
+      div.className = 'gh-drop-item';
+      const btnLabel = item.type === 'cultivation' ? '服下' : item.type === 'consumable' ? '远征用' : '使用';
+      div.innerHTML = `
+        <div class="gh-drop-icon">${(typeof CropArt!=="undefined")?CropArt.dom(item.id,item.icon,28):item.icon}</div>
+        <div class="gh-drop-info">
+          <div class="gh-drop-name">${item.name} ×${count}</div>
+          <div class="gh-drop-desc">${item.desc || item.effect || ''}</div>
+        </div>
+        <button class="gh-drop-use-btn" onclick="Greenhouse.useDropItem('${itemId}')">${btnLabel}</button>
+      `;
+      container.appendChild(div);
+    });
+
+    if (!hasItems) {
+      container.innerHTML += '<div class="gh-drops-empty">收获稀有植物获取道具</div>';
+    }
+  },
+
+  // 种植
+  plant(idx) {
+    if (idx >= GameState.greenhouse.unlockedPlots) return;
+    const plant = CONFIG.greenhousePlants.find(p => p.id === GameState.greenhouse.selectedPlant);
+    if (!plant) {
+      showToast('请选择要种植的稀有植物', 'warning');
+      return;
+    }
+    if (!this.isV58Plant(plant.id) && !GameState.greenhouse.unlockedPlants.includes(plant.id)) {
+      showToast(`${plant.name}尚未解锁`, 'warning');
+      return;
+    }
+    // 检查种子（用金币代替，温室种子需要金币购买）
+    if (GameState.gold < plant.seedPrice) {
+      showToast(`金币不足，需要${plant.seedPrice}金币购买种子`, 'warning');
+      return;
+    }
+    GameState.gold -= plant.seedPrice;
+    GameState.greenhouse.plots[idx].plant = plant;
+    GameState.greenhouse.plots[idx].plantedAt = Date.now();
+    GameState.greenhouse.plots[idx].ready = false;
+    showToast(`在温室种下了${plant.name}`, 'success');
+    SaveSystem.save();
+    this.render();
+  },
+
+  // 收获
+  harvest(idx) {
+    const plot = GameState.greenhouse.plots[idx];
+    if (!plot.ready) {
+      showToast('还没成熟呢', 'warning');
+      return;
+    }
+    const plant = plot.plant;
+    let rewardText = `${plant.name}收获！`;
+    const rewards = [];
+
+    // 处理掉落
+    plant.drops.forEach(drop => {
+      if (Math.random() < drop.chance) {
+        let amount = 1;
+        if (Array.isArray(drop.amount)) {
+          amount = randInt(drop.amount[0], drop.amount[1]);
+        } else if (typeof drop.amount === 'number') {
+          amount = drop.amount;
+        } else if (Number.isFinite(drop.min) && Number.isFinite(drop.max)) {
+          amount = randInt(drop.min, drop.max);
+        }
+
+        if (drop.id === 'gold') {
+          GameState.gold += amount;
+          rewards.push(`💰+${amount}`);
+        } else if (CONFIG.resources && CONFIG.resources[drop.id]) {
+          // v5.8 制卡材料资源（墨汁/颜料/附魔精华）：进材料背包
+          try { (window.ResourceSystem ? ResourceSystem.add(drop.id, amount) : (GameState.warehouse.materials = GameState.warehouse.materials || {})[drop.id] = ((GameState.warehouse.materials[drop.id]||0)+amount)); } catch (e) {}
+          const rd = CONFIG.resources[drop.id];
+          rewards.push(`${rd.icon||'✨'}${rd.name}×${amount}`);
+        } else {
+          // v5.0 修为类产物直接转化为修为
+          const _gd = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
+          if (_gd && _gd.type === 'cultivation' && window.CharacterSystem) {
+            const _cult = (_gd.cult ?? _gd.value ?? 0) * amount;
+            CharacterSystem.addExp(_cult);
+            rewards.push(`修为+${_cult}`);
+          } else {
+            const added = Warehouse.addItem(drop.id, amount);
+            if (added > 0) {
+              const itemDef = CONFIG.greenhouseDrops[drop.id] || CONFIG.warehouseItems[drop.id];
+              if (itemDef) rewards.push(`${itemDef.icon}×${added}`);
+            }
+          }
+        }
+      }
+    });
+
+    // 小概率解锁新植物
+    if (plant.rarity === 'legendary' && Math.random() < 0.15) {
+      const locked = CONFIG.greenhousePlants.filter(p => !this.isV58Plant(p.id) && !GameState.greenhouse.unlockedPlants.includes(p.id));
+      if (locked.length > 0) {
+        const newPlant = locked[randInt(0, locked.length - 1)];
+        GameState.greenhouse.unlockedPlants.push(newPlant.id);
+        rewards.push(`🎉解锁${newPlant.name}`);
+        showToast(`解锁新稀有植物：${newPlant.name}！`, 'gold');
+      }
+    }
+
+    rewardText += rewards.length > 0 ? ' 获得：' + rewards.join(' ') : ' 什么都没掉...';
+    showToast(rewardText, 'gold');
+
+    plot.plant = null;
+    plot.ready = false;
+    plot.status = null;
+    SaveSystem.save();
+    this.render();
+  },
+
+  // 解锁格子
+  unlockPlot(idx) {
+    if (idx !== GameState.greenhouse.unlockedPlots) {
+      showToast('请依次解锁温室格子', 'warning');
+      return;
+    }
+    const cost = this.getUnlockCost(idx);
+    if (GameState.gold < cost.gold) {
+      showToast(`金币不足，需要${cost.gold}金币`, 'warning');
+      return;
+    }
+    if (Warehouse.getCount('materials') < cost.materials) {
+      showToast(`材料不足，需要${cost.materials}材料`, 'warning');
+      return;
+    }
+    GameState.gold -= cost.gold;
+    Warehouse.removeItem('materials', cost.materials);
+    GameState.greenhouse.unlockedPlots++;
+    showToast(`温室格子解锁成功！当前${GameState.greenhouse.unlockedPlots}/16`, 'success');
+    SaveSystem.save();
+    this.render();
+  },
+
+  // 获取解锁费用
+  getUnlockCost(idx) {
+    const level = idx - 3; // 第5个格子开始收费
+    return {
+      gold: 200 * level,
+      materials: 5 * level
+    };
+  },
+
+  // 一键收获全部成熟格
+  harvestAll() {
+    let n = 0;
+    GameState.greenhouse.plots.forEach((p, i) => {
+      if (i < GameState.greenhouse.unlockedPlots && p.ready && p.plant) { try { this.harvest(i); n++; } catch (e) {} }
+    });
+    if (n === 0) showToast('没有成熟植物', 'warning');
+    this.render();
+  },
+
+  // 使用掉落道具
+  useDropItem(itemId) {
+    const count = Warehouse.getCount(itemId);
+    if (count <= 0) {
+      showToast('没有该道具', 'warning');
+      return;
+    }
+    const item = CONFIG.greenhouseDrops[itemId];
+    if (!item) return;
+
+    switch (itemId) {
+      case 'gold_card':
+        Warehouse.removeItem(itemId, 1);
+        GameState.gold += item.value;
+        showToast(`使用金币卡，获得${item.value}金币`, 'gold');
+        break;
+      case 'big_gold_card':
+        Warehouse.removeItem(itemId, 1);
+        GameState.gold += item.value;
+        showToast(`使用大金币卡，获得${item.value}金币！`, 'gold');
+        break;
+      case 'transform_card':
+        this.useTransformCard();
+        return;
+      case 'rare_seed_pack':
+        this.useRareSeedPack();
+        return;
+      case 'exp_boost_card':
+        if (GameState.expBoost) { showToast('已有修为加成待使用', 'warning'); return; }
+        Warehouse.removeItem(itemId, 1);
+        GameState.expBoost = true;
+        showToast('经验加成已激活，下次成功撤离修为+50%（失败保留）', 'success');
+        break;
+      case 'weapon_upgrade_stone':
+        Warehouse.removeItem(itemId, 1);
+        GameState.greenhouse.weaponBonus = (GameState.greenhouse.weaponBonus || 0) + 0.1;
+        showToast(`武器已强化！当前伤害+${Math.floor(GameState.greenhouse.weaponBonus * 100)}%`, 'success');
+        break;
+      default:
+        // v5.8.6 类型分发：修为丹直接转化为修为；远征药剂提示去远征使用（不吞道具）
+        if (item.type === 'cultivation') {
+          Warehouse.removeItem(itemId, 1);
+          const exp = item.value || 50;
+          if (window.CharacterSystem) CharacterSystem.addExp(exp);
+          showToast(`服下${item.name}，修为 +${exp}`, 'gold');
+          break;
+        }
+        if (item.type === 'consumable') {
+          showToast(`${item.name}是远征道具——出征集结时放入背包，局中按道具键使用`, 'info');
+          return;
+        }
+        showToast('该道具暂不可用', 'warning');
+        return;
+    }
+    SaveSystem.save();
+    this.renderDrops();
+    Farm.render();
+  },
+
+  // 使用作物转化卡
+  useTransformCard() {
+    // 找一块普通农场的成熟作物，转化为随机稀有作物
+    const readyPlots = GameState.farmPlots
+      .map((plot, idx) => ({ plot, idx }))
+      .filter(({ plot, idx }) => idx < GameState.unlockedPlots && plot.ready && plot.crop);
+    if (readyPlots.length === 0) {
+      showToast('需要一块成熟的普通作物才能转化', 'warning');
+      return;
+    }
+    Warehouse.removeItem('transform_card', 1);
+    const rarePlants = CONFIG.greenhousePlants.filter(p => this.isV58Plant(p.id) || GameState.greenhouse.unlockedPlants.includes(p.id));
+    if (!rarePlants.length) { Warehouse.addItem('transform_card', 1); showToast('暂无可转化的稀有植物', 'warning'); return; }
+    const newPlant = rarePlants[randInt(0, rarePlants.length - 1)];
+    const target = readyPlots[randInt(0, readyPlots.length - 1)];
+    target.plot.crop = newPlant;
+    target.plot.plantedAt = Date.now();
+    target.plot.ready = false;
+    showToast(`${target.plot.crop.name}转化为${newPlant.icon}${newPlant.name}！`, 'gold');
+    SaveSystem.save();
+    this.renderDrops();
+    Farm.render();
+  },
+
+  // 使用稀有种子包
+  useRareSeedPack() {
+    if (Warehouse.getCount('rare_seed_pack') <= 0) return;
+    const locked = CONFIG.greenhousePlants.filter(p => !this.isV58Plant(p.id) && !GameState.greenhouse.unlockedPlants.includes(p.id));
+    if (locked.length === 0) {
+      showToast('所有稀有植物都已解锁', 'warning');
+      return;
+    }
+    Warehouse.removeItem('rare_seed_pack', 1);
+    const newPlant = locked[randInt(0, locked.length - 1)];
+    GameState.greenhouse.unlockedPlants.push(newPlant.id);
+    showToast(`解锁新稀有植物：${newPlant.icon}${newPlant.name}！`, 'gold');
+    SaveSystem.save();
+    this.render();
+  }
+};

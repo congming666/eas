@@ -1,0 +1,146 @@
+/* ============================================================
+   荒野档案 · 统一图鉴样式 v1（codex.css）
+   服务于 v5.js openCodex() 七个分页；所有规则以 .cx- 前缀隔离，
+   基础色值写死（不依赖 :root），分类色由 .cx-cat-* 注入 CSS 变量。
+   设计令牌与游戏 UI 同源：底 #141f18 / 强调 #6fd69a / 金 #ffd680
+   稀有度：common #9fb0a5 / rare #6fb0ff / epic #c07fff / legendary #ffd680
+   ============================================================ */
+
+/* ---------- 网格 ---------- */
+.cx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* ---------- 完成度仪表 ---------- */
+.cx-meter {
+  display: flex; align-items: center; gap: 10px;
+  margin: 10px 0 0; font-size: 11px; color: #9fb5aa;
+}
+.cx-meter .bar {
+  flex: 1; max-width: 320px; height: 7px;
+  background: rgba(255,255,255,0.07); border-radius: 5px; overflow: hidden;
+}
+.cx-meter .bar i {
+  display: block; height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg, #3a6b4f, #6fd69a 60%, #ffd680);
+  transition: width .5s ease;
+}
+.cx-meter b { color: #ffd680; font-size: 13px; }
+.cx-note { margin: 6px 0 0; font-size: 11px; color: #7a8c82; }
+
+/* ---------- 统一图鉴卡 ---------- */
+.cx-card {
+  background:
+    linear-gradient(180deg, var(--cx-glow, rgba(255,255,255,0.03)), rgba(0,0,0,0.28) 42%),
+    #141f18;
+  border: 1px solid var(--cx-line, rgba(255,255,255,0.10));
+  border-radius: 10px; padding: 10px; position: relative;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.cx-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--cx-solid, #6fd69a);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 0 1px var(--cx-solid, #6fd69a) inset;
+}
+
+/* 图窗 */
+.cx-art {
+  height: 104px; border-radius: 8px; position: relative; overflow: hidden;
+  background: radial-gradient(circle at 50% 44%, var(--cx-glow2, rgba(255,255,255,0.05)), rgba(0,0,0,0.42) 78%);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 18px rgba(0,0,0,0.35);
+}
+.cx-art img {
+  max-width: 86%; max-height: 86%; object-fit: contain;
+  filter: drop-shadow(0 4px 9px rgba(0,0,0,0.55));
+}
+.cx-art .emoji {
+  font-size: 48px; line-height: 1;
+  text-shadow: 0 0 22px var(--cx-glow2, rgba(255,255,255,0.2));
+}
+
+/* 绶带（BOSS 金 / 精英红）与角标 */
+.cx-ribbon {
+  position: absolute; top: 8px; right: -30px; transform: rotate(38deg);
+  font-size: 9px; font-weight: 800; letter-spacing: 2px; color: #1a1408;
+  background: linear-gradient(90deg, #ffd680, #ffb84d); padding: 3px 32px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.cx-ribbon.elite { background: linear-gradient(90deg, #ff8a7a, #ff6b5a); color: #2a0e0a; }
+.cx-lv {
+  position: absolute; left: 8px; top: 8px; font-size: 9px; font-weight: 700;
+  background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 5px; padding: 2px 7px; color: #cfe0d6;
+}
+
+/* 名称 / chips / 描述 / 来源页脚 */
+.cx-name {
+  margin-top: 9px; font-size: 14px; font-weight: 700; color: #effff4;
+  display: flex; align-items: center; gap: 6px;
+}
+.cx-name .accent { width: 22px; height: 3px; border-radius: 2px; background: var(--cx-solid, #6fd69a); flex: none; }
+.cx-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; min-height: 20px; }
+.cx-chip {
+  font-size: 10px; color: #cfe0d6; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 5px;
+  padding: 2px 7px; white-space: nowrap;
+}
+.cx-chip.hp { color: #ff9a8a; }
+.cx-chip.dmg { color: #ffcf8a; }
+.cx-chip.spd { color: #9ad8ff; }
+.cx-chip.gold { color: #ffd680; }
+.cx-chip.rare { font-weight: 700; }
+.cx-desc { margin-top: 7px; font-size: 11px; color: #9fb5aa; line-height: 1.5; height: 33px; overflow: hidden; }
+.cx-src {
+  margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.09);
+  font-size: 10px; color: #7a8c82;
+}
+.cx-src::before { content: "📍 "; }
+
+/* ---------- 锁定态（未发现剪影） ---------- */
+.cx-card.locked:hover { transform: none; box-shadow: none; border-color: var(--cx-line, rgba(255,255,255,0.10)); }
+.cx-card.locked .cx-art img { filter: brightness(0) opacity(0.5) drop-shadow(0 0 10px rgba(111,214,154,0.12)); }
+.cx-card.locked .cx-art .emoji { filter: brightness(0) opacity(0.5); }
+.cx-card.locked .cx-name { color: #5f6f65; }
+.cx-card.locked .cx-chips .cx-chip { visibility: hidden; }
+.cx-card.locked .cx-desc { color: #4a5850; font-style: italic; }
+.cx-card.locked .cx-src { color: #54645a; }
+
+/* ---------- 稀有度边框（作物/卡牌用） ---------- */
+.cx-card.r-common { border-color: rgba(159,176,165,0.35); }
+.cx-card.r-common .cx-name .accent { background: #9fb0a5; }
+.cx-card.r-rare { border-color: rgba(111,176,255,0.45); }
+.cx-card.r-rare .cx-name .accent { background: #6fb0ff; }
+.cx-card.r-rare:hover { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 14px rgba(111,176,255,0.16); }
+.cx-card.r-epic {
+  border-color: rgba(192,127,255,0.5);
+  background: linear-gradient(180deg, rgba(192,127,255,0.08), rgba(0,0,0,0.28) 42%), #141f18;
+}
+.cx-card.r-epic .cx-name .accent { background: #c07fff; }
+.cx-card.r-epic:hover { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 16px rgba(192,127,255,0.2); }
+.cx-card.r-legendary {
+  border-color: rgba(255,214,128,0.55);
+  background: linear-gradient(180deg, rgba(255,214,128,0.10), rgba(0,0,0,0.28) 42%), #141f18;
+}
+.cx-card.r-legendary .cx-name .accent { background: #ffd680; }
+.cx-card.r-legendary:hover { box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 18px rgba(255,214,128,0.24); }
+.cx-card.r-legendary::after {
+  content: "✦"; position: absolute; top: 8px; left: 8px;
+  font-size: 11px; color: #ffd680;
+}
+
+/* ---------- 分类色注入 ---------- */
+.cx-cat-crop     { --cx-solid: #8fd0a0; --cx-line: rgba(143,208,160,0.28); --cx-glow: rgba(143,208,160,0.06);  --cx-glow2: rgba(143,208,160,0.10); }
+.cx-cat-monster  { --cx-solid: #ff8a7a; --cx-line: rgba(255,138,122,0.28); --cx-glow: rgba(255,138,122,0.05);  --cx-glow2: rgba(255,138,122,0.10); }
+.cx-cat-boss     { --cx-solid: #d9a8ff; --cx-line: rgba(217,168,255,0.32); --cx-glow: rgba(217,168,255,0.07);  --cx-glow2: rgba(217,168,255,0.12); }
+.cx-cat-weapon   { --cx-solid: #9fc4e8; --cx-line: rgba(159,196,232,0.28); --cx-glow: rgba(159,196,232,0.05);  --cx-glow2: rgba(159,196,232,0.10); }
+.cx-cat-item     { --cx-solid: #ffcf8a; --cx-line: rgba(255,207,138,0.26); --cx-glow: rgba(255,207,138,0.05);  --cx-glow2: rgba(255,207,138,0.10); }
+.cx-cat-plant    { --cx-solid: #9fe8b0; --cx-line: rgba(159,232,176,0.30); --cx-glow: rgba(159,232,176,0.06);  --cx-glow2: rgba(159,232,176,0.11); }
+.cx-cat-res      { --cx-solid: #9ad8ff; --cx-line: rgba(154,216,255,0.26); --cx-glow: rgba(154,216,255,0.05);  --cx-glow2: rgba(154,216,255,0.10); }
+
+/* ---------- 动图微调：webp 待机动画在图窗内匀速呼吸 ---------- */
+.cx-art img.cx-anim { animation: cx-bob 2.6s ease-in-out infinite; }
+@keyframes cx-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }

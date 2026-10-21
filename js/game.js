@@ -1,0 +1,777 @@
+const Game = {
+  expedition: null,
+  animId: null,
+
+  startGame() {
+    // 1) 立即切换界面：隐藏菜单、显示农场（保证点击后第一时间有画面反馈）
+    document.getElementById('mainMenu').classList.add('hidden');
+    document.getElementById('farmScreen').classList.remove('hidden');
+    GameState.screen = 'farm';
+    // 隐藏星云/文字粒子合成层，释放 GPU 合成开销（返回菜单时恢复）
+    this.hideNebulaFX(true);
+    AudioManager.start('farm');
+
+    // 2) 分帧执行：存档加载 + 农场渲染延后到下一帧，
+    //    避免与界面切换/音频启动挤在同一帧造成低配机帧突刺（表现为"卡住"）
+    clearTimeout(this._farmTimer);
+    this._farmTimer = setTimeout(() => {
+      try {
+        SaveSystem.load();
+        Farm.init();
+        Farm.render();
+        // v0.8.0 初始化NPC和科技系统
+        if (typeof NpcSystem !== 'undefined') NpcSystem.init();
+        if (typeof TechSystem !== 'undefined') TechSystem.init();
+        if (typeof EconLoop !== 'undefined') EconLoop.init(); // W1c/W5：土地等级 + 收益衰减 + 农场事件（存档加载后）
+        if (typeof CropExpansion !== 'undefined') { CropExpansion.registerCrops(); CropExpansion.CropBuffSystem.init(); }
+        if (typeof AchievementSystem !== 'undefined') AchievementSystem.init();
+        if (typeof LoadoutSystem !== 'undefined') LoadoutSystem.init();
+        if (GameState.lastDailyClaim !== RewardSystem.dateKey()) {
+          showToast('家园补给站有今日奖励可以领取', 'gold');
+        }
+      } catch (error) {
+        console.error('[Farm] 农场初始化失败（已兜底，不影响主流程）:', error);
+      }
+      // 农场生长定时器（渲染异常不中断游戏）
+      this._startFarmTimer();
+    }, 80);
+  },
+
+  hideNebulaFX(hidden) {
+    // nebulaBg（z-index:1 的深色星空背景层）必须与粒子层同进退，
+    // 否则它会盖在 gameCanvas（z-index:0）上方，导致远征画面被整块遮住（玩家/地形不可见）。
+    ['nebulaBg', 'nebulaCanvas', 'nebulaTextFx'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.visibility = hidden ? 'hidden' : 'visible';
+    });
+  },
+
+  backToMenu() {
+    AudioManager.setScene('menu');
+    SaveSystem.save();
+    clearInterval(this.farmInterval);
+    this.farmInterval = null;
+    document.getElementById('farmScreen').classList.add('hidden');
+    document.getElementById('expeditionPrepScreen').classList.add('hidden');
+    document.getElementById('mainMenu').classList.remove('hidden');
+    GameState.screen = 'menu';
+    // 恢复星云/文字粒子显示
+    this.hideNebulaFX(false);
+  },
+
+  showHelp() {
+    AudioManager.start('menu');
+    if (document.getElementById('gameHelpOverlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'gameHelpOverlay';
+    ov.className = 'v58-overlay';
+    ov.innerHTML = `<div class="v58-modal" style="max-width:780px;max-height:86vh;overflow-y:auto;text-align:left;">
+      <h3 class="v58-modal-title" style="text-align:center;">《农庄牌：荒野远征》新手指南</h3>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🎯 目标</b><br>
+      进入远征 → 搜集物资、击败怪物 → 找到<b>撤离点</b>并坚持读条完成撤离，把战利品带回家园；反复强化装备与卡牌，挑战更高层级。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🎮 操作</b><br>
+      <b>WASD</b> 移动　|　<b>鼠标瞄准 · 左键</b> 攻击 / 交互（开宝箱、占塔、进撤离点）<br>
+      <b>1–4</b> 释放技能　|　<b>Q / R</b> 使用消耗品　|　<b>Shift</b> 冲刺　|　<b>Esc</b> 暂停　|　<b>Tab</b> 背包<br>
+      战利品靠近后自动拾取。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🔄 核心循环</b><br>
+      家园（种作物 → 育种 / 锻造 / 配装）→ 远征（清怪 / 开箱 / 三选一夺卡）→ 撤离铭记卡牌（或失败：武器掉级但<b>不会销毁</b>）→ 反哺家园。</div>
+
+      <div style="margin:10px 0;"><b style="color:#f2d28a;">🧩 关键系统</b><br>
+      · <b>武器</b>：近战 / 远程，在锻造台用材料打造、升级（每级 +10% 伤害并解锁词条）。<br>
+      · <b>技能 / 卡牌</b>：8 大流派与元素克制环（克制 +25%），通过三选一夺卡构筑流派。<br>
+      · <b>种植</b>：家园种作物产出材料 / 食物；远征中可种「植物防线」协助作战。</div>
+
+      <div style="margin:10px 0;"><b style="color:#9be8ba;">💡 新手建议</b><br>
+      先打 T1「低危」图并跟着任务走；优先开宝箱、<b>占领防御塔</b>（塔下减伤）；残血及时用草药包；撤离读条时<b>待在圈内即可</b>（圈内会自动清怪）。不用怕失败——入门武器不会永久损毁。</div>
+
+      <button class="start-expedition-btn" id="gameHelpClose" style="margin-top:12px;width:100%;">我知道了，开始远征</button>
+    </div>`;
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+    document.getElementById('gameHelpClose').onclick = () => ov.remove();
+  },
+
+  openCardWorkshop() {
+    CardSystem.renderWorkshop();
+    document.getElementById('cardWorkshopModal').classList.remove('hidden');
+  },
+
+  closeCardWorkshop() {
+    document.getElementById('cardWorkshopModal').classList.add('hidden');
+  },
+
+  openExpeditionPrep() {
+    AudioManager.setScene('prep');
+    this.hideNebulaFX(true);   // 隐藏主菜单星云粒子层，避免其高 z-index 遮住准备大厅
+    // 兜底：武器实例为空时补发一把入门武器，防止任何路径导致的软锁死
+    if (!GameState.weaponInstances || GameState.weaponInstances.length === 0) {
+      const uid = LoadoutSystem._nextUid();
+      GameState.weaponInstances.push({ uid, weaponId: 'harvest_sickle', level: 0 });
+      showToast('已为你补发一把入门武器：收割镰刀', 'gold');
+    }
+    SaveSystem.save();
+    clearInterval(this.farmInterval);
+    this.farmInterval = null;
+    document.getElementById('farmScreen').classList.add('hidden');
+    document.getElementById('expeditionPrepScreen').classList.remove('hidden');
+    GameState.screen = 'prep';
+    Farm.renderMapSelect();
+    Farm.renderLoadout();
+    Farm.renderDefenseLoadout();
+    Farm.renderSkillPreview();
+    if (typeof DifficultySystem !== 'undefined') { DifficultySystem.renderDifficultySelect(); DifficultySystem.renderHeatSelect(); }
+    // v0.9.0 渲染作物buff
+    if (typeof CropExpansion !== 'undefined') {
+      const buffs = CropExpansion.CropBuffSystem.getAllBuffs();
+      const el = document.getElementById('cropBuffsDisplay');
+      if (el) {
+        if (buffs.length === 0) el.innerHTML = '暂无作物buff，去农场收获辣椒/薄荷/大蒜等获得';
+        else el.innerHTML = buffs.map(b => `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.1);">🌿 ${CropExpansion.CropBuffSystem._buffName(b.type)}：+${Math.round(b.value*100)}%（剩余${b.duration}场）</div>`).join('');
+      }
+    }
+    // v1.0 渲染带入武器选择
+    this.renderWeaponLoadout();
+    this.renderSeedLoadout();
+    ExpeditionLayout.prepare();
+  },
+
+  renderSeedLoadout() {
+    const el = document.getElementById('seedLoadoutSelect');
+    if (!el) return;
+    el.innerHTML = '';
+    const carried = GameState.carriedSeeds || (GameState.carriedSeeds = []);
+    const crops = GameState.warehouse.crops || {};
+    const deployMap = CONFIG.cropToDeploy;
+    Object.keys(deployMap).forEach(cropId => {
+      const count = crops[cropId] || 0;
+      if (count <= 0) return;
+      const deployId = deployMap[cropId];
+      const plantDef = CONFIG.deployPlants[deployId];
+      if (!plantDef) return;
+      const carriedEntry = carried.find(c => c.type === deployId);
+      const inBag = carriedEntry ? carriedEntry.count : 0;
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:6px;border:2px solid ' + (inBag>0?'#7fff7f':'#444') + ';border-radius:6px;cursor:pointer;text-align:center;width:80px;background:rgba(0,0,0,0.3);';
+      const seedArt = (typeof CropArt!=='undefined' && CropArt.ready(deployId)) ? CropArt.dom(deployId, plantDef.icon, 28) : plantDef.icon;
+      div.innerHTML = '<div style="display:flex;justify-content:center;">' + seedArt + '</div>' +
+        '<div style="font-size:10px;color:#ccc;">' + plantDef.name + '</div>' +
+        '<div style="font-size:9px;color:#888;">仓库x' + count + '</div>' +
+        '<div style="font-size:9px;color:' + (inBag>0?'#7fff7f':'#666') + ';">带x' + inBag + '</div>';
+      div.onclick = () => {
+        const total = carried.reduce((sum,c)=>sum+c.count,0);
+        if (inBag > 0) {
+          carriedEntry.count--;
+          if (carriedEntry.count <= 0) GameState.carriedSeeds = carried.filter(c => c !== carriedEntry);
+        } else {
+          if (total >= 5) { showToast('最多带5个种子', 'warning'); return; }
+          let e = carried.find(c => c.type === deployId);
+          if (!e) { e = { type: deployId, count: 0 }; carried.push(e); }
+          e.count++;
+        }
+        SaveSystem.save();
+        this.renderSeedLoadout();
+      };
+      el.appendChild(div);
+    });
+    if (el.children.length === 0) {
+      el.innerHTML = '<div style="color:#888;font-size:11px;">仓库没有可种的作物，去农场种点辣椒/向日葵等</div>';
+    }
+  },
+
+  renderWeaponLoadout() {
+    const el = document.getElementById('weaponLoadoutSelect');
+    if (!el) return;
+    el.innerHTML = '';
+    const insts = GameState.weaponInstances || [];
+    if (insts.length === 0) {
+      el.innerHTML = '<div style="color:#f66;font-size:12px;">仓库没有武器！去锻造台打造</div>';
+      return;
+    }
+    const brought = GameState.loadoutWeaponUids || [];
+    insts.forEach(inst => {
+      const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+      if (!wpn) return;
+      const stats = LoadoutSystem.getInstanceStats(inst.uid);
+      const isSelected = brought.includes(inst.uid);
+      const div = document.createElement('div');
+      div.style.cssText = `padding:8px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;width:120px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
+      div.innerHTML = `<img src="${wpn.img}" style="width:80px;height:80px;object-fit:contain;border-radius:6px;" onerror="this.style.display='none'">
+        <div style="font-size:12px;color:#e6bd54;font-weight:bold;margin-top:4px;">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
+        <div style="font-size:10px;color:#999;">伤害${stats?stats.damage:wpn.damage}</div>
+        <div style="font-size:9px;color:#666;">${inst.uid}</div>
+        <div style="font-size:9px;color:${isSelected?'#ffd700':'#888'};">${isSelected?'✓ 已带入':'点击带入'}</div>`;
+      div.onclick = () => {
+        const arr = GameState.loadoutWeaponUids || (GameState.loadoutWeaponUids = []);
+        const idx = arr.indexOf(inst.uid);
+        if (idx >= 0) {
+          arr.splice(idx, 1);
+        } else {
+          if (arr.length >= 2) { showToast('最多带2把武器', 'warning'); return; }
+          arr.push(inst.uid);
+        }
+        SaveSystem.save();
+        this.renderWeaponLoadout();
+      };
+      el.appendChild(div);
+    });
+  },
+
+  _startFarmTimer() {
+    if (this.farmInterval) return;
+    // W1c/W5 经济循环 tick：全程运行（农场+远征），衰减窗口按"游戏打开"口径；
+    // 事件用墙上时钟打点，远征 12 分钟期间照样发生（防囤积张力，ADR 式）
+    if (!this._econInterval && typeof EconLoop !== 'undefined') {
+      this._econInterval = setInterval(() => {
+        try {
+          EconLoop.tickDiminish(1);
+          EconLoop.tickEvents();
+        } catch (e) { console.error('[Econ] tick 失败:', e); }
+      }, 1000);
+    }
+    // 农场逻辑 tick 与重渲染共用周期：显示层锚点在 CONFIG.fx.renderInterval（ms），tick 换算为秒保持逻辑速率恒定
+    const _fxInterval = (typeof CONFIG !== 'undefined' && CONFIG.fx && CONFIG.fx.renderInterval) || 1000;
+    const _dt = _fxInterval / 1000;
+    this.farmInterval = setInterval(() => {
+      try {
+        if (typeof FarmCareSystem !== 'undefined') FarmCareSystem.tick(_dt);
+        if (typeof FarmProcessingSystem !== 'undefined') FarmProcessingSystem.tick(_dt);
+        if (typeof FarmUI !== "undefined") FarmUI.refreshProcessing();
+        if (typeof FarmDecorationSystem !== 'undefined') FarmDecorationSystem.tick(_dt);
+        Farm.render();
+      } catch (error) { console.error('[Farm] 定时渲染失败:', error); }
+    }, _fxInterval);
+  },
+
+  closeExpeditionPrep() {
+    AudioManager.setScene('farm');
+    document.getElementById('expeditionPrepScreen').classList.add('hidden');
+    document.getElementById('farmScreen').classList.remove('hidden');
+    GameState.screen = 'farm';
+    Farm.render();
+    this._startFarmTimer();
+  },
+
+  syncCombatViewport() {
+    const host = document.getElementById('gameContainer');
+    const rect = host.getBoundingClientRect();
+    const width = Math.max(1, Math.round(host.clientWidth || rect.width));
+    const height = Math.max(1, Math.round(host.clientHeight || rect.height));
+    CONFIG.canvas.width = width; CONFIG.canvas.height = height;
+    canvas.width = width; canvas.height = height;
+    if (this.expedition?.fogCanvas) { this.expedition.fogCanvas.width = width; this.expedition.fogCanvas.height = height; }
+    if (this.expedition?.uiCanvas) { this.expedition.uiCanvas.width = width; this.expedition.uiCanvas.height = height; }
+    if (PixiEffects.app?.renderer) PixiEffects.app.renderer.resize(width, height);
+    if (window.PixiTerrain) PixiTerrain.resize(width, height);
+    if (this.expedition) {
+      this.expedition.camera.x = clamp(this.expedition.player.x - width / 2, 0, Math.max(0, CONFIG.expedition.mapSize - width));
+      this.expedition.camera.y = clamp(this.expedition.player.y - height / 2, 0, Math.max(0, CONFIG.expedition.mapSize - height));
+    }
+  },
+
+  startExpedition() {
+    const map = CONFIG.maps.find(m => m.id === GameState.selectedMap) || CONFIG.maps[0];
+    if (!map) { showToast('没有可进入的远征区域', 'warning'); return; }
+    if (GameState.gold < map.entryFee) {
+      showToast('金币不足，无法支付入场费', 'warning');
+      return;
+    }
+    GameState.gold -= map.entryFee;
+    GameState.expRuns = (GameState.expRuns || 0) + 1;   // v1.5 农场引导「出发远征」计数
+    // v1.4 校验带入武器（至少1把）
+    const uids = GameState.loadoutWeaponUids || [];
+    const validUids = uids.filter(uid => LoadoutSystem.getWeaponInstance(uid));
+    if (validUids.length === 0) {
+      showToast('请至少选择一把带入的武器（最多2把）！', 'warning');
+      GameState.gold += map.entryFee;
+      return;
+    }
+    GameState.loadoutWeaponUids = validUids;
+    // v1.6 扣仓库作物（带的种子）
+    if (GameState.carriedSeeds) {
+      for (const s of GameState.carriedSeeds) {
+        // 找到对应作物id
+        const cropId = Object.keys(CONFIG.cropToDeploy).find(k => CONFIG.cropToDeploy[k] === s.type);
+        if (cropId && GameState.warehouse.crops) {
+          GameState.warehouse.crops[cropId] = Math.max(0, (GameState.warehouse.crops[cropId]||0) - s.count);
+        }
+      }
+    }
+    SaveSystem.save();
+    AudioManager.setScene('expedition');
+    clearInterval(this.farmInterval);
+    this.farmInterval = null;
+    document.getElementById('farmScreen').classList.add('hidden');
+    document.getElementById('expeditionPrepScreen').classList.add('hidden');
+    document.getElementById('expeditionHUD').classList.remove('hidden');
+    GameState.screen = 'expedition';
+    // 隐藏星云背景层，避免遮住远征画面（玩家/地形不可见）
+    this.hideNebulaFX(true);
+    // v0.9.0 作物buff持续时间-1
+    if (typeof CropExpansion !== 'undefined') CropExpansion.CropBuffSystem.onExpeditionStart();
+
+    this.syncCombatViewport();
+    this.expedition = new Expedition(GameState.selectedMap);
+    if (window.Telemetry) Telemetry.onExpeditionStart(this.expedition);
+    PixiEffects.init();
+    if (window.PixiEntities) PixiEntities._lazyInit();
+    GameState.expedition = this.expedition;
+    this.expedition.updateHUD();
+    this.lastTime = performance.now();
+    this.accumulator = 0;
+    this.gameLoop();
+  },
+
+  gameLoop() {
+    const now = performance.now();
+    const frameTime = Math.min((now - this.lastTime) / 1000, 0.25);
+    this.lastTime = now;
+
+    // 健壮性：单帧 update/render 出错不得杀死整条 RAF 链，否则游戏会永久卡死
+    try {
+      if (this.expedition && !this.expedition.gameOver) {
+        if (this.expedition.hitStop > 0) {
+          this.expedition.hitStop = Math.max(0, this.expedition.hitStop - frameTime);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          this.expedition.render(ctx, 0);
+          PixiEffects.render(this.expedition);
+        } else {
+          // Fixed 60 Hz simulation; rendering remains synchronized to the display refresh rate.
+          const fixedStep = 1 / 60;
+          this.accumulator = Math.min((this.accumulator || 0) + frameTime, fixedStep * 8);
+          let steps = 0;
+          while (this.accumulator >= fixedStep && steps < 8) {
+            this.expedition.update(fixedStep);
+            this.accumulator -= fixedStep;
+            steps++;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          this.expedition.render(ctx, this.accumulator / fixedStep);
+          PixiEffects.render(this.expedition);
+        }
+      }
+    } catch (err) {
+      console.error('[gameLoop] 本帧出现错误，已跳过以保持游戏继续运行：', err);
+    }
+
+    if (GameState.screen === 'expedition') {
+      this.animId = requestAnimationFrame(() => this.gameLoop());
+    }
+  },
+
+  // v1.6 远征评级计算：引擎中立纯函数（只依赖结算数据，方便离线校准）
+  _runGrade(data) {
+    const rs = data.runStats || {};
+    let score = 0;
+    if (data.success) score += 40;                       // 撤离成功是最大的成就
+    score += (data.kills || 0) * 1.2;
+    score += (data.chests || 0) * 5;
+    score += (data.goldEarned || 0) / 40;
+    score += (rs.maxCombo || 0) * 2;
+    score += (rs.eliteKills || 0) * 4;
+    score += (rs.bossKills || 0) * 10;
+    if ((rs.minHpSeen || 100) < 30) score += 6;          // 险象环生：濒死仍完成远征的勇气分
+    score -= (data.damageTaken || 0) / 80;               // 承伤惩罚（保底 0）
+    if (score < 0) score = 0;
+    const tier = score >= 150 ? 'S' : score >= 110 ? 'A' : score >= 70 ? 'B' : score >= 35 ? 'C' : 'D';
+    return { score: Math.round(score), tier };
+  },
+
+  showResult(data) {
+    this.expedition?.hidePauseMenu();
+    if (window.Telemetry) Telemetry.onExpeditionEnd(data, this.expedition);
+    AudioManager.setScene('result');
+    document.getElementById('lowHealthVignette').classList.remove('active');
+    cancelAnimationFrame(this.animId);
+    PixiEffects.clear();
+    if (window.PixiTerrain) PixiTerrain.clear();
+    if (window.PixiEntities) PixiEntities.clear();
+    // v1.4 复位世界层昼夜 CSS 分级（内联样式清空 → 回落 style.css 基准 saturate/contrast）
+    const _gc = document.getElementById('gameCanvas');
+    if (_gc) _gc.style.filter = '';
+    const _ui = document.getElementById('expeditionUICanvas');
+    if (_ui) { const _uctx = _ui.getContext('2d'); _uctx.clearRect(0, 0, _ui.width, _ui.height); }
+    document.getElementById('expeditionHUD').classList.add('hidden');
+    document.getElementById('resultScreen').classList.remove('hidden');
+
+    const card = document.getElementById('resultCard');
+    card.className = 'result-card' + (data.success ? '' : ' failed');
+    document.getElementById('resultTitle').className = 'result-title ' + (data.success ? 'success' : 'failed');
+    document.getElementById('resultTitle').textContent = data.success ? '远征成功！' : '远征失败...';
+
+    // v1.6 远征评级：撤离+击杀+宝箱+金币+连击+精英Boss 加权 → S/A/B/C/D 盖章式徽章
+    // 校准锚点：普通 T1 撤离（25杀/3箱/300金/12连）≈ A；完美局（40杀/5箱/500金/25连/2精英）≈ S；
+    // 阵亡局自然落 C/D（分数本来就低，不人为封顶——"虽败犹荣"的高击杀阵亡给到 B 是合理叙事）
+    const grade = this._runGrade(data);
+    const oldBadge = document.getElementById('resultGrade');
+    if (oldBadge) oldBadge.remove();
+    const badge = document.createElement('div');
+    badge.id = 'resultGrade';
+    badge.className = 'result-grade grade-' + grade.tier;
+    badge.innerHTML = '<span class="result-grade-letter">' + grade.tier + '</span><span class="result-grade-score">' + grade.score + ' 分</span>';
+    document.getElementById('resultTitle').insertAdjacentElement('beforebegin', badge);
+
+    // v5.8 死亡结算钩子 ①：明确死因 —— 你被「荒野蛛 Lv2」击杀 / 时间耗尽（提示克制，不加戏）
+    const dc = data.deathCause || {};
+    document.getElementById('resultSubtitle').innerHTML = data.success
+      ? `你成功从${data.mapName}撤离，战利品已存入仓库`
+      : (dc.reason === 'timeout'
+        ? `远征时间耗尽——你在${data.mapName}迷失了方向`
+        : (dc.name
+          ? `你被「<b>${dc.name}${dc.level ? ' Lv.' + dc.level : ''}</b>」击杀于${data.mapName}`
+          : `你在${data.mapName}倒下了，大部分物资丢失`));
+
+    // v5.8 死亡结算钩子 ②：主按钮变成复仇钩子（克制的呼吸光晕）
+    const againBtn = document.querySelector('#resultScreen .result-actions .menu-btn');
+    if (againBtn) {
+      if (data.success) { againBtn.classList.remove('revenge'); againBtn.textContent = '再次远征'; }
+      else {
+        againBtn.classList.add('revenge');
+        againBtn.textContent = dc.name ? `⚔️ 复仇「${dc.name}」` : '⚔️ 再战一场';
+      }
+    }
+
+    document.getElementById('resultStats').innerHTML = `
+      <div class="result-stat"><div class="result-stat-label">用时</div><div class="result-stat-value">${data.timeUsed}秒</div></div>
+      <div class="result-stat"><div class="result-stat-label">击杀数</div><div class="result-stat-value">${data.kills}</div></div>
+      <div class="result-stat"><div class="result-stat-label">开启宝箱</div><div class="result-stat-value">${data.chests}</div></div>
+      <div class="result-stat"><div class="result-stat-label">受到伤害</div><div class="result-stat-value">${Math.round(data.damageTaken||0)}</div></div>
+      <div class="result-stat"><div class="result-stat-label">获得金币</div><div class="result-stat-value" style="color:#ffd700;">+${data.goldEarned}</div></div>
+      <div class="result-stat"><div class="result-stat-label">地图</div><div class="result-stat-value">${data.mapName}</div></div>
+    `;
+
+    // v1.6 数字滚动：金币/击杀从 0 数到最终值（ease-out 0.9s）——结算页最有仪式感的一口气
+    // 先取元素引用再交给 ExpeditionLayout.result 重排（引用不随 DOM 移动失效）
+    const _countUp = (el, target, dur, fmt) => {
+      if (!el || !Number.isFinite(target) || target <= 0) return;
+      const t0 = performance.now();
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / dur);
+        const v = Math.round(target * (1 - Math.pow(1 - k, 3)));
+        el.textContent = fmt ? fmt(v) : String(v);
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const statNodes = document.querySelectorAll('#resultStats .result-stat .result-stat-value');
+    _countUp(statNodes[4], data.goldEarned, 900, v => '+' + v);
+    _countUp(statNodes[1], data.kills, 700);
+
+    // P2-3 社交战报钩子：一句话战报 + 复制按钮（坚持到第 X 波 · 击杀 Y · 最贵战利品 Z）
+    try {
+      const rsRep = data.runStats || {};
+      const bwave = data.wave || (data.deathCause && data.deathCause.wave) || 0;
+      const tl = rsRep.topLoot ? `${rsRep.topLoot.name}·${rsRep.topLoot.value}金` : '无';
+      const report = `【农庄牌：荒野远征】${data.success ? '成功撤离' : '远征阵亡'}「${data.mapName}」：坚持到第 ${bwave} 波 · 击杀 ${data.kills} · 最贵战利品 ${tl}`;
+      const oldBar = document.getElementById('battleReportBar');
+      if (oldBar) oldBar.remove();
+      const bar = document.createElement('div');
+      bar.id = 'battleReportBar';
+      bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin:10px 0 2px;padding:9px 12px;border-radius:8px;background:rgba(20,16,10,.55);border:1px solid rgba(255,200,90,.28);';
+      const txt = document.createElement('span');
+      txt.style.cssText = 'flex:1;color:#e8d9b8;font-size:12.5px;line-height:1.5;text-align:left;';
+      txt.textContent = report;
+      const btn = document.createElement('button');
+      btn.className = 'secondary-btn';
+      btn.style.cssText = 'flex-shrink:0;padding:6px 12px;font-size:12px;cursor:pointer;';
+      btn.textContent = '📋 复制战报';
+      const fallbackCopy = (text, cb) => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); cb(); } catch (e) { /* 忽略 */ }
+        ta.remove();
+      };
+      const doneCopy = () => { btn.textContent = '✓ 已复制'; setTimeout(() => { btn.textContent = '📋 复制战报'; }, 1600); };
+      btn.onclick = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(report).then(doneCopy).catch(() => fallbackCopy(report, doneCopy));
+        } else fallbackCopy(report, doneCopy);
+      };
+      bar.appendChild(txt); bar.appendChild(btn);
+      document.getElementById('resultStats').insertAdjacentElement('afterend', bar);
+    } catch (e) { console.warn('battleReport', e); }
+
+    const lootList = document.getElementById('lootList');
+    const plantGrowth = Array.isArray(data.plantGrowth) ? data.plantGrowth : [];
+
+    // v4.2 本局 MVP 主卡（最高连击 / 最远深入 / 丝血反杀 / 最值钱战利品）
+    const rs = data.runStats || {};
+    const iconOf = (it, sz) => (typeof CropArt !== 'undefined') ? CropArt.domFor(it, sz || 22) : (it.icon || '');
+    const mvpTiles = [
+      { key:'combo', art:'mvp_combo', label:'最高连击', value:(rs.maxCombo||0)+' 连击', score:(rs.maxCombo||0) },
+      { key:'dist', art:'mvp_dist', label:'最远深入', value:Math.round(rs.maxDistFromSpawn||0)+' m', score:(rs.maxDistFromSpawn||0)/40 },
+      { key:'clutch', art:'mvp_clutch', label:'丝血反杀', value:(rs.clutchKills||0)+' 杀', score:(rs.clutchKills||0)*8 },
+      { key:'loot', art:'mvp_loot', label:'最值钱战利品', value:rs.topLoot ? (rs.topLoot.name+' · '+rs.topLoot.value+'金') : '无', score:rs.topLoot?rs.topLoot.value/30:0 },
+    ];
+    let bestIdx = 0, bestScore = 0;
+    mvpTiles.forEach((t,i)=>{ if(t.score>bestScore){bestScore=t.score;bestIdx=i;} });
+    const hasMvp = bestScore > 0;
+    let mvpHtml = '<div style="margin:12px 0 6px;padding:12px;border-radius:10px;background:linear-gradient(135deg,rgba(255,190,60,0.18),rgba(120,70,10,0.10));border:1px solid rgba(255,200,80,0.55);box-shadow:0 0 18px rgba(255,180,40,0.15) inset;">';
+    mvpHtml += '<div style="text-align:center;color:#ffd700;font-weight:800;letter-spacing:2px;font-size:15px;margin-bottom:8px;">★ 本 局 M V P ★</div>';
+    mvpHtml += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    mvpTiles.forEach((t,i)=>{
+      const art = (typeof CropArt!=='undefined' && CropArt.ready(t.art)) ? CropArt.dom(t.art,'',34) : '';
+      const crown = hasMvp && i===bestIdx;
+      mvpHtml += '<div style="text-align:center;padding:8px 4px;border-radius:8px;background:'+(crown?'rgba(255,215,0,0.22)':'rgba(0,0,0,0.28)')+';border:1px solid '+(crown?'rgba(255,215,0,0.9)':'rgba(255,255,255,0.08)')+';">'
+        + '<div style="height:36px;display:flex;align-items:center;justify-content:center;">'+(art||'<span style="font-size:22px;">★</span>')+'</div>'
+        + '<div style="color:#cbb36a;font-size:10px;margin-top:3px;">'+t.label+(crown?' <span style="color:#ffd700;font-weight:800;">[MVP]</span>':'')+'</div>'
+        + '<div style="color:#fff;font-size:11px;font-weight:600;margin-top:2px;line-height:1.3;word-break:break-all;">'+t.value+'</div>'
+        + '</div>';
+    });
+    mvpHtml += '</div></div>';
+
+    // v3.8 本局高光卡片（v4.2 图标统一为写实素材/金色字徽）
+    let highlightHtml = mvpHtml;
+    if (Array.isArray(data.highlights) && data.highlights.length > 0) {
+      highlightHtml += '<div style="margin:6px 0 10px;">';
+      data.highlights.forEach(h => {
+        let hIcon;
+        const hlArtMap = {'杀戮机器':'mvp_combo','老练猎手':'mvp_combo','深度探索':'mvp_dist','丝血逃生':'mvp_clutch','险象环生':'mvp_clutch','精英猎人':'mvp_loot','Boss 终结者':'mvp_loot','宝箱收藏家':'mvp_loot','爆炸专家':'mvp_loot','命悬一线':'mvp_clutch'};
+        const hlArt = hlArtMap[h.title];
+        if (typeof CropArt !== 'undefined' && hlArt && CropArt.ready(hlArt)) hIcon = CropArt.dom(hlArt, '', 26);
+        else if (typeof CropArt !== 'undefined' && h.icon && CropArt.ready(h.icon)) hIcon = CropArt.dom(h.icon, '', 26);
+        else hIcon = '<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6a5320,#3a2e12);color:#f2d078;font-weight:700;font-size:14px;">'+(h.title?h.title.slice(0,1):'★')+'</span>';
+        highlightHtml += `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin:6px 0;
+                      background:linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04));
+                      border:1px solid rgba(255,215,0,0.3);border-radius:8px;">
+            <div style="width:30px;text-align:center;">${hIcon}</div>
+            <div style="flex:1;">
+              <div style="color:#ffd700;font-weight:600;font-size:14px;">${h.title}</div>
+              <div style="color:#aaa;font-size:12px;">${h.desc}</div>
+            </div>
+          </div>`;
+      });
+      highlightHtml += '</div>';
+    }
+
+    let plantHtml = '';
+    if (plantGrowth.length > 0) {
+      plantHtml = '<div style="font-size:14px;color:#7dff9a;margin:10px 0 6px;">🌿 植物培育</div>';
+      plantGrowth.forEach(p => {
+        const sign = p.delta > 0 ? '+' : '';
+        const color = p.delta > 0 ? '#7dff9a' : '#ff9a55';
+        plantHtml += `<div class="loot-item kept" style="margin-bottom:4px;"><span>${p.icon} ${p.name}</span><span style="color:${color};">${sign}${p.delta} 培育进度</span></div>`;
+      });
+    }
+    // v5.8 死亡结算钩子 ③：「保住的东西」清单 —— 死得明白，且知道下一步为什么再开一把
+    let keptGainsHtml = '';
+    if (!data.success) {
+      const gains = ['<div class="kept-gain">📖 技能收藏与精通进度 <b>永久保留</b></div>'];
+      (data.masteryLog || []).forEach(m => {
+        gains.push(`<div class="kept-gain">⬆️ ${m.name} 精通进度 <b>+${m.amt}</b>（已入账）</div>`);
+      });
+      if ((data.safeKeptCount || 0) > 0) gains.push(`<div class="kept-gain">📦 安全箱 <b>${data.safeKeptCount}</b> 件物资已入库</div>`);
+      if (data.deathReport && data.deathReport.pardonUsed) gains.push('<div class="kept-gain">🛡️ 免死令自动生效，<b>免除本次降级</b></div>');
+      if (typeof CollectionUI !== 'undefined' && CollectionUI.progress) {
+        const prog = CollectionUI.progress();
+        gains.push(`<div class="kept-gain dim">📚 卡牌图鉴 ${prog.owned}/${prog.total} —— 每一次远征都在点亮它</div>`);
+      }
+      keptGainsHtml = '<div class="kept-gains"><div class="kept-gains-title">🌾 这些已经保住了</div>' + gains.join('') + '</div>';
+    }
+    // v1.6 战利品汇总行：保留/遗失件数 + 总价值（金币之外的物资也折算价值，让"带回了多少"一眼可读）
+    const _ex = this.expedition;
+    const _lootVal = (arr) => (_ex && typeof _ex.getLootValue === 'function') ? arr.reduce((s, i) => s + (_ex.getLootValue(i) || 0), 0) : 0;
+    const keptVal = Math.round(_lootVal(data.keptItems || []));
+    const lostVal = Math.round(_lootVal(data.lostItems || []));
+    const lootSummary = '<div class="loot-summary">'
+      + '<span class="kept-n">📦 保留 ' + (data.keptItems || []).length + ' 件</span>'
+      + ((data.lostItems || []).length > 0 ? '<span class="lost-n">✗ 遗失 ' + data.lostItems.length + ' 件</span>' : '')
+      + '<span class="val-n">💰 保留价值 ' + keptVal + ' 金' + (lostVal > 0 ? '（遗失 ' + lostVal + ' 金）' : '') + '</span>'
+      + '</div>';
+    lootList.innerHTML = keptGainsHtml + '<div style="font-size:14px;color:#888;margin:12px 0 8px;">战利品清单</div>' + lootSummary + plantHtml;
+    const lootIcon = (i) => (typeof CropArt !== 'undefined') ? CropArt.domFor(i, 20) : (i.icon || '📦');
+    data.keptItems.forEach(i => {
+      lootList.innerHTML += `<div class="loot-item kept"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✓ 保留</span></div>`;
+    });
+    data.lostItems.forEach(i => {
+      lootList.innerHTML += `<div class="loot-item lost"><span>${lootIcon(i)} ${i.name} ×${i.amount}</span><span>✗ 丢失</span></div>`;
+    });
+    if (data.keptItems.length === 0 && data.lostItems.length === 0) {
+      lootList.innerHTML += '<div class="empty-loot">本次没有保留或遗失物资</div>';
+    }
+    // v1.6 成功局战斗记录默认展开（此前藏进 <details> 折叠，90% 玩家根本没见过自己的 MVP）
+    if (data.success) lootList.innerHTML += '<details open><summary>查看本局战斗记录</summary>' + highlightHtml + '</details>';
+    ExpeditionLayout.result(data);
+
+    // v1.6 入场节奏：评级盖章 → 统计格 → 战报条 → 汇总行 → 战利品逐条弹入（55ms 阶梯）
+    // 重开 .stag-in 类触发重播（同一局内不会二次结算，但保险起见仍做重置）
+    const _card = document.getElementById('resultCard');
+    if (_card) {
+      _card.classList.remove('stag-in');
+      void _card.offsetWidth;
+      _card.classList.add('stag-in');
+      let _idx = 0;
+      _card.querySelectorAll('.result-stat, #battleReportBar, .loot-summary, .loot-item, .kept-gains, .loot-list > h3, .loot-list > details')
+        .forEach(n => n.style.setProperty('--i', String(_idx++)));
+    }
+  },
+
+  returnToFarm() {
+    this.expedition?.hidePauseMenu();
+    AudioManager.setScene('farm');
+    SaveSystem.save();
+    document.getElementById('resultScreen').classList.add('hidden');
+    document.getElementById('farmScreen').classList.remove('hidden');
+    GameState.screen = 'farm';
+    // 清理远征残留 UI（暂停菜单 quit 路径不经 showResult，这里兜底）
+    ['expeditionHUD', 'lowHealthVignette'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.classList.add('hidden');
+    });
+    const fl = document.getElementById('flash'); if (fl) fl.classList.remove('active');
+    if (typeof ctx !== 'undefined' && typeof canvas !== 'undefined') ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (typeof CombatEnhancement !== 'undefined' && CombatEnhancement.branchActive) CombatEnhancement.branchActive = false;
+    Farm.render();
+    Farm.renderMapSelect();
+    Farm.renderLoadout();
+    Farm.renderDefenseLoadout();
+    this._startFarmTimer();
+    this.expedition = null;
+  },
+
+  // v1.0 成就板
+  openAchievements() {
+    if (typeof AchievementSystem === 'undefined') return;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay modal-overlay';
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="width:600px;max-height:80vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #4a6a4a;"><div id="achvContent"></div><div style="padding:12px;text-align:center;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    document.body.appendChild(overlay);
+    AchievementSystem.renderPanel(overlay.querySelector('#achvContent'));
+  },
+
+  // v1.0 武器锻造台
+  // v1.0 武器锻造台（v5.4：仅作物材料，修为不可抵扣，逐项标注材料来源）
+  openBlacksmith() {
+    if (typeof LoadoutSystem === 'undefined') return;
+    document.querySelectorAll('.modal-overlay[data-dynamic="1"]').forEach(el => el.remove());
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-dynamic', '1');
+    overlay.className = 'overlay modal-overlay';
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const have = m => (GameState.warehouse.materials && GameState.warehouse.materials[m]) || 0;
+    // 逐项材料：名称 持有/需要 + 来源作物
+    const matLines = mats => Object.entries(mats).map(([m,n]) => {
+      const ok = have(m) >= n;
+      return '<div style="font-size:10px;line-height:1.5;color:' + (ok ? '#9fe6a0' : '#ff8a8a') + ';">'
+        + LoadoutSystem.matName(m) + ' ' + have(m) + '/' + n
+        + '<span style="color:#8a9470;"> · ' + LoadoutSystem.materialSourceText(m) + '</span></div>';
+    }).join('');
+    let html = '<div style="width:640px;max-height:82vh;overflow-y:auto;background:#1a1f1a;border-radius:12px;border:1px solid #6a4a2a;padding:20px;">';
+    html += '<h3 style="color:#ffd700;margin:0 0 8px;">🔨 武器锻造台</h3>';
+    html += '<p style="color:#aaa;font-size:12px;margin-bottom:6px;">每把武器独立等级，死亡永久损失。升级单个实例，打造补充新武器。</p>';
+    html += '<p style="color:#ffcf8a;font-size:12px;margin:0 0 12px;">材料均由农作物产出（Lv6+ 需精炼/稀有材料，Lv7-10 需温室/稀有作物材料）。升级可自主选择：「材料升级」纯付材料，或「修为抵扣」材料先用、缺口按比例用修为补上（凝气草产修为）。</p>';
+
+    // 现有武器实例
+    html += '<div style="margin-bottom:12px;"><div style="color:#8ecf9a;font-weight:bold;margin-bottom:6px;">仓库中的武器</div>';
+    const insts = GameState.weaponInstances || [];
+    if (insts.length === 0) html += '<div style="color:#f66;font-size:12px;">没有武器，打造一把吧！</div>';
+    insts.forEach(inst => {
+      const wpn = CONFIG.weapons.find(w => w.id === inst.weaponId);
+      if (!wpn) return;
+      const stats = LoadoutSystem.getInstanceStats(inst.uid);
+      const cost = LoadoutSystem.getUpgradeCost(inst.uid);
+      const plan = cost ? LoadoutSystem.getCultivationUpgradePlan(inst.uid) : null;
+      html += '<div style="padding:8px;margin:6px 0;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+      html += '<div style="display:flex;align-items:center;gap:10px;"><img src="' + wpn.img + '" style="width:40px;height:40px;object-fit:contain;border-radius:4px;" onerror="this.style.display=\'none\'">';
+      html += '<div><span style="color:#e6bd54;font-weight:bold;">' + wpn.name + '</span>';
+      html += '<span style="color:' + (inst.level>=10?'#ffd700':'#7fff7f') + ';"> Lv.' + inst.level + '</span>';
+      html += '<span style="color:#888;font-size:11px;"> 伤害' + (stats?stats.damage:wpn.damage) + '</span></div></div>';
+      if (cost) {
+        html += '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;min-width:230px;">';
+        html += '<div style="color:#d8b46a;font-size:10px;">' + cost.gold + ' 金币（两种方式都需）</div>';
+        html += '<div style="text-align:right;">' + matLines(cost.materials) + '</div>';
+        html += '<div style="display:flex;gap:6px;">';
+        html += '<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.upgradeWeapon(\'' + inst.uid + '\');Game.openBlacksmith()">材料升级</button>';
+        html += '<button class="secondary-btn" style="font-size:11px;" title="材料先用，缺口按比例用修为抵扣" onclick="LoadoutSystem.upgradeWeaponWithCultivation(\'' + inst.uid + '\');Game.openBlacksmith()">修为抵扣（需' + (plan ? plan.needCultivation : 0) + '）</button>';
+        html += '</div>';
+        html += '</div>';
+      } else {
+        html += '<span style="color:#ffd700;font-size:11px;">已满级</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // 打造新武器
+    html += '<div style="margin-top:12px;"><div style="color:#e6a;font-weight:bold;margin-bottom:6px;">打造新武器</div>';
+    CONFIG.weapons.forEach(w => {
+      const owned = !w.blueprint || (GameState.blueprints && GameState.blueprints.includes(w.id));
+      if (!owned) return;
+      const count = LoadoutSystem.getWeaponCount(w.id);
+      const cc = LoadoutSystem.CRAFT_COSTS[w.id];
+      html += '<div style="padding:6px;margin:4px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+      html += '<span style="display:flex;align-items:center;gap:8px;"><img src="' + w.img + '" style="width:32px;height:32px;object-fit:contain;border-radius:4px;" onerror="this.style.display=\'none\'"> ' + w.name + ' <span style="color:#888;font-size:11px;">(现有×' + count + ')</span></span>';
+      html += '<span style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;min-width:230px;">';
+      if (cc) {
+        html += '<span style="color:#d8b46a;font-size:10px;">' + cc.gold + ' 金币</span>';
+        html += '<span style="text-align:right;">' + matLines(cc.materials) + '</span>';
+      }
+      html += '<button class="secondary-btn" style="font-size:11px;" onclick="LoadoutSystem.craftWeapon(\'' + w.id + '\');Game.openBlacksmith()">材料打造</button>';
+      html += '</span></div>';
+    });
+    html += '</div>';
+
+    html += '<div style="padding:12px;text-align:center;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  },
+
+  // v1.0 安全箱
+  openSafeBox() {
+    if (typeof LoadoutSystem === 'undefined') return;
+    document.querySelectorAll('.modal-overlay[data-dynamic="1"]').forEach(el => el.remove());
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay modal-overlay';
+    overlay.setAttribute('data-dynamic', '1');
+    overlay.style.cssText = 'background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const slots = LoadoutSystem.getSafeCapacity();
+    const cost = LoadoutSystem.upgradeSafeCost();
+    let html = '<div style="width:420px;background:#1a1f1a;border-radius:12px;border:1px solid #4a6a8a;padding:20px;">';
+    html += '<h3 style="color:#7ec8ff;margin:0 0 12px;">🔐 安全箱</h3>';
+    html += `<p style="color:#aaa;font-size:13px;">安全箱内的物品在远征失败时<b style="color:#7fff7f;">必定保留</b>，且不占背包格位。<br>当前：${slots}格 | 背包16格（金币每100个占1格）· 远征中按 Tab 打开背包自由存取</p>`;
+    html += '<div style="margin:12px 0;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">';
+    if (GameState.safeBox && GameState.safeBox.length) {
+      GameState.safeBox.forEach((item,i) => {
+        html += `<div style="padding:4px;">${item.icon||'📦'} ${item.name} ×${item.amount||1}</div>`;
+      });
+    } else {
+      html += '<p style="color:#666;font-size:12px;">安全箱为空。远征中按 Tab 打开背包，可把任意物品自由存入安全箱。</p>';
+    }
+    html += '</div>';
+    if (cost) {
+      html += `<button class="secondary-btn" onclick="if(LoadoutSystem.upgradeSafe()){Game.openSafeBox();}">升级到${slots+1}格（${cost}金币）</button>`;
+    } else {
+      html += '<p style="color:#ffd700;">安全箱已满级（3格）</p>';
+    }
+    html += '<div style="margin-top:12px;"><button class="secondary-btn" onclick="this.closest(\'.overlay\').remove()">关闭</button></div></div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  }
+};
+
+// ==================== 初始化 ====================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// 初始渲染菜单背景
+function renderMenuBg() {
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 装饰性粒子
+  for (let i = 0; i < 30; i++) {
+    ctx.fillStyle = `rgba(127,255,127,${Math.random() * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+renderMenuBg();
+
+console.log(`${GAME_NAME} v${GAME_VERSION} 已加载`);
+console.log('Ruleset ID:', CONFIG.ruleset_id);
+
+window.addEventListener('resize', () => { if (GameState.screen === 'expedition') Game.syncCombatViewport(); });
