@@ -683,7 +683,7 @@
     _initScene(wrap) {
       const w = Math.max(320, wrap.clientWidth), h = Math.max(200, wrap.clientHeight);
       const r = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-      r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       r.setSize(w, h, false);
       r.outputEncoding = T.LinearEncoding;
       r.shadowMap.enabled = true;
@@ -736,7 +736,7 @@
                   '  vec2 uv = vUv;',
                   '  vec3 acc = vec3(0.0);',
                   '  float illum = 1.0;',
-                  '  for (int i = 0; i < 32; i++) {',
+                  '  for (int i = 0; i < 20; i++) {',
                   '    uv -= delta;',
                   '    vec3 s = texture2D(tDiffuse, uv).rgb;',
                   '    float lum = dot(s, vec3(0.299, 0.587, 0.114));',
@@ -762,7 +762,7 @@
       scene.fog = new T.FogExp2(0x6a7280, 0.011);
       this._buildSky(scene);
       // 灯光
-      this._hemi = new T.HemisphereLight(0x9fb4d0, 0x3a3226, .30);
+      this._hemi = new T.HemisphereLight(0x9fb4d0, 0x33291e, .20);
       scene.add(this._hemi);
       const sun = new T.DirectionalLight(0xffd2a0, 2.2);
       sun.castShadow = true;
@@ -774,7 +774,7 @@
       sun.shadow.camera.updateProjectionMatrix();
       sun.shadow.bias = -0.0006;
       sun.shadow.mapSize.set(2048, 2048);
-      sun.shadow.radius = 2;
+      sun.shadow.radius = 1;
       sun.target.position.set(-2, 0, 2);
       scene.add(sun.target);
       sun.position.set(-10, 16, -14);
@@ -1355,7 +1355,7 @@
       // 光照强度
       const weatherDim = { clear: 1, cloud: .82, rain: .62, heavy_rain: .5, storm: .38, fog: .72, snow: .85 }[wk] || 1;
       const dayLight = Math.max(0, Math.sin(sunAngle)) * weatherDim;
-      this._sun.intensity = .2 + dayLight * 1.85;
+      this._sun.intensity = .18 + dayLight * 2.15;
       this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffd8a8);
       this._moon.intensity = nightF * .5;
       this._hemi.intensity = .18 + dayLight * .55;
