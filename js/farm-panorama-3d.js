@@ -194,14 +194,94 @@
       }
     });
   }
-  function clampedTexMat(name, color, repeat, rough, metal) {
+  function clampedTexMat(name, color, repeat, rough, metal, nrmStrength) {
     const base = { wood: woodTex, rust: rustTex, shingle: shingleTex }[name];
     const src = base();
     const tex = src.clone();
     tex.needsUpdate = true;
     tex.wrapS = tex.wrapT = T.RepeatWrapping;
     tex.repeat.set(repeat[0], repeat[1]);
-    return new T.MeshStandardMaterial({ map: tex, color: color, roughness: rough == null ? 1 : rough, metalness: metal || 0 });
+    const mat = new T.MeshStandardMaterial({ map: tex, color: color, roughness: rough == null ? 1 : rough, metalness: metal || 0 });
+    try {
+      if (!NORMALCACHE[name]) NORMALCACHE[name] = normalFromHeight(heightCanvas(name), 2.2);
+      const nrm = NORMALCACHE[name].clone();
+      nrm.needsUpdate = true;
+      nrm.wrapS = nrm.wrapT = T.RepeatWrapping;
+      nrm.repeat.set(repeat[0], repeat[1]);
+      mat.normalMap = nrm;
+      const s = nrmStrength == null ? 1 : nrmStrength;
+      mat.normalScale = new T.Vector2(s, s);
+    } catch (e) { /* 法线贴图失败不影响主流程 */ }
+    return mat;
+  }
+
+  const NORMALCACHE = {};
+  function heightCanvas(name) {
+    const hc = document.createElement('canvas'); hc.width = 256; hc.height = 256;
+    const c = hc.getContext('2d');
+    c.fillStyle = '#808080'; c.fillRect(0, 0, 256, 256);
+    if (name === 'wood') {
+      for (let row = 0; row < 4; row++) {
+        const y = row * 64;
+        c.fillStyle = '#383838'; c.fillRect(0, y + 60, 256, 4);           // 板缝凹槽
+        c.fillStyle = '#9a9a9a'; c.fillRect(0, y, 256, 2);                // 上缘凸
+        for (let i = 0; i < 26; i++) {
+          c.strokeStyle = Math.random() > .5 ? 'rgba(60,60,60,.55)' : 'rgba(190,190,190,.35)';
+          c.lineWidth = 1;
+          const yy = y + 6 + Math.random() * 48;
+          c.beginPath(); c.moveTo(0, yy); c.bezierCurveTo(80, yy + 2, 170, yy - 2, 256, yy); c.stroke();
+        }
+      }
+    } else if (name === 'rust') {
+      for (let i = 0; i < 900; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 1 + Math.random() * 7;
+        const v = Math.random() > .5 ? 150 : 60;
+        c.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',.25)';
+        c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+      }
+      for (let i = 0; i < 22; i++) {   // 铆钉凸起
+        const x = (i % 6) * 42 + 10, y = Math.floor(i / 6) * 64 + 12;
+        c.fillStyle = '#d8d8d8'; c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill();
+      }
+    } else {
+      const rows = 8, cols = 6;
+      for (let r = 0; r < rows; r++) {
+        for (let k = 0; k < cols; k++) {
+          const x = k * (256 / cols) + (r % 2 ? 256 / cols / 2 : 0), y = r * (256 / rows);
+          c.fillStyle = 'rgba(' + (110 + Math.random() * 50 | 0) + ',' + (110 + Math.random() * 50 | 0) + ',' + (110 + Math.random() * 50 | 0) + ',1)';
+          c.fillRect(x, y, 256 / cols - 2, 256 / rows - 2);
+          c.fillStyle = 'rgba(40,40,40,.9)'; c.fillRect(x, y + 256 / rows - 3, 256 / cols - 2, 2);
+        }
+      }
+    }
+    return hc;
+  }
+  function normalFromHeight(hc, strength) {
+    const w = hc.width, h = hc.height;
+    const src = hc.getContext('2d').getImageData(0, 0, w, h).data;
+    const out = document.createElement('canvas'); out.width = w; out.height = h;
+    const oc = out.getContext('2d');
+    const img = oc.createImageData(w, h);
+    const H = (x, y) => {
+      x = (x + w) % w; y = (y + h) % h;
+      return src[(y * w + x) * 4] / 255;
+    };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const dx = (H(x + 1, y) - H(x - 1, y)) * strength;
+        const dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+        const len = Math.sqrt(dx * dx + dy * dy + 1);
+        const i = (y * w + x) * 4;
+        img.data[i] = ((-dx / len) * .5 + .5) * 255;
+        img.data[i + 1] = ((dy / len) * .5 + .5) * 255;   // three 里绿通道朝上
+        img.data[i + 2] = ((1 / len) * .5 + .5) * 255;
+        img.data[i + 3] = 255;
+      }
+    }
+    oc.putImageData(img, 0, 0);
+    const tex = new T.CanvasTexture(out);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    return tex;
   }
 
   /* ---------- 作物几何体（v2：细节加强） ---------- */
@@ -625,14 +705,61 @@
         if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
           const comp = new T.EffectComposer(r);
           comp.addPass(new T.RenderPass(scene, cam));
-          const bloom = new T.UnrealBloomPass(new T.Vector2(w, h), .5, .65, .82);
+          const bloom = new T.UnrealBloomPass(new T.Vector2(w, h), .34, .55, .86);
           comp.addPass(bloom);
           this._composer = comp; this._bloom = bloom;
+          // God rays：径向模糊的屏幕空间体积光
+          try {
+            if (T.ShaderPass) {
+              const godraysShader = {
+                uniforms: {
+                  tDiffuse: { value: null },
+                  sunPos: { value: new T.Vector2(.72, .7) },
+                  weight: { value: 0.0 },
+                  decay: { value: 0.94 },
+                  density: { value: 0.55 },
+                  exposure: { value: 0.5 }
+                },
+                vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+                fragmentShader: [
+                  'uniform sampler2D tDiffuse;',
+                  'uniform vec2 sunPos;',
+                  'uniform float weight;',
+                  'uniform float decay;',
+                  'uniform float density;',
+                  'uniform float exposure;',
+                  'varying vec2 vUv;',
+                  'void main(){',
+                  '  vec3 base = texture2D(tDiffuse, vUv).rgb;',
+                  '  if (weight <= 0.001) { gl_FragColor = vec4(base, 1.0); return; }',
+                  '  vec2 delta = (vUv - sunPos) * density / 32.0;',
+                  '  vec2 uv = vUv;',
+                  '  vec3 acc = vec3(0.0);',
+                  '  float illum = 1.0;',
+                  '  for (int i = 0; i < 32; i++) {',
+                  '    uv -= delta;',
+                  '    vec3 s = texture2D(tDiffuse, uv).rgb;',
+                  '    float lum = dot(s, vec3(0.299, 0.587, 0.114));',
+                  '    acc += s * smoothstep(0.72, 1.0, lum) * illum;',
+                  '    illum *= decay;',
+                  '  }',
+                  '  vec3 col = base + acc * weight * exposure;',
+                  '  gl_FragColor = vec4(col, 1.0);',
+                  '}'
+                ].join('\n')
+              };
+              const gr = new T.ShaderPass(godraysShader);
+              gr.needsSwap = true;
+              comp.addPass(gr);
+              this._godrays = gr;
+            }
+          } catch (e) { console.warn('[Pano3D] godrays disabled', e); }
+
         }
       } catch (e) { console.warn('[Pano3D] bloom disabled', e); }
 
       // 雾/天空
-      scene.fog = new T.FogExp2(0x6a7280, 0.016);
+      scene.fog = new T.FogExp2(0x6a7280, 0.011);
       this._buildSky(scene);
       // 灯光
       this._hemi = new T.HemisphereLight(0x9fb4d0, 0x3a3226, .30);
@@ -696,34 +823,75 @@
       };
       addShadow(4.2, -8.5, 7, 5); addShadow(-7.5, -5.5, 6, 4.5); addShadow(8.6, -1.0, 5, 5);
       addShadow(.2, -10.5, 4, 3.5); addShadow(11.5, -9.0, 3.5, 3.5);
-      // 远景：废都剪影
-      this._ruins = new T.Group();
-      const ruinMat = new T.MeshStandardMaterial({ color: '#1c2228', roughness: 1 });
-      for (let i = 0; i < 70; i++) {
-        const bx = -48 + i * 1.5 + hash(i) * 1.6;
-        const bh = 3 + hash(i * 3.3) * 13;
-        const bw = 1.2 + hash(i * 5.1) * 2.6;
-        const b = new T.Mesh(new T.BoxGeometry(bw, bh, 1.4), ruinMat);
-        b.position.set(bx * 1.6, bh / 2, -72 - hash(i * 7.7) * 26);
-        b.rotation.y = (hash(i) - .5) * .3;
-        // 破损：顶部再叠一截偏移小方块
-        if (hash(i * 9.1) > .5) {
-          const top = new T.Mesh(new T.BoxGeometry(bw * .55, bh * .25, 1.0), ruinMat);
-          top.position.set(b.position.x + (hash(i) - .5) * bw * .5, bh + bh * .1, b.position.z);
-          top.rotation.y = b.rotation.y; this._ruins.add(top);
+      // ===== 程序化山体（三层山脊，越远越淡）=====
+      const ridge = (z, col, amp, seed, baseY) => {
+        const N = 140;
+        const pos = [];
+        const idx = [];
+        const height = (x) => {
+          const n = Math.sin(x * .021 + seed) * .5 + Math.sin(x * .057 + seed * 2.1) * .26 + Math.sin(x * .131 + seed * 3.7) * .12;
+          return baseY + amp * (.52 + .48 * n);
+        };
+        for (let i = 0; i <= N; i++) {
+          const x = -170 + (340 * i / N);
+          pos.push(x, height(x), z);
+          pos.push(x, -8, z);
         }
+        for (let i = 0; i < N; i++) {
+          const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
+          idx.push(a, b, c, b, d, c);
+        }
+        const g = new T.BufferGeometry();
+        g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        const mat = new T.MeshBasicMaterial({ color: col, side: T.DoubleSide, fog: true });
+        const mesh = new T.Mesh(g, mat);
+        mesh.frustumCulled = false;
+        this._scene.add(mesh);
+        return mesh;
+      };
+      this._mountains = new T.Group();
+      const m1 = ridge(-76, 0x1b2228, 16, 1.7, -1);
+      const m2 = ridge(-104, 0x232b31, 23, 4.3, -1);
+      const m3 = ridge(-134, 0x2b3339, 30, 8.1, -2);
+      this._mountainMeshes = [m1, m2, m3];
+      // 山脚残留工业剪影（少量废都感，不抢山体）
+      const ruinMat = new T.MeshStandardMaterial({ color: '#232a30', roughness: 1 });
+      this._ruins = new T.Group();
+      for (let i = 0; i < 18; i++) {
+        const side = i % 2 ? 1 : -1;
+        const bx = side * (26 + hash(i * 2.7) * 42);
+        const bh = 3 + hash(i * 3.3) * 6;
+        const bw = 1.4 + hash(i * 5.1) * 2.4;
+        const b = new T.Mesh(new T.BoxGeometry(bw, bh, 1.2), ruinMat);
+        b.position.set(bx, bh / 2, -68 - hash(i * 7.7) * 6);
         this._ruins.add(b);
       }
-      scene.add(this._ruins);
+      this._scene.add(this._ruins);
 
-      // 远山（压住地平线）
-      const hillMat = new T.MeshStandardMaterial({ color: '#3a3e38', roughness: 1 });
-      for (let i = 0; i < 8; i++) {
-        const hill = new T.Mesh(new T.SphereGeometry(14 + hash(i) * 10, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hillMat);
-        hill.position.set(-55 + i * 16, -.5, -78 - hash(i * 3) * 12);
-        hill.scale.set(1, .16 + hash(i) * .1, .6);
-        this._scene.add(hill);
-      }
+      // ===== 雾层（三层横向软雾带，缓慢漂移）=====
+      const fogTex = canvasTex(512, 128, (c, w, h) => {
+        const g = c.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, 'rgba(210,212,205,0)');
+        g.addColorStop(.45, 'rgba(214,216,208,.55)');
+        g.addColorStop(.6, 'rgba(218,220,212,.6)');
+        g.addColorStop(1, 'rgba(214,216,208,0)');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 90; i++) {
+          c.fillStyle = 'rgba(230,232,225,' + (.04 + Math.random() * .08) + ')';
+          c.beginPath(); c.ellipse(Math.random() * w, h * (.3 + Math.random() * .4), 30 + Math.random() * 70, 6 + Math.random() * 10, 0, 0, 7); c.fill();
+        }
+      });
+      this._fogLayers = [];
+      const fogSpec = [[-46, 7.5, 200, 26, .34], [-70, 10, 240, 34, .30], [-95, 13, 300, 44, .26]];
+      fogSpec.forEach(([z, y, w, h, op], i) => {
+        const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: fogTex, transparent: true, opacity: op, depthWrite: false, fog: false }));
+        m.position.set(0, y, z);
+        m.userData = { baseX: 0, speed: .35 + i * .22, op };
+        this._fogLayers.push(m);
+        this._scene.add(m);
+      });
       // 枯树 / 石头 / 栅栏
       for (let i = 0; i < 10; i++) {
         const t = deadTree(.8 + hash(i) * 1.3);
@@ -1097,7 +1265,7 @@
       this._buildings.house.traverse(o => { if (o.material && o.material.emissive && o.material.emissiveIntensity !== undefined && o.material.emissive.r > .8) winMats.push(o.material); });
       winMats.forEach(m => { m.emissiveIntensity = nightF * .9; });
       const gh = this._buildings.greenhouse.userData.glowMat;
-      if (gh) gh.emissiveIntensity = (lv('greenhouse') >= 2 ? .9 : .15) * (nightF > 0 ? 1.2 : .6);
+      if (gh) gh.emissiveIntensity = (lv('greenhouse') >= 2 ? .5 : .1) * (nightF > 0 ? .7 : .45);
       const lab = this._buildings.lab.userData.blink;
       if (lab) lab.material.emissiveIntensity = (Math.sin(t * 3.2) > .5 ? 2.4 : .2);
       // 火焰/灰烬轻飘
@@ -1120,6 +1288,25 @@
       this._camera.position.y = lerp(this._camera.position.y, targetY, .06);
       this._camera.position.z = lerp(this._camera.position.z, targetZ, .06);
       this._camera.lookAt(center);
+      // god rays：把太阳投影到屏幕空间，按视线/天气/时段调权重
+      if (this._godrays) {
+        const gv = this._sunDisc.position.clone().project(this._camera);
+        const inView = gv.z < 1 && Math.abs(gv.x) < 1.25 && Math.abs(gv.y) < 1.25;
+        const dayF = Math.max(0, Math.sin(sunAngle));
+        const weatherF = wk === 'clear' ? 1 : wk === 'cloud' ? .45 : wk === 'fog' ? .3 : .18;
+        const gu = this._godrays.uniforms;
+        gu.sunPos.value.set(gv.x * .5 + .5, gv.y * .5 + .5);
+        gu.weight.value = (inView && !ph.night) ? (0.30 + 0.45 * dayF) * weatherF : 0;
+      }
+      // 雾层漂移 / 透明度随天气
+      if (this._fogLayers) {
+        const fogOp = { clear: .55, cloud: .7, rain: .85, heavy_rain: .95, storm: 1.0, fog: 1.7, snow: .9 }[wk] || .6;
+        this._fogLayers.forEach((m, i) => {
+          m.position.x = Math.sin(t * .012 + i * 2.0) * 22;
+          const nightF2 = ph.night ? .55 : 1;
+          m.material.opacity = m.userData.op * fogOp * nightF2;
+        });
+      }
       // 水面微波
       if (this._water) { this._water.material.roughness = .16 + Math.sin(t * .8) * .04; }
       if (this._composer) this._composer.render();
