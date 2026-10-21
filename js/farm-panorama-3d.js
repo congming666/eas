@@ -284,6 +284,48 @@
     return tex;
   }
 
+
+  /* ---------- 几何合并（降低 draw call，软件/核显下帧率关键） ---------- */
+  function mergeGeometries(geos) {
+    const names = ['position', 'normal', 'uv'];
+    const merged = new T.BufferGeometry();
+    for (const name of names) {
+      const ok = geos.every(g => g.attributes[name]);
+      if (!ok) continue;
+      const itemSize = geos[0].attributes[name].itemSize;
+      let total = 0;
+      geos.forEach(g => total += g.attributes[name].array.length);
+      const out = new Float32Array(total);
+      let off = 0;
+      geos.forEach(g => { out.set(g.attributes[name].array, off); off += g.attributes[name].array.length; });
+      merged.setAttribute(name, new T.BufferAttribute(out, itemSize));
+    }
+    return merged;
+  }
+  function mergeMeshes(root) {
+    root.updateMatrixWorld(true);
+    const buckets = new Map();
+    root.traverse(o => {
+      if (!o.isMesh || o.isSkinnedMesh) return;
+      const m = o.material;
+      if (!m || Array.isArray(m)) return;
+      const sig = [m.type, m.color ? m.color.getHexString() : '', m.roughness, m.metalness, m.map ? m.map.uuid : '', m.emissive ? m.emissive.getHexString() : ''].join('|');
+      let g = o.geometry.clone();
+      if (g.index) g = g.toNonIndexed();
+      g.applyMatrix4(o.matrixWorld);
+      for (const name of Object.keys(g.attributes)) if (['position', 'normal', 'uv'].indexOf(name) < 0) g.deleteAttribute(name);
+      if (!buckets.has(sig)) buckets.set(sig, { mat: m, geos: [] });
+      buckets.get(sig).geos.push(g);
+    });
+    const out = new T.Group();
+    buckets.forEach(({ mat, geos }) => {
+      const mesh = new T.Mesh(mergeGeometries(geos), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      out.add(mesh);
+    });
+    return out;
+  }
+
   /* ---------- 作物几何体（v2：细节加强） ---------- */
   function cropGroup(kind) {
     const g = new T.Group();
@@ -705,7 +747,7 @@
         if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
           const comp = new T.EffectComposer(r);
           comp.addPass(new T.RenderPass(scene, cam));
-          const bloom = new T.UnrealBloomPass(new T.Vector2(w, h), .34, .55, .86);
+          const bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .34, .55, .86);
           comp.addPass(bloom);
           this._composer = comp; this._bloom = bloom;
           // God rays：径向模糊的屏幕空间体积光
@@ -872,7 +914,7 @@
         b.position.set(bx, bh / 2, -68 - hash(i * 7.7) * 6);
         this._ruins.add(b);
       }
-      this._scene.add(this._ruins);
+      this._scene.add(mergeMeshes(this._ruins));
 
       // ===== 雾层（三层横向软雾带，缓慢漂移）=====
       const fogTex = canvasTex(512, 128, (c, w, h) => {
@@ -897,21 +939,30 @@
         this._scene.add(m);
       });
       // 枯树 / 石头 / 栅栏
-      for (let i = 0; i < 10; i++) {
-        const t = deadTree(.8 + hash(i) * 1.3);
-        const side = i % 2 ? 1 : -1;
-        t.position.set(side * (8 + hash(i * 3.1) * 9), 0, -6 + hash(i * 5.3) * 16);
-        t.rotation.y = hash(i) * 6.28;
-        scene.add(t);
+      {
+        const treeRoot = new T.Group();
+        for (let i = 0; i < 10; i++) {
+          const tr = deadTree(.8 + hash(i) * 1.3);
+          const side = i % 2 ? 1 : -1;
+          tr.position.set(side * (8 + hash(i * 3.1) * 9), 0, -6 + hash(i * 5.3) * 16);
+          tr.rotation.y = hash(i) * 6.28;
+          treeRoot.add(tr);
+        }
+        scene.add(mergeMeshes(treeRoot));
       }
-      for (let i = 0; i < 26; i++) {
-        const rk = rock(.2 + hash(i) * .5);
-        rk.position.set(-14 + hash(i * 2.1) * 28, 0, -8 + hash(i * 4.7) * 18);
-        rk.rotation.y = hash(i) * 6.28;
-        scene.add(rk);
+      {
+        const rockRoot = new T.Group();
+        for (let i = 0; i < 26; i++) {
+          const rk = rock(.2 + hash(i) * .5);
+          rk.position.set(-14 + hash(i * 2.1) * 28, 0, -8 + hash(i * 4.7) * 18);
+          rk.rotation.y = hash(i) * 6.28;
+          rockRoot.add(rk);
+        }
+        scene.add(mergeMeshes(rockRoot));
       }
       // 草丛（散布，增加细节）
       const grassMat = new T.MeshStandardMaterial({ color: '#6a7440', roughness: 1 });
+      const grassRoot = new T.Group();
       for (let i = 0; i < 140; i++) {
         const tuft = new T.Group();
         for (let k = 0; k < 3; k++) {
@@ -921,7 +972,7 @@
           tuft.add(blade);
         }
         tuft.position.set(-24 + hash(i * 2.3) * 46, 0, -12 + hash(i * 6.1) * 24);
-        this._scene.add(tuft);
+        grassRoot.add(tuft);
       }
       // ===== 农场道具与环境细节 =====
       const propWood = clampedTexMat('wood', '#8a6a4a', [1, 1], 1);
@@ -1046,14 +1097,19 @@
       csPlane(-5.6, 2.6, 2.4, 1.8);
       csPlane(-15.5, -5.5, 3.2, 3.2); csPlane(-18.5, -9.5, 3.0, 3.0);
       csPlane(1.1, -4.4, .9, .9); csPlane(6.6, -2.2, .9, .9);
+      this._scene.add(mergeMeshes(grassRoot));
       // 栅栏沿田边
       const fenceMat = clampedTexMat('wood', '#7a6244', [3, 1], 1);
-      for (let i = 0; i < 26; i++) {
-        const post = new T.Mesh(new T.BoxGeometry(.09, .9, .09), fenceMat);
-        post.position.set(-11 + i * .9, .45, 11.4); scene.add(post);
+      {
+        const fenceRoot = new T.Group();
+        for (let i = 0; i < 26; i++) {
+          const post = new T.Mesh(new T.BoxGeometry(.09, .9, .09), fenceMat);
+          post.position.set(-11 + i * .9, .45, 11.4); fenceRoot.add(post);
+        }
+        const rail = new T.Mesh(new T.BoxGeometry(23, .08, .08), fenceMat); rail.position.set(.7, .72, 11.4); fenceRoot.add(rail);
+        const rail2 = new T.Mesh(new T.BoxGeometry(23, .07, .07), fenceMat); rail2.position.set(.7, .4, 11.4); fenceRoot.add(rail2);
+        scene.add(mergeMeshes(fenceRoot));
       }
-      const rail = new T.Mesh(new T.BoxGeometry(23, .08, .08), fenceMat); rail.position.set(.7, .72, 11.4); scene.add(rail);
-      const rail2 = new T.Mesh(new T.BoxGeometry(23, .07, .07), fenceMat); rail2.position.set(.7, .4, 11.4); scene.add(rail2);
 
       // 河流（右侧）
       const water = new T.Mesh(new T.PlaneGeometry(16, 26), new T.MeshStandardMaterial({ color: 0x2a4a52, roughness: .18, metalness: .65 }));
@@ -1087,6 +1143,8 @@
         o.pitch = Math.max(-.35, Math.min(.35, o.pitch + (e.clientY - o.lastY) * .002));
         o.lastX = e.clientX; o.lastY = e.clientY; o.idle = 0;
       });
+      this._renderer.shadowMap.autoUpdate = false;
+      this._renderer.shadowMap.needsUpdate = true;
       this._clock = new T.Clock();
       this._lastState = '';
       this._syncState(true);
@@ -1232,6 +1290,7 @@
       if (!force && key === this._lastState) return;
       this._lastState = key;
       const night = this._isNight();
+      this._renderer.shadowMap.needsUpdate = true;
       // 建筑等级
       const h = new T.Group();
       // 主屋等级 = 四建筑总级
@@ -1303,7 +1362,8 @@
         const cs = new T.Mesh(new T.PlaneGeometry(2.4, 2.1), new T.MeshBasicMaterial({ map: this._shadowTex, transparent: true, depthWrite: false }));
         cs.rotation.x = -Math.PI / 2; cs.position.set(x, .04, z);
         this._scene.add(cs); this._cropMeshes.push(cs);
-        this._scene.add(row); this._cropMeshes.push(row);
+        const mergedRow = mergeMeshes(row);
+        this._scene.add(mergedRow); this._cropMeshes.push(mergedRow);
         // 成熟金光
         if (plot.ready) {
           const l = new T.PointLight(0xffd27a, .7, 3.2); l.position.set(x, .9, z); this._scene.add(l); this._cropMeshes.push(l);
