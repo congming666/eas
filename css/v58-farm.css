@@ -284,3 +284,7 @@
   padding:3px 8px; font-size:11px; cursor:pointer; margin:2px;
 }
 .wh-empty{ text-align:center; color:#7a8aa0; padding:60px 0; }
+
+/* 3D 全景：2D canvas 隐藏后由 wrap 维持高度 */
+#farmHomestead .hs-pano-wrap.pano3d{aspect-ratio:2.4/1;height:auto;min-height:220px;}
+#farmHomestead .hs-pano-wrap.pano3d canvas#v58Panorama3D{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:3;}

@@ -428,6 +428,20 @@
         '<div id="farmGuideBar"></div>' +
         '<div class="hs-chips" id="v58HsChips"></div>';
     }
+    if (window.FarmPanorama3D && !document.getElementById('pano3dBtn')) {
+      const tb = hs.querySelector('.hs-titlebar');
+      if (tb) {
+        const b = document.createElement('button');
+        b.id = 'pano3dBtn';
+        b.title = '切换 3D / 2D 全景';
+        b.style.cssText = 'margin-left:auto;padding:2px 9px;font-size:11px;border-radius:6px;border:1px solid rgba(185,209,138,.35);background:rgba(255,255,255,.06);color:#cfe6a0;cursor:pointer;';
+        const sync = () => { b.textContent = (window.FarmPanorama3D.isEnabled && window.FarmPanorama3D.isEnabled()) ? '3D' : '2D'; };
+        sync();
+        b.addEventListener('click', (e) => { e.stopPropagation(); window.FarmPanorama3D.toggle(); sync(); });
+        tb.appendChild(b);
+      }
+    }
+    if (window.FarmPanorama3D) { try { FarmPanorama3D.attach(hs); } catch (e) {} }
     return hs;
   }
 
@@ -594,6 +608,12 @@
   (function loop(now = 0) {
     if (!document.hidden && farmVisible()) {
       try { ensureCultBed(); ensurePanorama(); } catch (e) {}
+      if (window.FarmPanorama3D && FarmPanorama3D.present()) {
+        try { FarmPanorama3D.frame(now); } catch (e) {}
+        if (now - lastChipFrame >= 300) { lastChipFrame = now; try { refreshChips(); } catch (e) {} }
+        requestAnimationFrame(loop);
+        return;
+      }
       let pixiFrame = false;
       if (window.FarmPixi && FarmPixi.enabled) {
         if (!FarmPixi.ready && !pixiInitTried) { pixiInitTried = true; FarmPixi.lazyInit(); }
