@@ -766,11 +766,15 @@
       scene.add(this._hemi);
       const sun = new T.DirectionalLight(0xffd2a0, 2.2);
       sun.castShadow = true;
-      sun.shadow.mapSize.set(1024, 1024);
-      sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
-      sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
-      sun.shadow.camera.far = 60;
-      sun.shadow.bias = -0.0004;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+      sun.shadow.camera.top = 26; sun.shadow.camera.bottom = -26;
+      sun.shadow.camera.far = 90;
+      sun.shadow.camera.near = 0.5;
+      sun.shadow.camera.updateProjectionMatrix();
+      sun.shadow.bias = -0.0006;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.radius = 2;
       sun.target.position.set(-2, 0, 2);
       scene.add(sun.target);
       sun.position.set(-10, 16, -14);
@@ -919,6 +923,129 @@
         tuft.position.set(-24 + hash(i * 2.3) * 46, 0, -12 + hash(i * 6.1) * 24);
         this._scene.add(tuft);
       }
+      // ===== 农场道具与环境细节 =====
+      const propWood = clampedTexMat('wood', '#8a6a4a', [1, 1], 1);
+      const propRust = clampedTexMat('rust', '#7a6a58', [1, 1], .85, .2);
+      const propDark = new T.MeshStandardMaterial({ color: '#3a352c', roughness: 1 });
+      const addBarrel = (x, z, s) => {
+        const g = new T.Group();
+        const b = new T.Mesh(new T.CylinderGeometry(.28 * s, .26 * s, .72 * s, 10), propRust);
+        b.position.y = .36 * s; g.add(b);
+        for (const y of [.16, .58]) {
+          const ring = new T.Mesh(new T.TorusGeometry(.285 * s, .022 * s, 4, 12), propDark);
+          ring.rotation.x = Math.PI / 2; ring.position.y = y * s; g.add(ring);
+        }
+        g.position.set(x, 0, z); g.rotation.y = hash(x + z) * 6.28;
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        this._scene.add(g);
+      };
+      const addCrate = (x, z, s, ry) => {
+        const c = new T.Mesh(new T.BoxGeometry(.6 * s, .5 * s, .6 * s), propWood);
+        c.position.set(x, .25 * s, z); c.rotation.y = ry; c.castShadow = true;
+        this._scene.add(c);
+      };
+      addBarrel(-4.6, -3.2, 1); addBarrel(-4.1, -3.6, .85); addBarrel(5.6, -6.4, 1.1);
+      addBarrel(5.1, -6.9, .9); addBarrel(-8.6, 1.8, 1); addBarrel(9.2, -7.4, 1.05);
+      addCrate(2.2, -5.6, 1, .2); addCrate(2.7, -5.2, .9, -.3); addCrate(2.4, -5.0, .7, .5);
+      addCrate(-6.2, -2.6, 1.1, .1); addCrate(8.4, -3.4, .95, -.2);
+      // 断裂石墙
+      for (let i = 0; i < 14; i++) {
+        if (i % 5 === 4) continue;
+        const wall = new T.Mesh(new T.BoxGeometry(1.1, .5 + hash(i) * .25, .45), new T.MeshStandardMaterial({ color: '#4a463c', roughness: 1 }));
+        wall.position.set(-12.4 + i * 1.15, .3, 12.1); wall.rotation.y = (hash(i) - .5) * .08;
+        wall.castShadow = true; wall.receiveShadow = true;
+        this._scene.add(wall);
+      }
+      // 水塔
+      {
+        const tower = new T.Group();
+        for (const [dx, dz] of [[-.9, -.9], [.9, -.9], [-.9, .9], [.9, .9]]) {
+          const leg = new T.Mesh(new T.CylinderGeometry(.07, .1, 3.4, 5), propRust);
+          leg.position.set(dx, 1.7, dz); tower.add(leg);
+        }
+        const tank = new T.Mesh(new T.CylinderGeometry(.95, .95, 1.1, 12), propRust);
+        tank.position.y = 3.9; tower.add(tank);
+        const cap = new T.Mesh(new T.ConeGeometry(1.0, .45, 12), propDark);
+        cap.position.y = 4.55; tower.add(cap);
+        tower.position.set(-15.5, 0, -5.5);
+        tower.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        this._scene.add(tower);
+      }
+      // 筒仓
+      {
+        const silo = new T.Mesh(new T.CylinderGeometry(1.1, 1.1, 4.2, 14), clampedTexMat('rust', '#9a8a70', [2, 2], .8, .2));
+        silo.position.set(-18.5, 2.1, -9.5); silo.castShadow = true; this._scene.add(silo);
+        const dome = new T.Mesh(new T.SphereGeometry(1.12, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), propDark);
+        dome.position.set(-18.5, 4.2, -9.5); this._scene.add(dome);
+      }
+      // 板车（两轮）
+      {
+        const cart = new T.Group();
+        const bed = new T.Mesh(new T.BoxGeometry(1.5, .12, .9), propWood); bed.position.y = .62; cart.add(bed);
+        for (const side of [-1, 1]) {
+          const rail = new T.Mesh(new T.BoxGeometry(1.5, .3, .06), propWood);
+          rail.position.set(0, .8, side * .45); cart.add(rail);
+        }
+        for (const side of [-1, 1]) {
+          const wheel = new T.Mesh(new T.TorusGeometry(.42, .06, 6, 14), propDark);
+          wheel.position.set(-.2, .42, side * .55); wheel.rotation.y = Math.PI / 2; cart.add(wheel);
+        }
+        cart.position.set(-5.6, 0, 2.6); cart.rotation.y = .35;
+        cart.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        this._scene.add(cart);
+      }
+      // 路灯（夜里两盏暖光）
+      this._lampLights = [];
+      const addLamp = (x, z) => {
+        const post = new T.Mesh(new T.CylinderGeometry(.06, .09, 2.2, 6), propDark);
+        post.position.set(x, 1.1, z); post.castShadow = true; this._scene.add(post);
+        const arm = new T.Mesh(new T.BoxGeometry(.5, .06, .06), propDark);
+        arm.position.set(x + .22, 2.15, z); this._scene.add(arm);
+        const bulbMat = new T.MeshStandardMaterial({ color: '#ffcf8a', emissive: new T.Color('#ffb85a'), emissiveIntensity: 0, roughness: .4 });
+        const bulb = new T.Mesh(new T.BoxGeometry(.26, .2, .26), bulbMat);
+        bulb.position.set(x + .44, 2.02, z); this._scene.add(bulb);
+        const pl = new T.PointLight(0xffb85a, 0, 6.5);
+        pl.position.set(x + .44, 1.95, z); this._scene.add(pl);
+        this._lampLights.push({ mat: bulbMat, light: pl });
+      };
+      addLamp(1.1, -4.4); addLamp(6.6, -2.2);
+      // 土路 + 车辙
+      {
+        const pathTex = canvasTex(256, 256, (c, w, h) => {
+          c.fillStyle = '#6e5638'; c.fillRect(0, 0, w, h);
+          for (let i = 0; i < 1800; i++) {
+            c.fillStyle = Math.random() > .5 ? 'rgba(150,124,84,.25)' : 'rgba(40,28,16,.30)';
+            c.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 1 + Math.random() * 2);
+          }
+        });
+        pathTex.repeat.set(2, 10);
+        const road = new T.Mesh(new T.PlaneGeometry(3.0, 17), new T.MeshStandardMaterial({ map: pathTex, roughness: 1, color: 0x9a7a52 }));
+        road.rotation.x = -Math.PI / 2; road.position.set(3.4, .03, 3.6); road.receiveShadow = true;
+        this._scene.add(road);
+        const rutMat = new T.MeshBasicMaterial({ color: 0x4a3a24, transparent: true, opacity: .35, depthWrite: false });
+        for (const dx of [-.5, .5]) {
+          const rut = new T.Mesh(new T.PlaneGeometry(.16, 16), rutMat);
+          rut.rotation.x = -Math.PI / 2; rut.position.set(3.4 + dx, .045, 3.6);
+          this._scene.add(rut);
+        }
+      }
+      // 田块木桩边界（让 16 块地更可读）
+      for (let i = 0; i < 5; i++) {
+        const post = new T.Mesh(new T.BoxGeometry(.1, .5, .1), propWood);
+        post.position.set(-11.6 + i * 3.2, .25, 13.0); post.castShadow = true; this._scene.add(post);
+      }
+      // 道具接触阴影（保底落地感）
+      const csPlane = (x, z, sx, sz) => {
+        const m = new T.Mesh(new T.PlaneGeometry(sx, sz), new T.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: .85 }));
+        m.rotation.x = -Math.PI / 2; m.position.set(x, .05, z);
+        this._scene.add(m);
+      };
+      csPlane(-4.6, -3.2, 1.1, 1.0); csPlane(-4.1, -3.6, .9, .9); csPlane(5.6, -6.4, 1.2, 1.1);
+      csPlane(5.1, -6.9, 1.0, .9); csPlane(-8.6, 1.8, 1.1, 1.0); csPlane(9.2, -7.4, 1.2, 1.1);
+      csPlane(2.4, -5.3, 2.2, 1.8); csPlane(-6.2, -2.6, 1.4, 1.3); csPlane(8.4, -3.4, 1.2, 1.2);
+      csPlane(-5.6, 2.6, 2.4, 1.8);
+      csPlane(-15.5, -5.5, 3.2, 3.2); csPlane(-18.5, -9.5, 3.0, 3.0);
+      csPlane(1.1, -4.4, .9, .9); csPlane(6.6, -2.2, .9, .9);
       // 栅栏沿田边
       const fenceMat = clampedTexMat('wood', '#7a6244', [3, 1], 1);
       for (let i = 0; i < 26; i++) {
@@ -1266,6 +1393,13 @@
       winMats.forEach(m => { m.emissiveIntensity = nightF * .9; });
       const gh = this._buildings.greenhouse.userData.glowMat;
       if (gh) gh.emissiveIntensity = (lv('greenhouse') >= 2 ? .5 : .1) * (nightF > 0 ? .7 : .45);
+      if (this._lampLights) {
+        this._lampLights.forEach((L, i) => {
+          const on = nightF > .05 ? 1 : 0;
+          L.mat.emissiveIntensity = on * (1.6 + Math.sin(t * 2 + i) * .15);
+          L.light.intensity = on * 1.5;
+        });
+      }
       const lab = this._buildings.lab.userData.blink;
       if (lab) lab.material.emissiveIntensity = (Math.sin(t * 3.2) > .5 ? 2.4 : .2);
       // 火焰/灰烬轻飘
@@ -1276,14 +1410,14 @@
       this._mouse.y = lerp(this._mouse.y, this._mouse.ty, .04);
       const o = this._orbit || { yaw: 0, pitch: 0, idle: 99 };
       o.idle = (o.idle || 0) + dt;
-      const autoYaw = -0.10 + Math.sin(t * .05) * .20 + Math.sin(t * .019) * .08;
+      const autoYaw = -0.04 + Math.sin(t * .045) * .16 + Math.sin(t * .021) * .06;
       const yaw = autoYaw + o.yaw;
       const pitch = Math.max(-.35, Math.min(.35, o.pitch + Math.sin(t * .03) * .015));
-      const center = new T.Vector3(0.8, 1.05, -2.5);
-      const R = 22.5;
+      const center = new T.Vector3(1.0, 1.15, -3.2);
+      const R = 20.5;
       const targetX = center.x + Math.sin(yaw) * R * Math.cos(pitch * .6) + this._mouse.x * 1.0;
       const targetZ = center.z + Math.cos(yaw) * R * Math.cos(pitch * .6);
-      const targetY = center.y + 3.3 + Math.sin(pitch) * 9 - this._mouse.y * .7;
+      const targetY = center.y + 2.9 + Math.sin(pitch) * 8 - this._mouse.y * .6;
       this._camera.position.x = lerp(this._camera.position.x, targetX, .06);
       this._camera.position.y = lerp(this._camera.position.y, targetY, .06);
       this._camera.position.z = lerp(this._camera.position.z, targetZ, .06);

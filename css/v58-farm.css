@@ -288,3 +288,28 @@
 /* 3D 全景：2D canvas 隐藏后由 wrap 维持高度 */
 #farmHomestead .hs-pano-wrap.pano3d{aspect-ratio:2.4/1;height:auto;min-height:220px;}
 #farmHomestead .hs-pano-wrap.pano3d canvas#v58Panorama3D{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:3;}
+
+/* 全景统计条（v5.9.10） */
+#farmHomestead .hs-stats{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  padding:7px 14px 2px; font-size:12px; color:#b9c9a8;
+}
+#farmHomestead .hs-stat{
+  display:inline-flex; align-items:center; gap:4px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(185,209,138,.22);
+  border-radius:999px; padding:2px 9px; line-height:1.5;
+}
+#farmHomestead .hs-stat b{ color:#e8d18a; font-weight:700; }
+#farmHomestead .hs-stat-hot{ border-color:#e8c86a; background:rgba(232,200,106,.14); }
+#farmHomestead .hs-stat-hot b{ color:#ffd76a; }
+#farmHomestead .hs-stat-env{ color:#9fc4d8; border-color:rgba(140,180,210,.3); }
+/* 3D 全景电影感压角 */
+#farmHomestead .hs-pano-wrap::after{
+  content:''; position:absolute; inset:0; z-index:4; pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(0,0,0,0) 52%, rgba(0,0,0,.26) 100%),
+    linear-gradient(180deg, rgba(255,224,180,.05), rgba(16,20,26,.10));
+}
+/* 统计更新时轻微脉冲 */
+@keyframes hsStatPulse{0%{transform:scale(1)}45%{transform:scale(1.06)}100%{transform:scale(1)}}
+#farmHomestead .hs-stat.hs-pulse{animation:hsStatPulse .32s ease;}

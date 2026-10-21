@@ -424,7 +424,9 @@
     if (!document.getElementById('v58Panorama')) {
       hs.innerHTML =
         '<div class="hs-titlebar">🏞️ 家园全景 · 实时联动<span class="hs-live">作物/建筑/天气</span></div>' +
+        '<div class="hs-stats" id="v58HsStats"></div>' +
         '<div class="hs-pano-wrap"><canvas id="v58PanoramaPixi"></canvas><canvas id="v58Panorama"></canvas></div>' +
+        '<div class="hs-stats" id="v58HsStats"></div>' +
         '<div id="farmGuideBar"></div>' +
         '<div class="hs-chips" id="v58HsChips"></div>';
     }
@@ -442,6 +444,7 @@
       }
     }
     if (window.FarmPanorama3D) { try { FarmPanorama3D.attach(hs); } catch (e) {} }
+    try { refreshStats(); } catch (e) {}
     return hs;
   }
 
@@ -561,6 +564,33 @@
   }
 
   /* ---------- 刷新数据 chips ---------- */
+  function refreshStats() {
+    const el = document.getElementById('v58HsStats');
+    if (!el) return;
+    const plots = GameState.farmPlots || [];
+    const n = Math.min(GameState.unlockedPlots || 16, plots.length || 16);
+    let planted = 0, ready = 0, empty = 0;
+    for (let i = 0; i < n; i++) {
+      const p = plots[i];
+      if (p && p.crop) { planted++; if (p.ready) ready++; } else empty++;
+    }
+    const bl = GameState.buildings || {};
+    const totalLv = ['workshop', 'greenhouse', 'barn', 'lab'].reduce((s, id) => s + (((bl[id] || {}).level) || 0), 0);
+    const w = (GameState.farmWeather && GameState.farmWeather.state) || 'clear';
+    const wName = { clear: '晴', cloud: '阴', rain: '雨', heavy_rain: '暴雨', storm: '雷暴', fog: '雾', snow: '雪' }[w] || '晴';
+    const sName = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' }[GameState.season] || '春';
+    const key = planted + '/' + ready + '/' + empty + '/' + totalLv;
+    if (el._k === key) return;
+    if (el._k) { el.classList.remove('hs-pulse'); void el.offsetWidth; el.classList.add('hs-pulse'); setTimeout(function () { el.classList.remove('hs-pulse'); }, 340); }
+    el._k = key;
+    el.innerHTML =
+      '<span class="hs-stat"><b>' + planted + '</b>/' + n + ' 已种</span>' +
+      '<span class="hs-stat' + (ready ? ' hs-stat-hot' : '') + '"><b>' + ready + '</b> 成熟</span>' +
+      '<span class="hs-stat"><b>' + empty + '</b> 空地</span>' +
+      '<span class="hs-stat">建筑 Lv<b>' + totalLv + '</b></span>' +
+      '<span class="hs-stat hs-stat-env">' + sName + '季 · ' + wName + '</span>';
+  }
+
   function refreshChips() {
     const el = document.getElementById('v58HsChips');
     if (!el) return;
@@ -610,7 +640,7 @@
       try { ensureCultBed(); ensurePanorama(); } catch (e) {}
       if (window.FarmPanorama3D && FarmPanorama3D.present()) {
         try { FarmPanorama3D.frame(now); } catch (e) {}
-        if (now - lastChipFrame >= 300) { lastChipFrame = now; try { refreshChips(); } catch (e) {} }
+        if (now - lastChipFrame >= 300) { lastChipFrame = now; try { refreshChips(); refreshStats(); } catch (e) {} }
         requestAnimationFrame(loop);
         return;
       }
@@ -624,13 +654,13 @@
           } catch (e) {}
           if (pixiFrame && now - lastChipFrame >= 300) {
             lastChipFrame = now;
-            try { refreshChips(); } catch (e) {}
+            try { refreshChips(); refreshStats(); } catch (e) {}
           }
         }
       }
       if (!pixiFrame && now - lastFarmFrame >= 100) {
         lastFarmFrame = now;
-        try { drawPanorama(); refreshChips(); } catch (e) {}
+        try { drawPanorama(); refreshChips(); refreshStats(); } catch (e) {}
       }
     }
     requestAnimationFrame(loop);
