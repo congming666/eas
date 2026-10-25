@@ -138,40 +138,83 @@
       return p;
     },
 
-    async _getMaterial(slotName, base) {
-      if (this._matLib[slotName]) return this._matLib[slotName];
-      const proc = EXP_MODELS.proceduralSlots[slotName];
-      let mat;
-      if (proc) {
-        mat = new T.MeshStandardMaterial({
-          color: 0xffffff, roughness: proc.roughness == null ? 0.85 : proc.roughness, metalness: 0.0,
-        });
-        if (proc.type === 'emissive') {
-          // 水晶自发光：绿/紫按槽名取色，对齐 LowPolyArt crystal emission
-          const em = slotName.indexOf('green') >= 0 ? 0x9dffb0 : 0xb69cff;
-          mat.color.setHex(slotName.indexOf('green') >= 0 ? 0x2e6b46 : 0x3a2f63);
-          mat.emissive = new T.Color(em);
-          mat.emissiveIntensity = proc.emissiveStrength || 1.2;
-          mat.roughness = proc.roughness == null ? 0.25 : proc.roughness;
-        }
-      } else {
-        const dir = base + 'textures/' + slotName + '/';
-        const [map, normalMap, orm] = await Promise.all([
-          this._loadTexture(dir + 'albedo.jpg', true),
-          this._loadTexture(dir + 'normal.png', false),
-          this._loadTexture(dir + 'orm.png', false),
-        ]);
-        mat = new T.MeshStandardMaterial({
-          map, normalMap,
-          roughnessMap: orm, metalnessMap: orm, aoMap: orm,
-          roughness: 1.0, metalness: 1.0,           // 系数必须为 1，否则贴图通道被清零
-          normalScale: new T.Vector2(1, 1),
-          envMapIntensity: 0.6,
-        });
-        mat.aoMapIntensity = 1.0;
+    _resolveLib(id, slotName) {
+      const rw = window.EXP_REWORK;
+      if (rw && rw.slotMap && rw.slotMap[id]) {
+        const lib = rw.slotMap[id][slotName];
+        if (lib) return { lib, rw: true, key: 'rw:' + lib };
       }
-      mat.name = 'pbr_' + slotName;
-      this._matLib[slotName] = mat;
+      return { lib: slotName, rw: false, key: 'old:' + slotName };
+    },
+
+    async _getMaterial(id, slotName, base) {
+      const info = this._resolveLib(id, slotName);
+      if (this._matLib[info.key]) return this._matLib[info.key];
+      let mat;
+      if (info.rw) {
+        mat = await this._buildReworkMaterial(info.lib, base);
+      } else {
+        const proc = EXP_MODELS.proceduralSlots[slotName];
+        if (proc) {
+          mat = new T.MeshStandardMaterial({
+            color: 0xffffff, roughness: proc.roughness == null ? 0.85 : proc.roughness, metalness: 0.0,
+          });
+          if (proc.type === 'emissive') {
+            const em = slotName.indexOf('green') >= 0 ? 0x9dffb0 : 0xb69cff;
+            mat.color.setHex(slotName.indexOf('green') >= 0 ? 0x2e6b46 : 0x3a2f63);
+            mat.emissive = new T.Color(em);
+            mat.emissiveIntensity = proc.emissiveStrength || 1.2;
+            mat.roughness = proc.roughness == null ? 0.25 : proc.roughness;
+          }
+        } else {
+          const dir = base + 'textures/' + slotName + '/';
+          const [map, normalMap, orm] = await Promise.all([
+            this._loadTexture(dir + 'albedo.jpg', true),
+            this._loadTexture(dir + 'normal.png', false),
+            this._loadTexture(dir + 'orm.png', false),
+          ]);
+          mat = new T.MeshStandardMaterial({
+            map, normalMap,
+            roughnessMap: orm, metalnessMap: orm, aoMap: orm,
+            roughness: 1.0, metalness: 1.0,
+            normalScale: new T.Vector2(1, 1),
+            envMapIntensity: 0.6,
+          });
+          mat.aoMapIntensity = 1.0;
+        }
+      }
+      mat.name = 'pbr_' + info.lib;
+      this._matLib[info.key] = mat;
+      return mat;
+    },
+
+    async _buildReworkMaterial(lib, base) {
+      const rw = window.EXP_REWORK;
+      // 与 GLB/旧纹理一致，基于 _assetBase() 推导，保证任意页面深度（含子目录测试页）可加载
+      const dir = base + 'rework-tex/' + lib + '/';
+      const em = rw.emissive && rw.emissive[lib];
+      const [map, normalMap, orm] = await Promise.all([
+        this._loadTexture(dir + 'albedo.jpg', true),
+        this._loadTexture(dir + 'normal.png', false),
+        this._loadTexture(dir + 'orm.png', false),
+      ]);
+      const mat = new T.MeshStandardMaterial({
+        map, normalMap,
+        roughnessMap: orm, metalnessMap: orm, aoMap: orm,
+        roughness: 1.0, metalness: 1.0,
+        normalScale: new T.Vector2(1, 1),
+        envMapIntensity: em ? 0.9 : 0.7,
+      });
+      mat.aoMapIntensity = 1.0;
+      if (em) {
+        // 能量晶体/符文：基色压暗，自发光走 Bloom；低粗糙带通透感
+        mat.color.setHex(em.baseColor || 0x202020);
+        mat.emissive = new T.Color(em.color);
+        mat.emissiveIntensity = em.strength || 2.0;
+        mat.emissiveMap = map;
+        mat.roughness = em.roughness == null ? 0.2 : em.roughness;
+        mat.metalness = 0.0;
+      }
       return mat;
     },
 
@@ -184,7 +227,7 @@
       // 按 GLB 材质名替换为共享 PBR 材质；并补 uv2 给 aoMap
       const slotSet = meta.materialSlots || [];
       const matByIndex = {};
-      await Promise.all(slotSet.map(async (slot) => { matByIndex[slot] = await this._getMaterial(slot, base); }));
+      await Promise.all(slotSet.map(async (slot) => { matByIndex[slot] = await this._getMaterial(id, slot, base); }));
       scene.traverse((obj) => {
         if (!obj.isMesh) return;
         obj.castShadow = true;
