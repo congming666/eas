@@ -579,6 +579,26 @@
     const w = (GameState.farmWeather && GameState.farmWeather.state) || 'clear';
     const wName = { clear: '晴', cloud: '阴', rain: '雨', heavy_rain: '暴雨', storm: '雷暴', fog: '雾', snow: '雪' }[w] || '晴';
     const sName = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' }[GameState.season] || '春';
+    // 全景右上角"可收 N 格"角标（成熟时脉冲提示）
+    try {
+      const wrap = document.querySelector('.hs-pano-wrap');
+      if (wrap) {
+        let badge = document.getElementById('panoReadyBadge');
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.id = 'panoReadyBadge';
+          badge.className = 'pano-ready-badge';
+          wrap.appendChild(badge);
+        }
+        if (ready > 0) {
+          badge.textContent = '🌾 可收 ' + ready + ' 格';
+          badge.style.display = 'flex';
+        } else {
+          badge.textContent = '';
+          badge.style.display = 'none';
+        }
+      }
+    } catch (e) {}
     const key = planted + '/' + ready + '/' + empty + '/' + totalLv;
     if (el._k === key) return;
     if (el._k) { el.classList.remove('hs-pulse'); void el.offsetWidth; el.classList.add('hs-pulse'); setTimeout(function () { el.classList.remove('hs-pulse'); }, 340); }

@@ -34,6 +34,15 @@ const PixiEntities = {
   async init() {
     if (!window.PIXI || this.app) return;
     if (typeof CONFIG === 'undefined') return;
+    // 2026-10-24 根因修复：浏览器在 file:// 下把每个本地文件视为不透明源，
+    // WebGL 上传本地图片纹理时 texImage2D 会抛 SecurityError（cross-origin data），
+    // 导致 Pixi 实体层崩掉、玩家/野怪一起不可见。file:// 下直接走 2D 实体渲染。
+    if (location.protocol === 'file:') {
+      this.ready = false;
+      this.enabled = false;
+      console.info('[PixiEntities] file:// 禁止 WebGL 上传本地图片纹理，实体使用 2D 渲染；用本地 HTTP 服务可启用 Pixi。');
+      return;
+    }
     const host = document.getElementById('gameContainer');
     const gc = document.getElementById('gameCanvas');
     if (!host || !gc) return;
@@ -196,11 +205,13 @@ const PixiEntities = {
       const key = 'plant:' + this._id(p); seen.add(key);
       this._syncDecor(key, exp, 'plant', p);
     });
-    (exp.obstaclesByY || []).forEach(o => {
-      if (o.fxOnly) return;
-      const key = 'obstacle:' + this._id(o); seen.add(key);
-      this._syncDecor(key, exp, 'obstacle', o);
-    });
+    if (!exp._terrainOn3D) {
+      (exp.obstaclesByY || []).forEach(o => {
+        if (o.fxOnly) return;
+        const key = 'obstacle:' + this._id(o); seen.add(key);
+        this._syncDecor(key, exp, 'obstacle', o);
+      });
+    }
     if (exp.fxWalls) exp.fxWalls.forEach(o => {
       const key = 'wallfx:' + this._id(o); seen.add(key);
       this._syncDecor(key, exp, 'wallfx', o);
@@ -353,7 +364,7 @@ const PixiEntities = {
   },
 
   _updateCreature(w, obj, kind, exp) {
-    if (kind === 'player' && typeof PlayerSkel !== 'undefined') {
+    if (kind === 'player' && typeof PlayerSkel !== 'undefined' && PlayerSkel.ENABLED !== false) {
       const sp = PlayerSkel.pose(obj);
       if (sp) { this._updatePlayerSkel(w, obj, exp, sp); return; }
     }
@@ -376,14 +387,15 @@ const PixiEntities = {
     // 基础位置（含 visualZ 腾空、击退）
     const lift = obj.visualZ || 0;
     const kx = obj.knockX || 0, ky = obj.knockY || 0;
-    w.cont.position.set(obj.x + kx, obj.y + ky * .45 - lift);
+    const _elev = (exp && exp.getElevationPx) ? exp.getElevationPx(obj.x, obj.y) : 0;
+    w.cont.position.set(obj.x + kx, obj.y + ky * .45 - lift - _elev);
     w.cont.zIndex = obj.y;
 
     // 阴影（独立、不随动作；扁平、随腾空淡出）
     const shR = kind === 'player' ? 40 : (obj.type === 'boss' ? 70 : 30);
     w.shadow.width = shR * 2.2 * elite * depth;
     w.shadow.height = shR * 1.1 * elite * depth;
-    w.shadow.position.set(0, 2);
+    w.shadow.position.set(0, 2 + _elev);
     w.shadow.alpha = Math.max(.08, .4 - lift * .004);
 
     // 朝向翻转（立绘面朝左：cos(facing)>0 向右 → flip）
@@ -512,7 +524,8 @@ const PixiEntities = {
     const depth = exp.getDepthScale ? exp.getDepthScale(obj.y) : 1;
     const lift = obj.visualZ || 0;
     const kx = obj.knockX || 0, ky = obj.knockY || 0;
-    w.cont.position.set(obj.x + kx, obj.y + ky * .45 - lift);
+    const _elev = (exp && exp.getElevationPx) ? exp.getElevationPx(obj.x, obj.y) : 0;
+    w.cont.position.set(obj.x + kx, obj.y + ky * .45 - lift - _elev);
     w.cont.zIndex = obj.y;
 
     // 影子随步伐呼吸：支撑瞬间最大、抬脚时收小
@@ -520,12 +533,12 @@ const PixiEntities = {
     const shR = 40;
     w.shadow.width = shR * 2.2 * depth * shPulse;
     w.shadow.height = shR * 1.1 * depth * shPulse;
-    w.shadow.position.set(0, 2);
+    w.shadow.position.set(0, 2 + _elev);
     w.shadow.alpha = Math.max(.08, .4 * shPulse - lift * .004);
 
     const scale = (124 / 256) * depth;
     w.skel.scale.set(scale);
-    w.skel.position.set(-128 * scale + (pose.sway || 0) * scale, -250 * scale);
+    w.skel.position.set(-128 * scale + (pose.sway || 0), -250 * scale);
     PlayerSkel.applyPixi({ body: w.skelBody, legs: w.skelLegs }, pose);
 
     // 转向过渡：上一层方向的残影 0.07s 交叉淡出
@@ -628,7 +641,8 @@ const PixiEntities = {
       w.signature = signature;
       this._captureDecor(w, exp, kind, obj);
     }
-    w.sp.position.set(obj.x, obj.y);
+    const _elev = (exp && exp.getElevationPx) ? exp.getElevationPx(obj.x, obj.y) : 0;
+    w.sp.position.set(obj.x, obj.y - _elev);
     w.sp.zIndex = obj.y;
     w.sp.visible = true;
   },

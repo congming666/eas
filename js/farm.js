@@ -55,6 +55,11 @@
         const cost = this.getUnlockCost(idx);
         cell.classList.add('locked');
         if (idx === GameState.unlockedPlots) cell.classList.add('next-unlock');
+        // 资源够了就高亮"可扩建"，把首扩建提示前置到格子上
+        try {
+          const fiberHave = (typeof Warehouse !== 'undefined' && Warehouse.getCount) ? Warehouse.getCount('fiber') : 0;
+          if (idx === GameState.unlockedPlots && GameState.gold >= cost.gold && fiberHave >= (cost.fiber || 0)) cell.classList.add('can-unlock');
+        } catch (e) {}
         cell.dataset.idx = idx; cell.dataset.act = 'lock';
         cell.innerHTML = `<div class="plot-lock">🔒<div class="plot-cost">${idx === GameState.unlockedPlots ? `💰${cost.gold}${cost.fiber ? ` · 🌾纤维×${cost.fiber}` : ''}` : '依次扩建'}</div></div>`;
         cell.onclick = () => this.unlockPlot(idx);
@@ -185,10 +190,20 @@
     if (existing) { existing.remove(); return; }
     const unlocked = CONFIG.crops.filter(c => GameState.unlockedCrops.includes(c.id));
     const seeds = Warehouse.getCount('seeds');
+    const sortMode = this._cropSort || (function () { try { return localStorage.getItem('farmCropSort') || 'default'; } catch (e) { return 'default'; } })();
+    const sortOpts = [['default', '默认'], ['gold', '金币效率'], ['mat', '材料效率'], ['cult', '修为效率'], ['fast', '生长最快']]
+      .map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sortMode ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
     let html = `<section class="crop-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="cropPickerTitle">
-      <header class="crop-picker-header"><div><h3 id="cropPickerTitle">选择作物</h3><p>每块农田消耗 1 份通用种子</p></div><span class="crop-seed-count">可用种子 <b>${seeds}</b></span><button class="crop-picker-close" aria-label="关闭" onclick="document.getElementById('cropPickerOverlay').remove()">×</button></header><div class="crop-picker-list">`;
-    unlocked.forEach(crop => {
-      html += `<article class="crop-picker-row"><div class="crop-picker-icon">${crop.icon}</div><div class="crop-picker-info"><strong>${crop.name}</strong><div class="crop-picker-meta">${crop.growTime} 秒成熟 · ${crop.rewardType === 'oil' ? '植物油 ×'+crop.oilQty : crop.rewardLabel || '收获作物'}</div><div class="crop-picker-yield">${this.materialYield(crop.id).join(' · ') || crop.description || '可出售或用于加工'}</div></div><button class="secondary-btn crop-plant-action" ${seeds < 1 ? 'disabled' : ''} onclick="Farm.plantFromPicker(${idx}, '${crop.id}')">${seeds < 1 ? '缺少种子' : '种植'}</button></article>`;
+      <header class="crop-picker-header"><div><h3 id="cropPickerTitle">选择作物</h3><p>每块农田消耗 1 份通用种子 · 效率按单块地连续种植估算</p></div><span class="crop-sort-wrap">排序 <select id="cropSortSel" onchange="Farm.setCropSort(this.value, ${idx})">${sortOpts}</select></span><span class="crop-seed-count">可用种子 <b>${seeds}</b></span><button class="crop-picker-close" aria-label="关闭" onclick="document.getElementById('cropPickerOverlay').remove()">×</button></header><div class="crop-picker-list">`;
+    const rows = unlocked.map(crop => ({ crop: crop, eff: this.cropEfficiency(crop) }));
+    if (sortMode === 'gold') rows.sort((a, b) => b.eff.goldPerMin - a.eff.goldPerMin);
+    else if (sortMode === 'mat') rows.sort((a, b) => b.eff.matPerMin - a.eff.matPerMin);
+    else if (sortMode === 'cult') rows.sort((a, b) => b.eff.cultPerMin - a.eff.cultPerMin);
+    else if (sortMode === 'fast') rows.sort((a, b) => (a.crop.growTime || 0) - (b.crop.growTime || 0));
+    rows.forEach(({ crop, eff }) => {
+      const gpm = (eff.goldPerMin >= 0 ? '+' : '') + eff.goldPerMin;
+      const effTxt = '⏱ ' + crop.growTime + 's · 💰 ' + gpm + '/分 · 📦 ' + eff.matPerMin + '/分' + (eff.cultPerMin ? ' · 🧘 ' + eff.cultPerMin + ' 修为/分' : '');
+      html += `<article class="crop-picker-row"><div class="crop-picker-icon">${crop.icon}</div><div class="crop-picker-info"><strong>${crop.name}</strong><div class="crop-picker-meta">${crop.growTime} 秒成熟 · ${crop.rewardType === 'oil' ? '植物油 ×'+crop.oilQty : crop.rewardLabel || '收获作物'}</div><div class="crop-picker-eff">${effTxt}</div><div class="crop-picker-yield">${this.materialYield(crop.id).join(' · ') || crop.description || '可出售或用于加工'}</div></div><button class="secondary-btn crop-plant-action" ${seeds < 1 ? 'disabled' : ''} onclick="Farm.plantFromPicker(${idx}, '${crop.id}')">${seeds < 1 ? '缺少种子' : '种植'}</button></article>`;
     });
     html += '</div></section>';
     const overlay = document.createElement('div');
@@ -207,6 +222,29 @@
         else if (!e.shiftKey && document.activeElement === buttons.at(-1)) { e.preventDefault(); buttons[0].focus(); }
       }
     });
+  },
+
+  // 选种排序：记住玩家偏好
+  setCropSort(mode, idx) {
+    this._cropSort = mode;
+    try { localStorage.setItem('farmCropSort', mode); } catch (e) {}
+    const ov = document.getElementById('cropPickerOverlay');
+    if (ov) ov.remove();
+    this.showCropPicker(idx);
+  },
+
+  // 单块地效率：金币/分钟、材料期望/分钟、修为/分钟（不计品质、土地等级与特性加成）
+  cropEfficiency(crop) {
+    const grow = Math.max(1, Number(crop.growTime) || 1);
+    const seed = Number(crop.seedPrice) || 0;
+    const sell = Number(crop.sellPrice) || 0;
+    const goldPerMin = Math.round((sell - seed) * 60 / grow * 10) / 10;
+    let matPerMin = 0;
+    const mats = (CONFIG.cropMaterials && CONFIG.cropMaterials[crop.id]) || [];
+    mats.forEach(m => { matPerMin += (Number(m[1]) || 0) * (Number(m[2]) || 1); });
+    matPerMin = Math.round(matPerMin * 60 / grow * 10) / 10;
+    const cultPerMin = Math.round((Number(crop.cultivation) || 0) * 60 / grow * 10) / 10;
+    return { goldPerMin: goldPerMin, matPerMin: matPerMin, cultPerMin: cultPerMin };
   },
 
   // ===== v5.1 作物产出说明（材料数据来自 CONFIG.cropMaterials，由 v5.js 注册）=====
@@ -586,15 +624,13 @@
     if (this._mapTierFilter == null) this._mapTierFilter = _selMap ? _selMap.tier : 1;
     const _tier = this._mapTierFilter;
     const _tabBar = document.createElement('div');
-    _tabBar.style.cssText = 'grid-column:1/-1;display:flex;gap:6px;';
+    _tabBar.className = 'prep-tabs';
     [1, 2, 3, 4].forEach(t => {
       const _b = document.createElement('button');
       _b.type = 'button';
-      _b.textContent = 'T' + t;
-      _b.style.cssText = 'flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-weight:700;border:1px solid '
-        + (t === _tier ? '#f2d28a' : 'rgba(255,255,255,.18)') + ';background:'
-        + (t === _tier ? 'rgba(242,210,138,.16)' : 'rgba(255,255,255,.04)') + ';color:'
-        + (t === _tier ? '#f2d28a' : '#cdd');
+      _b.className = 'prep-tab' + (t === _tier ? ' active' : '');
+      _b.textContent = 'T' + t;                       // 保持纯文本 "T3"，兼容既有测试/读屏
+      _b.dataset.rank = ['低危', '中危', '高危', '极危'][t - 1] || '';
       _b.onclick = () => { this._mapTierFilter = t; this.renderMapSelect(); };
       _tabBar.appendChild(_b);
     });
@@ -602,12 +638,11 @@
 
     // 随机地图按钮
     const randDiv = document.createElement('div');
-    randDiv.className = 'map-option map-random';
-    randDiv.style.cssText = 'border:2px dashed #f2d28a;background:rgba(242,210,138,0.08);cursor:pointer;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;';
+    randDiv.className = 'map-card map-random map-option';
     randDiv.innerHTML = `
-      <div style="font-size:32px;">🎲</div>
-      <div style="font-weight:700;color:#f2d28a;font-size:14px;">随机地图</div>
-      <div style="font-size:11px;color:#aab;">从 T${_tier} 随机一张</div>
+      <div class="map-random-icon">🎲</div>
+      <div class="map-card-name">随机地图</div>
+      <div class="map-card-meta"><span>从 T${_tier} 随机一张</span></div>
     `;
     randDiv.onclick = () => {
       const affordable = CONFIG.maps.filter(m => m.tier === _tier && GameState.gold >= m.entryFee);
@@ -621,21 +656,20 @@
     CONFIG.maps.filter(m => m.tier === _tier).forEach(map => {
       const div = document.createElement('div');
       const locked = GameState.gold < map.entryFee;
-      div.className = 'map-option' + (GameState.selectedMap === map.id ? ' selected' : '') + (locked ? ' locked' : '');
-      div.style.cssText += ';position:relative;overflow:hidden;';
-      const thumb = map.bgImage ? `<img src="${map.bgImage}" style="position:absolute;top:0;left:0;width:100%;height:60%;object-fit:cover;opacity:0.85;z-index:0;" onerror="this.style.display='none'"/>` : '';
+      div.className = 'map-card map-option' + (GameState.selectedMap === map.id ? ' selected' : '') + (locked ? ' locked' : '');
+      const thumb = map.bgImage ? `<div class="map-thumb" style="background-image:url('${map.bgImage}')"></div>` : '<div class="map-thumb map-thumb-plain"></div>';
       const modifierTag = map.modifier && map.modifier !== '标准'
-        ? `<div style="display:inline-block;margin-top:4px;padding:2px 8px;background:rgba(255,120,80,0.2);border:1px solid #ff8866;border-radius:10px;font-size:11px;color:#ffaa88;">⚡ ${map.modifier}</div>`
+        ? `<span class="map-mod">${map.modifier}</span>`
         : '';
       div.innerHTML = `
         ${thumb}
-        <div style="position:relative;z-index:1;background:linear-gradient(transparent,rgba(0,0,0,0.85) 40%);padding-top:60px;">
-          <div class="map-name">T${map.tier} ${map.name} <span style="font-size:12px;color:#ff8866;">[${map.danger}]</span></div>
-          ${modifierTag}
-          <div class="map-info">
-            <span style="display:inline-flex;align-items:center;gap:3px;">${(typeof CropArt!=='undefined')?CropArt.dom('coin','',15):''} ${map.entryFee}</span>
-            <span><span style="display:inline-flex;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle,#c0392b,#7b1f15);color:#ffd9d2;font-size:9px;font-weight:700;align-items:center;justify-content:center;vertical-align:-2px;">敌</span> ${map.monsterCount}</span>
-            <span><span style="display:inline-flex;width:15px;height:15px;border-radius:3px;background:linear-gradient(135deg,#a9772f,#6e4c18);color:#ffe2ae;font-size:9px;font-weight:700;align-items:center;justify-content:center;vertical-align:-2px;">箱</span> ${map.chestCount}</span>
+        <div class="map-card-body">
+          <div class="map-card-name"><span class="map-tier">T${map.tier}</span>${map.name}</div>
+          <div class="map-card-tags"><span class="map-danger t${map.tier}">${map.danger}</span>${modifierTag}</div>
+          <div class="map-card-meta">
+            <span title="入场费">💰 ${map.entryFee}</span>
+            <span title="怪物数量">⚔ ${map.monsterCount}</span>
+            <span title="宝箱数量">📦 ${map.chestCount}</span>
           </div>
         </div>
       `;
@@ -663,6 +697,9 @@
       <div style="color:#f2d28a;font-size:15px;font-weight:700;margin-bottom:7px;">T${map.tier} · ${map.name}</div>
       <div>${environments[map.tier - 1]}</div>
       <div style="margin-top:9px;color:#d7e9df;">环境威胁：${3 + map.tier * 2}–${5 + map.tier * 3} 个陷阱 · 水域/泥地减速 · T${map.tier >= 3 ? map.tier : 3} 起出现持续伤害区域</div>
+      <div class="terrain-codex" style="margin-top:8px;padding-top:7px;border-top:1px dashed #3a4130;color:#b9a87a;font-size:11px;line-height:1.7;">
+        <b style="color:#d9cba6;">地形战斗</b>：浅水（雷 +35% / 火 -30% / 潮湿）· 泥地（陷足禁冲刺 / 击退 -30%）· 密林（近战 +10% / 远程 -15% / 隐蔽）· 废墟（掩体远程 -35%）· 高地（视野 +25% / 射程 +15% / 暴击 +8%）
+      </div>
     `;
   },
 
@@ -750,9 +787,9 @@
       container.appendChild(div);
       return div;
     };
-    const grpHdr = (txt) => { const h = document.createElement('div'); h.style.cssText='grid-column:1/-1;width:100%;color:#cfe6a0;font-weight:bold;font-size:13px;margin:10px 0 2px;'; h.textContent=txt; container.appendChild(h); };
+    const grpHdr = (txt) => { const h = document.createElement('div'); h.className = 'loadout-group-title'; h.textContent = txt; container.appendChild(h); };
     const carriedTypes = Object.keys(GameState.loadout).filter(k => (GameState.loadout[k] || 0) > 0).length;
-    grpHdr('携带消耗品（最多 6 种，每种最多 5 个，火把计入种类；Q 草药 · E 信号弹 · R 道具转盘，当前 ' + carriedTypes + '/6 种）');
+    grpHdr('Q 草药 · E 信号弹 · R 道具转盘 · 当前 ' + carriedTypes + '/6 种');
     const owned = CONFIG.consumables.filter(i => Warehouse.getCount(i.id) > 0 || (GameState.loadout[i.id] || 0) > 0);
     (this.showUnavailableSupplies ? CONFIG.consumables : owned).forEach(i => container.appendChild(mkLoadoutSlot(i, !!i.key)));
     if (!owned.length && !this.showUnavailableSupplies) grpHdr('暂无可携带补给，可先返回农场领取补给或前往仓库查看。');

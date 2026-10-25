@@ -313,3 +313,50 @@
 /* 统计更新时轻微脉冲 */
 @keyframes hsStatPulse{0%{transform:scale(1)}45%{transform:scale(1.06)}100%{transform:scale(1)}}
 #farmHomestead .hs-stat.hs-pulse{animation:hsStatPulse .32s ease;}
+
+/* ===== P0：选种效率/排序、可扩建提示、成熟角标（2026-10-22）===== */
+.crop-picker-eff{font-size:12px;color:#cfe0a8;margin-top:3px;line-height:1.55;letter-spacing:.2px;}
+.crop-picker-header .crop-sort-wrap{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#b9c8bd;margin-left:auto;white-space:nowrap;}
+.crop-sort-wrap select{background:#1d2a20;color:#d8e4c8;border:1px solid #43583f;border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;}
+.crop-sort-wrap select:focus{outline:1px solid #9bbf68;}
+#farmScreen .farm-cell.locked.can-unlock{opacity:1!important;border-color:#ffd76a!important;animation:unlockPulse 1.6s ease-in-out infinite;}
+@keyframes unlockPulse{0%,100%{box-shadow:0 0 0 1px rgba(255,215,106,.3),inset 0 0 12px rgba(255,215,106,.12);}50%{box-shadow:0 0 0 3px rgba(255,215,106,.75),inset 0 0 22px rgba(255,215,106,.28);}}
+#farmHomestead .hs-pano-wrap .pano-ready-badge{position:absolute;top:8px;right:10px;z-index:4;display:none;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:linear-gradient(135deg,#ffe08a,#e0a83a);color:#2a2010;font-size:12px;font-weight:800;box-shadow:0 2px 12px rgba(0,0,0,.45),0 0 0 1px rgba(120,80,20,.35);animation:panoReadyPulse 1.8s ease-in-out infinite;pointer-events:none;}
+@keyframes panoReadyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}
+
+
+/* 2026-10-23 3D 作物成熟期特效：立绘呼吸高光 + 星屑 + 柔光 */
+#farmGrid .crop-visual { position: relative; }
+#farmGrid .farm-cell .crop-visual.ready img.crop-3d-art {
+  animation: crop3dReadyPulse 2.6s ease-in-out infinite;
+}
+@keyframes crop3dReadyPulse {
+  0%, 100% { filter: brightness(1.12) saturate(1.08) drop-shadow(0 0 4px rgba(255,246,222,.45)) drop-shadow(0 2px 2px rgba(0,0,0,.45)); }
+  50%      { filter: brightness(1.24) saturate(1.16) drop-shadow(0 0 9px rgba(255,224,140,.7)) drop-shadow(0 2px 2px rgba(0,0,0,.45)); }
+}
+#farmGrid .farm-cell .crop-visual.ready::before {
+  content: "";
+  position: absolute;
+  inset: 4% 6% 10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,235,170,.22), rgba(255,235,170,0) 68%);
+  animation: crop3dHalo 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+#farmGrid .farm-cell .crop-visual.ready::after {
+  content: "✦";
+  position: absolute;
+  right: 4%;
+  top: -2%;
+  font-size: 12px;
+  color: #ffe7a8;
+  text-shadow: 0 0 6px rgba(255,207,90,.95);
+  animation: crop3dSparkle 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes crop3dHalo { 0%, 100% { opacity: .35; transform: scale(.94); } 50% { opacity: .8; transform: scale(1.04); } }
+@keyframes crop3dSparkle {
+  0%, 100% { opacity: 0; transform: translateY(3px) scale(.7) rotate(0deg); }
+  40% { opacity: 1; transform: translateY(-5px) scale(1.15) rotate(18deg); }
+  70% { opacity: .25; transform: translateY(-2px) scale(.9) rotate(28deg); }
+}

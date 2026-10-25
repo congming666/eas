@@ -190,21 +190,12 @@ Object.assign(Expedition.prototype, {
       if (Math.cos(monster.facing || 0) < 0) ctx.scale(-1, 1);
       ctx.drawImage(creatureSprite, -drawSize * .5, -drawSize * .67, drawSize, drawSize);
       ctx.restore();
-      if (monster.attackAnim > 0 && this.fxSprites) {
-        const fxMap = { treant: 'treant', gargoyle: 'gargoyle', shadow_demon: 'shadow', boar: 'boar', boar_king: 'boar' };
-        const fxKey = fxMap[monster.type];
-        if (fxKey) {
-          const img = this.fxSprites[fxKey];
-          if (img && img.naturalWidth) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = Math.min(1, monster.attackAnim * 5);
-            const fw = drawSize * 1.1;
-            const fh = fw * img.naturalHeight / img.naturalWidth;
-            ctx.drawImage(img, sx - fw/2, sy - fh/2, fw, fh);
-            ctx.restore();
-          }
-        }
+      if (monster.attackAnim > 0) {
+        // 怪物攻击：程序化新月刃（不再用 mobfx JPEG 贴图），朝向玩家
+        const toP = Math.atan2((this.player.y - monster.y) || .001, (this.player.x - monster.x) || .001);
+        const ATK_COL = { treant: '#9fd86a', gargoyle: '#c2a8ff', shadow_demon: '#b48aff', boar: '#ff9a6a', boar_king: '#ffb066' };
+        this.drawSlashArc(ctx, sx, sy - drawSize * .28, toP, ATK_COL[monster.type] || '#ff9a6a',
+          drawSize * .5, Math.min(1, monster.attackAnim * 5), 1 - Math.min(1, monster.attackAnim / .3), 1);
       }
       ctx.restore();
       const barW = monster.elite ? 54 : 44, barY = sy - drawSize * .52;
@@ -397,7 +388,7 @@ Object.assign(Expedition.prototype, {
 
   renderHero(ctx, sx, sy) {
     // 骨骼版：真实立绘切成身体+双腿，按步态相位旋转
-    if (typeof PlayerSkel !== 'undefined') {
+    if (typeof PlayerSkel !== 'undefined' && PlayerSkel.ENABLED !== false) {
       const sp = PlayerSkel.pose(this.player);
       if (sp) {
         const depth = this.getDepthScale(this.player.y);
@@ -908,12 +899,17 @@ Object.assign(Expedition.prototype, {
     }
     // v3.5 植物改由下方 Y-sort 统一绘制（避免双绘）
     // this.renderPlants(ctx, cam);
-    // 地形：Pixi（WebGL）层可用时由其合成（纹理+水面位移着色器），
-    // 2D 画布只保留实体/特效/迷雾做透明叠加；不可用时走原 2D chunk 路径
-    this._terrainOnPixi = !!(window.PixiTerrain && PixiTerrain.enabled && PixiTerrain.render(this, cam));
-    if (this._terrainOnPixi) {
-      // 地形已由 Pixi 层绘制
+    // 地形：3D（three.js 正交地表）优先 → Pixi 平面地形 → 2D chunk 三级回退
+    this._terrainOn3D = !!(window.Terrain3D && Terrain3D.render && Terrain3D.render(this, cam));
+    if (this._terrainOn3D) {
+      // 3D 地表已绘制；Pixi 平面分块地形必须停用，避免盖在 3D 上
+      this._terrainOnPixi = true;
+      if (!this._pixiTerrainCleared) { this._pixiTerrainCleared = true; if (window.PixiTerrain && PixiTerrain.clear) PixiTerrain.clear(); }
     } else {
+      this._pixiTerrainCleared = false;
+      this._terrainOnPixi = !!(window.PixiTerrain && PixiTerrain.enabled && PixiTerrain.render(this, cam));
+    }
+    if (!this._terrainOn3D && !this._terrainOnPixi) {
       this.renderTerrain(ctx, cam);
     }
     ctx.textAlign = 'center';
@@ -1598,6 +1594,61 @@ Object.assign(Expedition.prototype, {
     }
     ctx.restore();
   },
+  // 程序化新月刀光：玩家挥砍 / 怪物攻击共用（颜色、大小、方向、进度可调）
+  drawSlashArc(ctx, x, y, angle, color, size, alpha, t, dir = 1) {
+    const a = Math.max(0, Math.min(1, alpha || 0));
+    if (a <= 0.001) return;
+    const sweep = (1.85 + t * 0.35) * dir;
+    const outerR = size * (1.05 + t * 0.22);
+    const innerR = outerR * 0.56;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle || 0);
+    ctx.globalCompositeOperation = 'lighter';
+    // 新月刃体：外弧 + 内弧反向闭合，两端自然收尖
+    ctx.beginPath();
+    ctx.arc(0, 0, outerR, -sweep / 2, sweep / 2, dir < 0);
+    ctx.arc(0, 0, innerR, sweep / 2, -sweep / 2, dir > 0);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(0, 0, innerR, 0, 0, outerR);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(.55, color || '#f2c45b');
+    g.addColorStop(1, 'rgba(255,255,255,.92)');
+    ctx.fillStyle = g;
+    ctx.globalAlpha = a * .5;
+    ctx.fill();
+    // 外缘柔光
+    ctx.globalAlpha = a * .55;
+    ctx.strokeStyle = color || '#f2c45b';
+    ctx.lineWidth = size * .12;
+    ctx.beginPath();
+    ctx.arc(0, 0, outerR, -sweep / 2, sweep / 2, dir < 0);
+    ctx.stroke();
+    // 白热内刃
+    ctx.globalAlpha = a * .95;
+    ctx.strokeStyle = 'rgba(255,252,240,.95)';
+    ctx.lineWidth = Math.max(1.6, size * .05);
+    ctx.beginPath();
+    ctx.arc(0, 0, outerR * .74, -sweep * .42, sweep * .42, dir < 0);
+    ctx.stroke();
+    // 刀尖星屑
+    for (let e = 0; e < 2; e++) {
+      const ang = (sweep / 2) * (e === 0 ? 1 : -1);
+      const rx = Math.cos(ang) * outerR * .95, ry = Math.sin(ang) * outerR * .95;
+      ctx.globalAlpha = a * .85;
+      const tip = ctx.createRadialGradient(rx, ry, 0, rx, ry, size * .2);
+      tip.addColorStop(0, 'rgba(255,255,245,.95)');
+      tip.addColorStop(.4, color || '#f2c45b');
+      tip.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = tip;
+      ctx.beginPath();
+      ctx.arc(rx, ry, size * .2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+
   renderParticles(ctx, cam) {
     // 粒子
     this.particles.forEach(p => {
@@ -1664,33 +1715,8 @@ Object.assign(Expedition.prototype, {
         ctx.restore();
         ctx.globalAlpha = 1;
       } else if (p.type === 'slash') {
-        const slashImg = this.fxSprites && this.fxSprites.slash;
-        if (slashImg && slashImg.naturalWidth) {
-          ctx.save();
-          ctx.translate(sx, sy);
-          ctx.rotate(p.angle);
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.globalAlpha = alpha;
-          const dw = p.size * 2.4;
-          const dh = dw * slashImg.naturalHeight / slashImg.naturalWidth;
-          ctx.drawImage(slashImg, -dw/2, -dh/2, dw, dh);
-          ctx.restore();
-        } else {
-          const dir = p.dir || 1;
-          ctx.save();
-          ctx.translate(sx, sy);
-          ctx.rotate(p.angle);
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.lineCap = 'round';
-          ctx.strokeStyle = p.color;
-          ctx.globalAlpha = alpha;
-          ctx.lineWidth = 5;
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size, -Math.PI / 3 * dir, Math.PI / 3 * dir);
-          ctx.stroke();
-          ctx.restore();
-        }
-        ctx.globalAlpha = 1;
+        // 程序化刀光（新月刃 + 白热内刃 + 刀尖星屑），不再加载 fire_slash 贴图
+        this.drawSlashArc(ctx, sx, sy, p.angle, p.color, p.size, alpha, 1 - alpha, p.dir || 1);
       } else if (p.type === 'warn') {
         // Boss 蓄力警示：头顶上浮闪烁的感叹号
         ctx.save();

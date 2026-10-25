@@ -2,6 +2,40 @@
 (function () {
   'use strict';
 
+  // 2026-10-23 作物 3D 阶段立绘：由 tools/crop3d 离线渲染（幼苗→成熟 5 帧），
+  // 让每种作物在田里都有独立的 3D 造型与生长过程；图缺失时回退旧 2D 插画。
+  const STAGE3D_SIZE = [30, 38, 46, 56, 66];
+  const stage3dImgs = {};
+  function stage3dImg(cropId, stage) {
+    const k = cropId + '_s' + stage;
+    let im = stage3dImgs[k];
+    if (!im) {
+      im = new Image();
+      im.src = 'assets/crops/stages/' + k + '.png?v=5.9.46';
+      im.alt = '';
+      stage3dImgs[k] = im;
+    }
+    return im;
+  }
+  function stage3dHtml(cropId, stage, icon, index) {
+    // UI 阶段 1..4 → 精灵阶段：1 发芽=s0，2 幼苗=s1，3 开花=s3，4 结果=s4
+    const sp = stage <= 1 ? 0 : stage === 2 ? 1 : stage === 3 ? 3 : 4;
+    const im = stage3dImg(cropId, sp);
+    if (!im.complete || !im.naturalWidth) return null;
+    const sz = STAGE3D_SIZE[sp];
+    // 确定性个体差异：同一张精灵按格子索引镜像/缩放/微旋转，整片田不显得克隆
+    let h = 0;
+    for (let i = 0; i < cropId.length; i++) h = (h * 31 + cropId.charCodeAt(i)) >>> 0;
+    const v = (h + (index | 0) * 37) % 9;
+    const sc = (0.94 + (v % 4) * 0.028).toFixed(3);
+    const rot = ((v - 4) * 1.6).toFixed(1);
+    const flip = (v % 2 === 0) ? 1 : -1;
+    return '<img class="crop-3d-art" data-stage="' + sp + '" data-variant="' + v + '" src="' + im.src + '" alt="' + icon + '" style="width:' +
+      sz + 'px;height:auto;display:inline-block;vertical-align:middle;max-height:' + (sz + 6) +
+      'px;object-fit:contain;transform:scaleX(' + flip + ') rotate(' + rot + 'deg) scale(' + sc + ');transform-origin:50% 92%;' +
+      'filter:drop-shadow(0 0 4px rgba(255,246,222,.45)) drop-shadow(0 2px 2px rgba(0,0,0,.45));" />';
+  }
+
   const CropRenderExt = {
     // 渲染单个农田格子（支持4阶段+品质+组合效果）
     renderPlot(plot, index, element) {
@@ -46,11 +80,15 @@
       const statusBadge = plot.status && STATUS_ICONS[plot.status] ? `<div class="plot-status">${STATUS_ICONS[plot.status]}</div>` : '';
 
       // v3.5 用真实图片替换 emoji（按阶段缩放大小）
-      const stageSizes = [28, 18, 22, 26, 30];
+      const stageSizes = [40, 28, 34, 42, 50];
       const imgSize = stageSizes[stage] || 28;
-      const cropArt = (typeof CropArt !== 'undefined' && CropArt.ready(crop.id))
-        ? CropArt.dom(crop.id, stageIcon, imgSize)
-        : `<span class="crop-icon stage-${stage}">${stageIcon}</span>`;
+      // 2026-10-23 优先 3D 阶段立绘（每作物独立造型 + 真实生长过程）
+      const art3d = stage3dHtml(crop.id, stage, stageIcon, index);
+      const cropArt = art3d
+        ? art3d
+        : ((typeof CropArt !== 'undefined' && CropArt.ready(crop.id))
+          ? CropArt.dom(crop.id, stageIcon, imgSize)
+          : `<span class="crop-icon stage-${stage}">${stageIcon}</span>`);
 
       element.innerHTML = `
         <div class="crop-visual ${ready ? 'ready' : ''} ${needsWater ? 'thirsty' : ''} ${hasPest ? 'diseased' : ''}"
@@ -139,7 +177,9 @@
   // 注入CSS
   function injectCSS() {
     const css = `
-      .crop-visual { position: relative; font-size: 24px; line-height: 1; transition: transform 0.2s; }
+      .crop-visual { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 24px; line-height: 1; transition: transform 0.2s; }
+      .crop-visual img { filter: drop-shadow(0 2px 2px rgba(0,0,0,.65)) contrast(1.06) saturate(1.04); max-width: 78% !important; max-height: 76% !important; }
+      .plot-empty { font-size: 20px; font-weight: 700; color: #34261a; opacity: .5; text-shadow: 0 1px 0 rgba(255,255,255,.06); }
       .crop-visual.ready { animation: cropBounce 1s ease-in-out infinite; }
       .crop-visual.thirsty { filter: brightness(0.6) sepia(0.3); }
       .crop-visual.diseased { filter: hue-rotate(60deg) brightness(0.7); }

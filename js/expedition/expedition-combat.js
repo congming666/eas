@@ -470,6 +470,10 @@ Object.assign(Expedition.prototype, {
       const p = this.plants[i];
       p.age += dt;
       if (p.growTimer > 0) { p.growTimer -= dt; continue; }
+      this._activePlant = p;
+      const _pt = this.getTerrainAt(p.x, p.y);
+      if (p._baseRange === undefined) p._baseRange = p.range;
+      p.range = p._baseRange * (_pt.id === 'highland' ? 1.15 : 1);
       p.cd -= dt;
       // 各种效果
       switch (p.effect) {
@@ -597,6 +601,7 @@ Object.assign(Expedition.prototype, {
           break;
         }
       }
+      this._activePlant = null;
       // 植物血量
       if (p.hp <= 0) this.plants.splice(i, 1);
     }
@@ -1808,7 +1813,8 @@ Object.assign(Expedition.prototype, {
     // v5.8.2 固定点拦截波：撤离点的开门声同样惊动掠食者（轻量：3+tier 只、单波、无中段增援）。
     // 没有它，89% 的撤离走固定点零威胁（160局实测 fixed 0死亡），"最后100米"对多数局不存在
     else this.spawnSignalAmbush(0, { intercept: true });
-    showToast(type === 'signal' ? '信号弹撤离启动！坚持20秒，伏击正在逼近！' : '开始撤离读条，坚持15秒！', 'warning');
+    const _extSec = Math.round(type === 'signal' ? CONFIG.expedition.signalExtractTime : CONFIG.expedition.extractTime);
+    showToast(type === 'signal' ? `信号弹撤离启动！坚持${_extSec}秒，伏击正在逼近！` : `开始撤离读条，坚持${_extSec}秒！`, 'warning');
     // v1.6 撤离启动音：三音上行电报式提示（此前静默开始读条，玩家常没意识到已进入撤离阶段）
     if (typeof AudioManager !== 'undefined' && AudioManager.playExtractStart) AudioManager.playExtractStart();
     this.allySay('extract');   // v1.9 游侠撤离台词
@@ -2294,8 +2300,9 @@ Object.assign(Expedition.prototype, {
     // v2.0 武器等级：暴击率加成（镰刀Lv6 +10%、飞刃Lv6 +15%）
     const critBonus = (fromPlayer && this.weapon && this.weapon.critChanceBonus) ? this.weapon.critChanceBonus : 0;
     const _affixCrit = fromPlayer && this.syn && this.syn.critChance ? this.syn.critChance : 0;
-    const critBase = (fromPlayer && hitInfo && hitInfo.crit !== false) ? (0.20 + critBonus + _affixCrit) : 0;
+    const critBase = (fromPlayer && hitInfo && hitInfo.crit !== false) ? (0.20 + critBonus + _affixCrit + (this._terrainCritBonus || 0)) : 0;
     const isCrit = !quiet && (hitInfo?.crit === true || (critBase > 0 && Math.random() < critBase));
+    this._terrainCritBonus = 0;
     if (isCrit) {
       let critMult = 1.8;
       if (fromPlayer && this.weapon && this.weapon.critDmgBonus) critMult += this.weapon.critDmgBonus;
@@ -2388,6 +2395,7 @@ Object.assign(Expedition.prototype, {
       this.critFlash = Math.max(this.critFlash, 0.2);
       AudioManager.playCritHit();
       this.pushCombatFeedback('暴击', '#ffd968', target.x, target.y);
+      if (window.JuiceFX) { try { JuiceFX.onCrit(this, target, { hitX, hitY }); } catch (e) {} }
     }
     if (hitInfo && hitInfo.element) this.pushCombatFeedback(`${hitInfo.element === 'fire' ? '火焰' : hitInfo.element === 'ice' ? '冰霜' : hitInfo.element === 'lightning' ? '雷电' : '附魔'}`, color, target.x, target.y, .65);
     if (hitInfo && hitInfo.countered) this.pushCombatFeedback('克制', '#8affd8', target.x, target.y, .75);
@@ -2560,7 +2568,7 @@ Object.assign(Expedition.prototype, {
           const wa = m.windupAngle || 0;
           if (m.windupKind === 'ranged') {
             const p = this.allocProjectile();
-            Object.assign(p, { x: m.x, y: m.y, vx: Math.cos(wa) * 320, vy: Math.sin(wa) * 320, damage: m.damage, life: 2, fromMonster: true, fromAmbush: !!m.signalAmbush, radius: 6, monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644' });
+            Object.assign(p, { x: m.x, y: m.y, vx: Math.cos(wa) * 320, vy: Math.sin(wa) * 320, damage: m.damage, life: 2, fromMonster: true, ranged: true, fromAmbush: !!m.signalAmbush, radius: 6, monsterType: m.type, color: m.type === 'spider' ? '#9bea55' : '#ff6644' });
             p.hit = p.hit || []; p.hit.length = 0;
             this.projectiles.push(p);
             m.attackAnim = 0.3;
@@ -2589,7 +2597,7 @@ Object.assign(Expedition.prototype, {
       }
       // v2.0 减速到期
       if (m.slowUntil && performance.now() > m.slowUntil) { m.slow = 0; m.slowUntil = 0; }
-      const slowMul = m.slow > 0 ? clamp(1 - m.slow, 0.35, 1) : 1;
+      const slowMul = (m.slow > 0 ? clamp(1 - m.slow, 0.35, 1) : 1) * (m._terrainSlow || 1);
       if (m.stunned > 0) return;
 
       const d = dist(m, this.player);
@@ -2921,8 +2929,10 @@ Object.assign(Expedition.prototype, {
 
       if (t.state === 'player') {
         // 攻击怪物
-        let nearest = null, minD = t.range;
-        this.entitySpatialHash.queryCircle(t.x, t.y, t.range).forEach(m => {
+        const _tTerr = this.getTerrainAt(t.x, t.y);
+        const _tRange = t.range * (_tTerr.id === 'highland' ? 1.15 : 1);
+        let nearest = null, minD = _tRange;
+        this.entitySpatialHash.queryCircle(t.x, t.y, _tRange).forEach(m => {
           if (!this.monsters.includes(m)) return;
           const d = dist(t, m);
           if (d < minD) { minD = d; nearest = m; }
@@ -2932,9 +2942,10 @@ Object.assign(Expedition.prototype, {
           if (d < minD) { minD = d; nearest = r; }
         });
         if (nearest) {
-          this.damageEnemy(nearest, t.damage * (this.beastWave.active ? 2.15 : 1), '#8affb5', false, {
+          const _tDmg = t.damage * (this.beastWave.active ? 2.15 : 1) * (_tTerr.id === 'water' ? 1.2 : 1);
+          this.damageEnemy(nearest, _tDmg, '#8affb5', false, {
             x: t.x, y: t.y, angle: Math.atan2(nearest.y - t.y, nearest.x - t.x),
-            weaponId: '', fromPlayer: false
+            weaponId: '', fromPlayer: false, element: _tTerr.id === 'water' ? 'lightning' : null
           });
           t.attackCd = this.beastWave.active ? 0.42 : 0.72;
           const p = this.allocProjectile();
@@ -2950,7 +2961,7 @@ Object.assign(Expedition.prototype, {
       } else if (t.state === 'enemy') {
         // 攻击玩家
         if (dist(t, this.player) < t.range) {
-          this.damagePlayer(t.damage, t.monsterType ? t : { monsterType: 'tower', name: '防御塔' });
+          this.damagePlayer(t.damage, { x: t.x, y: t.y, type: 'tower', name: '防御塔', ranged: true });
           t.attackCd = 1.0;
         }
       }

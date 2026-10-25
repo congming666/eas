@@ -634,6 +634,108 @@ const AudioManager = {
   },
 
   // 资源到账"叮"：双音上行（飞行图标抵达资源栏时）
+
+  // ===== 农事环境音 / 额外交互音（v5.9.15）=====
+  playWaterSfx() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastWaterSfxAt || 0) < 0.08) return;
+    this._lastWaterSfxAt = now;
+    this.playNoise(0.18, 0.05, 1200, 'bandpass');
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(520, now);
+    o.frequency.exponentialRampToValueAtTime(220, now + 0.16);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.05, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    o.connect(g); g.connect(this.master);
+    o.start(now); o.stop(now + 0.2);
+  },
+  playFertilizeSfx() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastFertSfxAt || 0) < 0.08) return;
+    this._lastFertSfxAt = now;
+    this.playNoise(0.12, 0.05, 500, 'lowpass');
+    this.playTone(140, 0.12, 'sine', 0.05);
+  },
+  playOrderSfx() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    [660, 880, 1320].forEach((f, i) => {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, now + i * 0.07);
+      g.gain.exponentialRampToValueAtTime(0.055, now + i * 0.07 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.16);
+      o.connect(g); g.connect(this.master);
+      o.start(now + i * 0.07); o.stop(now + i * 0.07 + 0.18);
+    });
+  },
+  playUpgradeSfx() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    const now = this.ctx.currentTime;
+    this.playNoise(0.06, 0.06, 900, 'lowpass');
+    this.playTone(180, 0.1, 'square', 0.04);
+    setTimeout(() => { this.playNoise(0.05, 0.05, 700, 'lowpass'); }, 120);
+    setTimeout(() => {
+      this.playTone(523, 0.12, 'triangle', 0.05);
+      this.playTone(784, 0.18, 'triangle', 0.045);
+    }, 260);
+  },
+  playReadySfx() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    this.playTone(880, 0.08, 'sine', 0.04);
+    setTimeout(() => { this.playTone(1175, 0.12, 'sine', 0.035); }, 90);
+  },
+  startFarmAmbient() {
+    if (!this.ctx || !this.enabled || !this.master) return;
+    if (this._farmAmbient) return;
+    const ctx = this.ctx;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'lowpass'; filt.frequency.value = 420; filt.Q.value = 0.6;
+    const g = ctx.createGain(); g.gain.value = 0.018;
+    src.connect(filt); filt.connect(g); g.connect(this.master);
+    src.start();
+    const self = this;
+    const crow = () => {
+      if (!self._farmAmbient) return;
+      try {
+        const now = ctx.currentTime;
+        const o = ctx.createOscillator(); const og = ctx.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(520, now);
+        o.frequency.exponentialRampToValueAtTime(300, now + 0.12);
+        og.gain.setValueAtTime(0.0001, now);
+        og.gain.exponentialRampToValueAtTime(0.035, now + 0.02);
+        og.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        o.connect(og); og.connect(self.master);
+        o.start(now); o.stop(now + 0.18);
+      } catch (e) {}
+      self._farmCrowTimer = setTimeout(crow, 9000 + Math.random() * 16000);
+    };
+    this._farmCrowTimer = setTimeout(crow, 6000 + Math.random() * 8000);
+    this._farmAmbient = { src, filt, g };
+  },
+  stopFarmAmbient() {
+    try {
+      if (this._farmCrowTimer) clearTimeout(this._farmCrowTimer);
+      this._farmCrowTimer = null;
+      if (this._farmAmbient) {
+        this._farmAmbient.src.stop();
+        this._farmAmbient.src.disconnect();
+        this._farmAmbient = null;
+      }
+    } catch (e) { this._farmAmbient = null; }
+  },
   playCoinSfx() {
     if (!this.ctx || !this.enabled || !this.master) return;
     const now = this.ctx.currentTime;

@@ -1,0 +1,65 @@
+/* ============================================================
+   地形 × 战斗 HUD（2026-10-22）
+   纸绘风格 chips，与去 AI 味皮肤一致；不改变原有 missionHud 布局。
+   ============================================================ */
+#expeditionHUD #missionHud .terrain-combat-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(232, 223, 200, .18);
+}
+#expeditionHUD #missionHud .tc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border: 1px solid rgba(232, 223, 200, .22);
+  border-radius: 2px;
+  background: rgba(20, 24, 15, .55);
+  color: #cfc6ad;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+#expeditionHUD #missionHud .tc-terrain {
+  color: var(--c, #e8dfc8);
+  border-color: rgba(232, 223, 200, .38);
+  font-weight: 700;
+}
+#expeditionHUD #missionHud .tc-move { color: #b99a5a; border-color: rgba(185, 154, 90, .45); }
+#expeditionHUD #missionHud .tc-out { color: #ffd76a; border-color: rgba(255, 215, 106, .35); }
+#expeditionHUD #missionHud .tc-in { color: #e0a080; border-color: rgba(224, 160, 128, .35); }
+#expeditionHUD #missionHud .tc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--c, #7cc7e8);
+  border-radius: 2px;
+  color: var(--c, #7cc7e8);
+  font-size: 10px;
+  background: rgba(20, 24, 15, .5);
+}
+#expeditionHUD #missionHud .tc-momentum {
+  padding: 1px 7px;
+  border: 1px solid rgba(255, 215, 106, .5);
+  border-radius: 2px;
+  background: rgba(201, 162, 90, .16);
+  color: #ffe08a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* 含地形条时放宽 missionHud，保证 chips 可见 */
+#expeditionHUD #missionHud:has(.terrain-combat-hud) { max-height: 176px; }
+#expeditionHUD.details-open #missionHud:has(.terrain-combat-hud) { max-height: 150px; }
+
+#expeditionHUD #missionHud .tc-affinity {
+  color: #ffb070;
+  border-color: rgba(255, 176, 112, .55);
+  background: rgba(255, 176, 112, .12);
+  font-weight: 700;
+}

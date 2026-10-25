@@ -204,6 +204,7 @@ Object.assign(Expedition.prototype, {
     const theme = this.map.terrain;
 
     this.generateTerrainRegions();
+    this.buildTerrainHeightField();
     this.placePlayerSpawn();
     // 相机立即对齐出生点（updateCamera 是平滑趋近，不对齐开局会从旧位置飘过来）
     try {
@@ -521,6 +522,7 @@ Object.assign(Expedition.prototype, {
     ctx.restore();
 
     // v3.7 绘制高低差区域
+    this._drawTerrainHeightShade(ctx, cam);
   },
 
   renderTerrain(ctx, cam) {
@@ -736,9 +738,234 @@ Object.assign(Expedition.prototype, {
     this.heightZones = this.terrainRegions.filter(r => r.type === 'highland').map(r => ({x:r.x,y:r.y,r:r.rx,type:'high'}));
   },
 
+  // ===== v5.9.26 真实高度场（192×192）：远征地形 3D 化 / 战斗高低差 / 2D 山体光影的共同数据源 =====
+  buildTerrainHeightField() {
+    const size = CONFIG.expedition.mapSize;
+    const n = 192;
+    const cell = size / n;
+    const data = new Float32Array(n * n);
+    const types = new Uint8Array(n * n);
+    const TYPE_IDX = { grass: 0, water: 1, mud: 2, forest: 3, ruins: 4, highland: 5 };
+    const BASE = { water: -0.35, mud: -0.12, grass: 0, forest: 0.06, ruins: 0.10, highland: 0.55 };
+    const h2 = (a, b) => {
+      let x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    const fbm = (x, y) => {
+      let v = 0, amp = 0.5, f = 1;
+      for (let i = 0; i < 3; i++) { v += amp * (h2(Math.floor(x * f), Math.floor(y * f)) * 2 - 1); amp *= 0.5; f *= 2.1; }
+      return v;
+    };
+    const regions = this.terrainRegions || [];
+    for (let iy = 0; iy < n; iy++) {
+      for (let ix = 0; ix < n; ix++) {
+        const x = (ix + 0.5) * cell, y = (iy + 0.5) * cell;
+        let base = 0, region = null, regionP = 1, bestP = 9;
+        for (const r of regions) {
+          const dx = (x - r.x) / r.rx, dy = (y - r.y) / r.ry;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d <= 1.02) {
+            const edge = 1 + 0.07 * Math.sin(Math.atan2(dy, dx) * 3 + r.seed) + 0.04 * Math.cos(Math.atan2(dy, dx) * 5 - r.seed);
+            const p = d / edge;
+            if (p <= 1 && p < bestP) { bestP = p; base = BASE[r.type] || 0; region = r; regionP = p; }
+          }
+        }
+        if (!region) base = 0.02 + fbm(x * 0.01, y * 0.01) * 0.05;
+        // 高地/泥地边缘用窄过渡形成陡坡（悬崖感），平地缓过渡
+        const edgeK = region && (region.type === 'highland' || region.type === 'water') ? 0.26 : 0.5;
+        let h = base + fbm(x * 0.02 + 7, y * 0.02 + 3) * (region && region.type === 'highland' ? 0.06 : 0.03);
+        if (region && region.type === 'water') {
+          const shore = Math.min(1, Math.max(0, (regionP - 0.62) / 0.38));
+          h = base * (0.35 + 0.65 * shore) + fbm(x * 0.03, y * 0.03) * 0.015 - 0.02 * (1 - shore);
+        } else if (region && regionP > 0.72) {
+          const k = Math.min(1, (regionP - 0.72) / edgeK);
+          const e = k * k * (3 - 2 * k);
+          h = base * e + (1 - e) * 0.015;
+        }
+        data[iy * n + ix] = h;
+        types[iy * n + ix] = region ? (TYPE_IDX[region.type] || 0) : 0;
+      }
+    }
+    // 3×3 平滑两遍：坡面连续，避免采样噪点
+    const tmp = new Float32Array(n * n);
+    for (let pass = 0; pass < 2; pass++) {
+      tmp.set(data);
+      for (let iy = 1; iy < n - 1; iy++) {
+        for (let ix = 1; ix < n - 1; ix++) {
+          let sum = 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) sum += tmp[(iy + dy) * n + (ix + dx)];
+          data[iy * n + ix] = sum / 9;
+        }
+      }
+    }
+    this.terrainHeight = { n, cell, data, types, waterLevel: -0.05, size };
+    return this.terrainHeight;
+  },
+
+  getElevation(x, y) {
+    const hf = this.terrainHeight;
+    if (!hf) return 0;
+    const fx = Math.max(0, Math.min(hf.n - 1.001, x / hf.cell));
+    const fy = Math.max(0, Math.min(hf.n - 1.001, y / hf.cell));
+    const ix = Math.floor(fx), iy = Math.floor(fy);
+    const tx = fx - ix, ty = fy - iy;
+    const d = hf.data, n = hf.n;
+    const a = d[iy * n + ix], b = d[iy * n + ix + 1];
+    const c = d[(iy + 1) * n + ix], e2 = d[(iy + 1) * n + ix + 1];
+    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + e2 * tx) * ty;
+  },
+
+  getElevationPx(x, y) {
+    let e = this.getElevation(x, y);
+    // 水域：实体站在水面而非水底
+    if (this.getTerrainTypeId && this.getTerrainTypeId(x, y) === 1 && this.terrainHeight) {
+      e = this.terrainHeight.waterLevel;
+    }
+    return e * (window.TERRAIN_ELEV_WORLD || 150);
+  },
+
+  getSlope(x, y) {
+    const d = 14;
+    const hx = this.getElevation(x + d, y) - this.getElevation(x - d, y);
+    const hy = this.getElevation(x, y + d) - this.getElevation(x, y - d);
+    return Math.sqrt(hx * hx + hy * hy);
+  },
+
+  // 保留旧 API：高度档位由连续高度场采样（战斗/地形修正继续可用）
   getHeightAt(x, y) {
-    const id = this.getTerrainAt(x,y).id;
-    return id === 'highland' ? 'high' : id === 'mud' ? 'low' : 'normal';
+    const e = this.getElevation(x, y);
+    return e > 0.30 ? 'high' : e < -0.12 ? 'low' : 'normal';
+  },
+
+  getTerrainTypeId(x, y) {
+    const hf = this.terrainHeight;
+    if (!hf || !hf.types) return 0;
+    const ix = Math.max(0, Math.min(hf.n - 1, Math.floor(x / hf.cell)));
+    const iy = Math.max(0, Math.min(hf.n - 1, Math.floor(y / hf.cell)));
+    return hf.types[iy * hf.n + ix];
+  },
+
+  // 2D 回退：山体光影 / 悬崖暗边 / 水深渐变（烘焙进 chunk，零运行时开销）
+  _drawTerrainHeightShade(ctx, cam) {
+    if (this._terrain3DShadeOff) return;   // 3D 模式不烘焙 2D 假光影
+
+    const hf = this.terrainHeight;
+    if (!hf) return;
+    const w = ctx.canvas.width || 512, h = ctx.canvas.height || 512;
+    const res = 4;
+    const gw = Math.ceil(w / res), gh = Math.ceil(h / res);
+    let off = this._shadeCanvas;
+    if (!off || off.width !== gw || off.height !== gh) {
+      off = document.createElement('canvas'); off.width = gw; off.height = gh;
+      this._shadeCanvas = off;
+    }
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(gw, gh);
+    const px = img.data;
+    const lx = -0.52, ly = -0.64, lz = 0.56;
+    const ll = Math.hypot(lx, ly, lz);
+    const W = hf.waterLevel;
+    for (let gy = 0; gy < gh; gy++) {
+      for (let gx = 0; gx < gw; gx++) {
+        const wx = cam.x + gx * res + res / 2, wy = cam.y + gy * res + res / 2;
+        const e = this.getElevation(wx, wy);
+        const dx = this.getElevation(wx + 12, wy) - this.getElevation(wx - 12, wy);
+        const dy = this.getElevation(wx, wy + 12) - this.getElevation(wx, wy - 12);
+        const nx = -dx * 16, ny = -dy * 16, nz = 1;
+        const nl = Math.hypot(nx, ny, nz);
+        const dot = (nx * lx + ny * ly + nz * lz) / (nl * ll);
+        const slope = Math.hypot(dx, dy) * 16;
+        const type = this.getTerrainTypeId(wx, wy);
+        let r = 0, g = 0, b = 0, a = 0;
+        const blend = (cr, cg, cb, ca) => {
+          if (ca <= 0) return;
+          if (a <= 0) { r = cr; g = cg; b = cb; a = ca; return; }
+          const na = ca + a * (1 - ca);
+          r = (cr * ca + r * a * (1 - ca)) / na;
+          g = (cg * ca + g * a * (1 - ca)) / na;
+          b = (cb * ca + b * a * (1 - ca)) / na;
+          a = na;
+        };
+        if (type === 1) {
+          const depth = Math.max(0, W - e);
+          blend(6, 20, 30, Math.min(0.72, depth * 1.35));
+          if (depth < 0.08) blend(205, 235, 224, (0.08 - depth) * 1.9);
+        } else {
+          if (dot > 0.55) blend(255, 243, 205, Math.min(0.5, (dot - 0.55) * 0.95));
+          else blend(18, 14, 8, Math.min(0.78, (0.55 - dot) * 1.05));
+          // 陡坡：悬崖暗边 + 顶部暖边（纸雕切面）
+          if (slope > 0.42) blend(14, 11, 6, Math.min(0.6, (slope - 0.42) * 1.25));
+          else if (slope > 0.22) blend(255, 235, 190, Math.min(0.14, (slope - 0.22) * 0.8));
+        }
+        const o = (gy * gw + gx) * 4;
+        px[o] = Math.round(r); px[o + 1] = Math.round(g); px[o + 2] = Math.round(b);
+        px[o + 3] = Math.round(a * 255);
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(off, 0, 0, w, h);
+    ctx.restore();
+  },
+
+  _drawTerrainHeightShadeLegacy(ctx, cam) {
+    const hf = this.terrainHeight;
+    if (!hf) return;
+    const viewW = ctx.canvas.width || 512, viewH = ctx.canvas.height || 512;
+    const step = 24;
+    const lightX = -0.52, lightY = -0.64, lightZ = 0.56;
+    const len = Math.hypot(lightX, lightY, lightZ);
+    for (let y = 0; y < viewH; y += step) {
+      for (let x = 0; x < viewW; x += step) {
+        const wx = cam.x + x + step / 2, wy = cam.y + y + step / 2;
+        const e = this.getElevation(wx, wy);
+        const dx = this.getElevation(wx + 10, wy) - this.getElevation(wx - 10, wy);
+        const dy = this.getElevation(wx, wy + 10) - this.getElevation(wx, wy - 10);
+        // 法线（高度场 → 3D 法线，z 向上）
+        const nx = -dx * 14, ny = -dy * 14, nz = 1;
+        const nl = Math.hypot(nx, ny, nz);
+        const dot = (nx * lightX + ny * lightY + nz * lightZ) / (nl * len);
+        const slope = Math.hypot(dx, dy) * 14;
+        if (dot > 0.5) {
+          ctx.fillStyle = 'rgba(255,244,208,' + ((dot - 0.5) * 0.55).toFixed(3) + ')';
+          ctx.fillRect(x, y, step, step);
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,' + ((0.5 - dot) * 0.85).toFixed(3) + ')';
+          ctx.fillRect(x, y, step, step);
+        }
+        // 悬崖暗边 + 顶部高光：坡度过陡处出现纸雕切面感
+        if (slope > 0.34) {
+          ctx.strokeStyle = 'rgba(18,14,8,' + Math.min(0.55, (slope - 0.34) * 1.6).toFixed(3) + ')';
+          ctx.lineWidth = Math.min(3, 1 + (slope - 0.34) * 4);
+          ctx.strokeRect(x + 0.5, y + 0.5, step - 1, step - 1);
+        } else if (slope > 0.18) {
+          ctx.strokeStyle = 'rgba(255,232,180,0.10)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, step - 1, step - 1);
+        }
+        // 水域：按水深加深（waterLevel - 地形高度）
+        const terr = this.getTerrainAt(wx, wy);
+        if (terr.id === 'water') {
+          const depth = Math.max(0, hf.waterLevel - e);
+          ctx.fillStyle = 'rgba(8,22,32,' + Math.min(0.55, depth * 1.1).toFixed(3) + ')';
+          ctx.fillRect(x, y, step, step);
+          if (depth < 0.09) {
+            ctx.fillStyle = 'rgba(210,240,230,' + ((0.09 - depth) * 1.6).toFixed(3) + ')';
+            ctx.fillRect(x, y, step, step);
+          }
+        }
+        // 等高线（手绘绘本感，稀疏）
+        const band = 0.12;
+        const c1 = Math.floor(e / band), c2 = Math.floor((this.getElevation(wx + step, wy)) / band);
+        const c3 = Math.floor((this.getElevation(wx, wy + step)) / band);
+        if (c1 !== c2 || c1 !== c3) {
+          ctx.strokeStyle = 'rgba(40,32,18,0.10)';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, y + step); ctx.lineTo(x + step, y); ctx.stroke();
+        }
+      }
+    }
   },
 
   // v3.7 打道具（油桶爆炸/木箱掉钱）
@@ -1196,12 +1423,17 @@ Object.assign(Expedition.prototype, {
     if (this.player.root > 0) { dx = 0; dy = 0; }
 
     let speed = CONFIG.player.speed;
-    if (this.keys['shift'] && this.player.energy > 1) {
-      speed = CONFIG.player.sprintSpeed;
+    const _sprintGround = this.getTerrainAt(this.player.x, this.player.y);
+    const _canSprint = this.keys['shift'] && this.player.energy > 1
+      && _sprintGround.id !== 'mud' && !(this.hasTerrainStatus && this.hasTerrainStatus(this.player, 'rooted'));
+    if (_canSprint) {
+      speed = CONFIG.player.sprintSpeed * (_sprintGround.id === 'water' ? 0.8 : 1);
       this.player.energy -= CONFIG.player.sprintCost * dt;
     }
     const ground = this.getTerrainAt(this.player.x, this.player.y);
     let terrainModifier = ground.moveMul;
+    if (this.hasTerrainStatus && this.hasTerrainStatus(this.player, 'rooted')) terrainModifier *= 0.85;
+    if (this.hasTerrainStatus && this.hasTerrainStatus(this.player, 'wet')) terrainModifier *= 0.97;
     if (this.player.slow > 0) terrainModifier *= 0.56;
     const hz = this.getHeightAt(this.player.x, this.player.y);
     // v5.4 贪婪成本：背包超重（>12 格）小幅降移速，最多 -12%
@@ -1211,6 +1443,7 @@ Object.assign(Expedition.prototype, {
       if (_used > 12) carryModifier = Math.max(0.82, 1 - 0.045 * (_used - 12));
     }
     speed *= terrainModifier * carryModifier;
+    if (ground.id === 'mud') { this._terrainKnockbackMul = 0.7; } else { this._terrainKnockbackMul = 1; }
     const targetVx = dx * speed, targetVy = dy * speed;
     const accel = len > 0 ? 16 : 20;
     this.player.vx = lerp(this.player.vx || 0, targetVx, clamp(accel * dt, 0, 1));

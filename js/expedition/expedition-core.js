@@ -283,12 +283,9 @@ class Expedition {
       }
     }
     // v5.8.3：命中反馈全面程序化——hit_spark/hit_blood/player_hit 贴图加载移除（暴击星芒走 spawnStarburst、血雾走 spawnBloodMist）
-    this.fxSprites = { slash: new Image(), treant: new Image(), gargoyle: new Image(), shadow: new Image(), boar: new Image() };
-    this.fxSprites.slash.src = 'docs/art/effects/fire_slash.png';
-    this.fxSprites.treant.src = 'docs/art/mobfx/treant_swipe.png';
-    this.fxSprites.gargoyle.src = 'docs/art/mobfx/gargoyle_dive.png';
-    this.fxSprites.shadow.src = 'docs/art/mobfx/shadow_blink.png';
-    this.fxSprites.boar.src = 'docs/art/mobfx/boar_charge.png';
+    // 2026-10-23 战斗特效全面程序化：fire_slash / mobfx 系列实际都是不透明 JPEG（带大片黑底），
+    // 用 lighter 叠加会变成一块红弧贴图；现在玩家刀光与怪物攻击都改画程序化新月刃，不再加载这些图。
+    this.fxSprites = {};
     this.playerSprite = new Image(); this.playerSprite.src = 'docs/art/v2/player.png';
     this.playerWalkSheet = new Image(); this.playerWalkSheet.src = 'docs/art/v2/player_walk_transparent.png';
     this.weaponSheet = new Image(); this.weaponSheet.src = 'assets/weapons/weapon_sheet_t.png'; this.weaponSheetPrekeyed = true;
@@ -630,6 +627,7 @@ class Expedition {
     this.updateDamageNumbers(dt);
     this.killFlash = Math.max(0, this.killFlash - dt);
     this.updateExtraction(dt);
+    if (this.updateCaptureCharge) this.updateCaptureCharge(dt);
 
     this.updateHUD();
   }

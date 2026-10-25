@@ -3,7 +3,7 @@
 //   带版本号参数：先更新此处，再同步 index.html 的标题、meta 与所有本地 js/css 的 ?v= 缓存戳；
 //   不带参数：按当前版本刷新 index.html。
 const GAME_NAME = '农庄牌：荒野远征';
-const GAME_VERSION = '5.8.18';
+const GAME_VERSION = '5.9.47';
 
 const CONFIG = {
   version: GAME_VERSION,
@@ -175,8 +175,8 @@ const CONFIG = {
     duration: 720,
     demoDuration: 720, // v1.3 统一对局时限：12分钟
     mapSize: 2400,
-    extractTime: 15,
-    signalExtractTime: 20,
+    extractTime: 5,          // 2026-10-23 玩家反馈：15 秒在读条被反复打断时过于挫败，缩短到 5 秒
+    signalExtractTime: 5,    // 信号弹同步 5 秒（同样受击退/出圈打断）
     zoomBase: 0.86,    // v1.8 视角拉远：常态视野（<1 拉远，可见世界 ≈ 1490×837）
     zoomBoss: 0.78     // v1.8 Boss 战自动再拉一档（演出感 + 躲弹幕空间）
   },

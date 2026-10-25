@@ -9,12 +9,27 @@ function regionHash(x, y, salt) {
 
 Object.assign(Expedition.prototype, {
   terrainRules: {
-    grass: {name:'草甸',moveMul:1,visionMul:1,rangeMul:1,hint:'沿路寻找补给；树干与岩石可挡弹'},
-    water: {name:'浅水河湾',moveMul:.62,visionMul:1,rangeMul:1,hint:'移动 -38% · 灭火 · 雷电 +35% / 火焰 -30%'},
-    mud: {name:'泥地',moveMul:.72,visionMul:1,rangeMul:1,hint:'移动 -28% · 冲刺也受泥地影响'},
-    forest: {name:'密林草丛',moveMul:.94,visionMul:1,rangeMul:1,hint:'发现距离 -45% · 停火 2 秒后隐蔽 5 秒'},
-    ruins: {name:'旧哨站废墟',moveMul:1,visionMul:1,rangeMul:1,hint:'残墙挡弹 · 搜寻金属与首领线索'},
-    highland: {name:'风望高地',moveMul:1,visionMul:1.25,rangeMul:1.15,hint:'视野 +25% · 远程射程 +15% · 观测撤离方向'}
+    // 地形 = 战斗修正层：moveMul 位移 / dmgOutMul 输出 / dmgInMul 承伤 / meleeOut·rangedOut 攻击类型
+    // / critAdd 攻方暴击加成 / critTakenAdd 守方被暴击加成 / elementOut·elementIn 元素修正
+    grass: {name:'草甸',moveMul:1,visionMul:1,rangeMul:1,dmgOutMul:1,dmgInMul:1,meleeOut:1,rangedOut:1,critAdd:0,critTakenAdd:0,
+      hint:'基准地形：没有增减，靠走位和技能取胜'},
+    water: {name:'浅水河湾',moveMul:.62,visionMul:1,rangeMul:1,dmgOutMul:1,dmgInMul:1,meleeOut:1,rangedOut:1,critAdd:0,critTakenAdd:0,
+      elementOut:{fire:.70,lightning:1.35}, elementIn:{},
+      statusOnEnter:{key:'wet',dur:2.5},
+      hint:'移动 -38% · 潮湿：受雷 +15% / 受火 -10% · 灭火 · 冲刺距离 -50%'},
+    mud: {name:'泥地',moveMul:.72,visionMul:1,rangeMul:1,dmgOutMul:1,dmgInMul:1,meleeOut:1,rangedOut:.95,critAdd:0,critTakenAdd:0,
+      elementOut:{fire:.80},
+      statusOnEnter:{key:'rooted',dur:1.0},
+      hint:'移动 -28% · 陷足：禁止冲刺、击退 -30% · 火伤 -20%'},
+    forest: {name:'密林草丛',moveMul:.94,visionMul:1,rangeMul:1,dmgOutMul:1,dmgInMul:1,meleeOut:1.10,rangedOut:.85,critAdd:0,critTakenAdd:0,
+      statusOnEnter:null,
+      hint:'近战 +10% / 远程 -15% · 发现距离 -45% · 停火 2 秒隐蔽 5 秒 · 火攻可点燃'},
+    ruins: {name:'旧哨站废墟',moveMul:1,visionMul:1,rangeMul:1,dmgOutMul:1,dmgInMul:1,meleeOut:1,rangedOut:1,critAdd:0,critTakenAdd:0,
+      statusOnEnter:null,
+      hint:'残墙方向掩体：远程减伤 35% · AOE -15% · 掩体可被破坏'},
+    highland: {name:'风望高地',moveMul:1,visionMul:1.25,rangeMul:1.15,dmgOutMul:1,dmgInMul:1,meleeOut:1,rangedOut:1.12,critAdd:.08,critTakenAdd:.10,
+      statusOnEnter:null,
+      hint:'视野 +25% · 射程 +15% · 远程 +12% · 暴击 +8% · 暴露：被远程命中 +10% · 高打低 +10%'}
   },
   regionContains(r,x,y) {
     const dx=(x-r.x)/r.rx, dy=(y-r.y)/r.ry, a=Math.atan2(dy,dx);
@@ -168,10 +183,12 @@ Object.assign(Expedition.prototype, {
     // 6) 障碍：按生态区类型 + 原型密度系数生成（密林多树、荒原多石）
     const pushObstacle = (type, x, y) => {
       if (Math.hypot(x - this.player.x, y - this.player.y) < 150) return;
+      const _hp = type === 'tree' ? 60 : type === 'ruin' ? 90 : type === 'rock' ? 130 : 0;
       this.obstacles.push({
         type, x, y, scale: 1, rotation: 0, radius: type === 'tree' ? 15 : 21,
         collisionRx: type === 'tree' ? 15 : 23, collisionRy: 12, collisionOffsetY: 0,
-        projectileBlock: type !== 'bush'
+        projectileBlock: type !== 'bush',
+        destructible: _hp > 0, hp: _hp, maxHp: _hp
       });
     };
     for (const r of this.terrainRegions) {

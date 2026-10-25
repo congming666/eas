@@ -154,12 +154,11 @@ const Game = {
       const carriedEntry = carried.find(c => c.type === deployId);
       const inBag = carriedEntry ? carriedEntry.count : 0;
       const div = document.createElement('div');
-      div.style.cssText = 'padding:6px;border:2px solid ' + (inBag>0?'#7fff7f':'#444') + ';border-radius:6px;cursor:pointer;text-align:center;width:80px;background:rgba(0,0,0,0.3);';
+      div.className = 'seed-chip' + (inBag > 0 ? ' filled' : '');
       const seedArt = (typeof CropArt!=='undefined' && CropArt.ready(deployId)) ? CropArt.dom(deployId, plantDef.icon, 28) : plantDef.icon;
-      div.innerHTML = '<div style="display:flex;justify-content:center;">' + seedArt + '</div>' +
-        '<div style="font-size:10px;color:#ccc;">' + plantDef.name + '</div>' +
-        '<div style="font-size:9px;color:#888;">仓库x' + count + '</div>' +
-        '<div style="font-size:9px;color:' + (inBag>0?'#7fff7f':'#666') + ';">带x' + inBag + '</div>';
+      div.innerHTML = '<div class="seed-art">' + seedArt + '</div>' +
+        '<div class="seed-name">' + plantDef.name + '</div>' +
+        '<div class="seed-count">仓库 ' + count + ' · 带 ' + inBag + '</div>';
       div.onclick = () => {
         const total = carried.reduce((sum,c)=>sum+c.count,0);
         if (inBag > 0) {
@@ -197,12 +196,13 @@ const Game = {
       const stats = LoadoutSystem.getInstanceStats(inst.uid);
       const isSelected = brought.includes(inst.uid);
       const div = document.createElement('div');
-      div.style.cssText = `padding:8px;border:2px solid ${isSelected?'#ffd700':'#4a6a4a'};border-radius:8px;cursor:pointer;width:120px;text-align:center;background:${isSelected?'rgba(255,215,0,0.1)':'rgba(0,0,0,0.3)'};`;
-      div.innerHTML = `<img src="${wpn.img}" style="width:80px;height:80px;object-fit:contain;border-radius:6px;" onerror="this.style.display='none'">
-        <div style="font-size:12px;color:#e6bd54;font-weight:bold;margin-top:4px;">${wpn.name}${inst.level>0?' +'+inst.level:''}</div>
-        <div style="font-size:10px;color:#999;">伤害${stats?stats.damage:wpn.damage}</div>
-        <div style="font-size:9px;color:#666;">${inst.uid}</div>
-        <div style="font-size:9px;color:${isSelected?'#ffd700':'#888'};">${isSelected?'✓ 已带入':'点击带入'}</div>`;
+      div.className = 'weapon-card' + (isSelected ? ' selected' : '');
+      div.innerHTML = `<div class="weapon-art"><img src="${wpn.img}" alt="" onerror="this.style.display='none'"></div>
+        <div class="weapon-body">
+          <div class="weapon-name">${wpn.name}${inst.level>0?'<i>+'+inst.level+'</i>':''}</div>
+          <div class="weapon-stat">伤害 ${stats?stats.damage:wpn.damage}</div>
+          <div class="weapon-state">${isSelected?'✓ 已带入':'点击带入'}</div>
+        </div>`;
       div.onclick = () => {
         const arr = GameState.loadoutWeaponUids || (GameState.loadoutWeaponUids = []);
         const idx = arr.indexOf(inst.uid);

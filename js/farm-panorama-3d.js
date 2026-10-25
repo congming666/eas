@@ -10,7 +10,19 @@
  */
 (function () {
   'use strict';
-  if (!window.THREE) { window.FarmPanorama3D = { active: false, attach() { return false; } }; return; }
+  if (!window.THREE) {
+    window.FarmPanorama3D = {
+      active: false, _stub: true,
+      attach() { return false; },
+      frame() { return false; },
+      present() { return false; },
+      detach() {},
+      setEnabled() { return false; },
+      isEnabled() { return false; },
+      toggle() { return false; }
+    };
+    return;
+  }
 
   const T = THREE;
   const CROP_KINDS = ['wheat', 'corn', 'watermelon', 'pumpkin', 'sunflower', 'cabbage', 'carrot', 'moon_rice'];
@@ -287,7 +299,7 @@
 
   /* ---------- 几何合并（降低 draw call，软件/核显下帧率关键） ---------- */
   function mergeGeometries(geos) {
-    const names = ['position', 'normal', 'uv'];
+    const names = ['position', 'normal', 'uv', 'color'];
     const merged = new T.BufferGeometry();
     for (const name of names) {
       const ok = geos.every(g => g.attributes[name]);
@@ -297,8 +309,18 @@
       geos.forEach(g => total += g.attributes[name].array.length);
       const out = new Float32Array(total);
       let off = 0;
-      geos.forEach(g => { out.set(g.attributes[name].array, off); off += g.attributes[name].array.length; });
-      merged.setAttribute(name, new T.BufferAttribute(out, itemSize));
+      if (name === 'color') {
+        geos.forEach(g => {
+          const a = g.attributes.color;
+          const src = a.array;
+          const max = a.normalized ? ((src instanceof Uint16Array || src instanceof Int16Array) ? 65535 : 255) : 1;
+          for (let i = 0; i < src.length; i++) out[off + i] = max === 1 ? src[i] : src[i] / max;
+          off += src.length;
+        });
+      } else {
+        geos.forEach(g => { out.set(g.attributes[name].array, off); off += g.attributes[name].array.length; });
+      }
+      merged.setAttribute(name, new T.BufferAttribute(out, itemSize, false));
     }
     return merged;
   }
@@ -313,7 +335,7 @@
       let g = o.geometry.clone();
       if (g.index) g = g.toNonIndexed();
       g.applyMatrix4(o.matrixWorld);
-      for (const name of Object.keys(g.attributes)) if (['position', 'normal', 'uv'].indexOf(name) < 0) g.deleteAttribute(name);
+      for (const name of Object.keys(g.attributes)) if (['position', 'normal', 'uv', 'color'].indexOf(name) < 0) g.deleteAttribute(name);
       if (!buckets.has(sig)) buckets.set(sig, { mat: m, geos: [] });
       buckets.get(sig).geos.push(g);
     });
@@ -679,7 +701,7 @@
   const Patches = {
     _wrap: null, _canvas: null, _renderer: null, _scene: null, _camera: null,
     _clock: null, _raf: null, _ok: false, _ready: false, _pano3d: true,
-    _stateKey: '', _plots: [], _cropMeshes: [], _buildings: {},
+    _stateKey: '', _plots: [], _cropMeshes: [], _readyGlowMats: [], _readySprites: [], _buildings: {},
     _sun: null, _moon: null, _hemi: null, _sky: null, _stars: null, _clouds: null,
     _rain: null, _snow: null, _ash: null, _fogPts: null, _lightning: 0,
     _mouse: { x: 0, y: 0, tx: 0, ty: 0 }, _sunAngle: 0, _wind: 0,
@@ -747,7 +769,7 @@
         if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
           const comp = new T.EffectComposer(r);
           comp.addPass(new T.RenderPass(scene, cam));
-          const bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .34, .55, .86);
+          const bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .22, .46, .92);
           comp.addPass(bloom);
           this._composer = comp; this._bloom = bloom;
           // God rays：径向模糊的屏幕空间体积光
@@ -790,10 +812,63 @@
                   '}'
                 ].join('\n')
               };
+              // 去 AI 味插画后处理：Sobel 墨线 + 纸纹颗粒 + 高低光压缩 + 轻暗角
+              const illusShader = {
+                uniforms: {
+                  tDiffuse: { value: null },
+                  time: { value: 0 },
+                  res: { value: new T.Vector2(w, h) },
+                  lineStrength: { value: 0.58 },
+                  grain: { value: 0.030 }
+                },
+                vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+                fragmentShader: [
+                  'uniform sampler2D tDiffuse;',
+                  'uniform float time;',
+                  'uniform vec2 res;',
+                  'uniform float lineStrength;',
+                  'uniform float grain;',
+                  'varying vec2 vUv;',
+                  'float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }',
+                  'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+                  'void main(){',
+                  '  vec2 texel = 1.0 / res;',
+                  '  vec3 base = texture2D(tDiffuse, vUv).rgb;',
+                  '  float l00 = luma(texture2D(tDiffuse, vUv + vec2(-1.0,-1.0)*texel).rgb);',
+                  '  float l10 = luma(texture2D(tDiffuse, vUv + vec2( 0.0,-1.0)*texel).rgb);',
+                  '  float l20 = luma(texture2D(tDiffuse, vUv + vec2( 1.0,-1.0)*texel).rgb);',
+                  '  float l01 = luma(texture2D(tDiffuse, vUv + vec2(-1.0, 0.0)*texel).rgb);',
+                  '  float l21 = luma(texture2D(tDiffuse, vUv + vec2( 1.0, 0.0)*texel).rgb);',
+                  '  float l02 = luma(texture2D(tDiffuse, vUv + vec2(-1.0, 1.0)*texel).rgb);',
+                  '  float l12 = luma(texture2D(tDiffuse, vUv + vec2( 0.0, 1.0)*texel).rgb);',
+                  '  float l22 = luma(texture2D(tDiffuse, vUv + vec2( 1.0, 1.0)*texel).rgb);',
+                  '  float gx = (l20 + 2.0*l21 + l22) - (l00 + 2.0*l01 + l02);',
+                  '  float gy = (l02 + 2.0*l12 + l22) - (l00 + 2.0*l10 + l20);',
+                  '  float edge = smoothstep(0.09, 0.46, length(vec2(gx, gy)));',
+                  '  vec3 ink = vec3(0.11, 0.09, 0.07);',
+                  '  vec3 col = mix(base, ink, edge * lineStrength);',
+                  '  float g = luma(col);',
+                  '  col = mix(vec3(g), col, 0.94);',
+                  '  col = col * vec3(1.022, 1.0, 0.958);',
+                  '  col = mix(col, vec3(0.80, 0.76, 0.68), 0.032);',
+                  '  col = clamp(col * 1.03 - 0.012, 0.0, 1.0);',
+                  '  float n = hash(vUv * res + fract(time * 0.7) * 173.0) - 0.5;',
+                  '  float n2 = hash(floor(vUv * res * 0.5) + fract(time) * 51.0) - 0.5;',
+                  '  col += (n * 0.7 + n2 * 0.3) * grain;',
+                  '  vec2 q = vUv - 0.5;',
+                  '  col *= 1.0 - dot(q, q) * 0.22;',
+                  '  gl_FragColor = vec4(col, 1.0);',
+                  '}'
+                ].join('\n')
+              };
               const gr = new T.ShaderPass(godraysShader);
               gr.needsSwap = true;
               comp.addPass(gr);
               this._godrays = gr;
+              const il = new T.ShaderPass(illusShader);
+              il.needsSwap = true;
+              comp.addPass(il);
+              this._illustration = il;
             }
           } catch (e) { console.warn('[Pano3D] godrays disabled', e); }
 
@@ -839,12 +914,12 @@
 
       // 耕地（前景，明显抬高的田块）
       this._field = new T.Group(); scene.add(this._field);
-      const fieldBed = new T.Mesh(new T.PlaneGeometry(21, 14), new T.MeshStandardMaterial({ map: fieldTex, roughness: 1, color: 0xb09068 }));
-      fieldBed.rotation.x = -Math.PI / 2; fieldBed.position.set(-3.0, .02, 6.2); fieldBed.receiveShadow = true;
+      const fieldBed = new T.Mesh(new T.PlaneGeometry(12.8, 10.6), new T.MeshStandardMaterial({ map: fieldTex, roughness: 1, color: 0xb09068 }));
+      fieldBed.rotation.x = -Math.PI / 2; fieldBed.position.set(-3.7, .02, 5.3); fieldBed.receiveShadow = true;
 
       this._field.add(fieldBed);
       // 田埂边
-      for (const [x, z, w, d] of [[-11.2, 5.2, .3, 12], [6.8, 5.2, .3, 12]]) {
+      for (const [x, z, w, d] of [[-10.3, 5.3, .3, 10.6], [2.7, 5.3, .3, 10.6]]) {
         const edge = new T.Mesh(new T.BoxGeometry(w, .18, d), new T.MeshStandardMaterial({ color: '#3a2d1e', roughness: 1 }));
         edge.position.set(x, .09, z); this._field.add(edge);
       }
@@ -1498,7 +1573,11 @@
         wood_light: ['wood', 0xd8b888], roof_shingle: ['shingle', 0xb09080],
         metal_rust: ['rust', 0xb08968], metal_dark: ['rust', 0x9a9a96],
         stone: ['stone', 0xcfc6b4], bark: ['wood', 0x8a6a4c], hay: ['grass', 0xd8c080],
-        plaster: [null, 0xd8d0c0]
+        plaster: [null, 0xd8d0c0],
+        crop_stem: [null, 0x9aab5a], crop_leaf: [null, 0x8cc45e], crop_leaf_dark: [null, 0x6f9c48],
+        crop_gold: [null, 0xf0d078], crop_green: [null, 0x86c25a], crop_green_dark: [null, 0x5f9440],
+        crop_orange: [null, 0xf0a850], crop_root: [null, 0xe09048], crop_flower: [null, 0xffe066],
+        crop_disc: [null, 0x9a7438], crop_rice: [null, 0xe6ecdc], crop_rice_glow: [null, 0xf6fff0]
       };
       const cfg = TABLE[name] || ['wood', 0xbfa080];
       if (cfg[0]) {
@@ -1515,6 +1594,22 @@
     _applyModelMaterials(root) {
       root.traverse(o => {
         if (!o.isMesh) return;
+        const mArr = Array.isArray(o.material) ? o.material : [o.material];
+        const isCrop = mArr.some(m => m && (m.name || '').toLowerCase().indexOf('crop_') === 0);
+        // 作物：AO 顶点色压缩到 0.62~1.0，保持立体感但不发黑
+        if (isCrop) {
+          const col = o.geometry && o.geometry.attributes && o.geometry.attributes.color;
+          if (col) {
+            const src = col.array;
+            const max = col.normalized ? ((src instanceof Uint16Array || src instanceof Int16Array) ? 65535 : 255) : 1;
+            const out = new Float32Array(src.length);
+            for (let i = 0; i < src.length; i++) {
+              const v = max === 1 ? src[i] : src[i] / max;
+              out[i] = 0.62 + 0.38 * v;
+            }
+            o.geometry.setAttribute('color', new T.BufferAttribute(out, col.itemSize, false));
+          }
+        }
         if (Array.isArray(o.material)) o.material = o.material.map(x => this._modelMat(x));
         else if (o.material) o.material = this._modelMat(o.material);
       });
@@ -1548,10 +1643,19 @@
       const lv = id => (bl[id] && bl[id].level) || 0;
       const wk = (G.farmWeather && G.farmWeather.state) || G.weather || 'clear';
       const plots = G.farmPlots || [];
-      const n = Math.min(G.unlockedPlots || 16, plots.length || 16);
+      const n = Math.min(G.unlockedPlots || 16, 48, plots.length || 48);
+      const nowMs = Date.now();
+      const plotSig = [];
+      for (let pi = 0; pi < 48; pi++) {
+        const p = plots[pi];
+        if (!p || !p.crop) { plotSig.push('-'); continue; }
+        const prog = p.ready ? 1 : Math.max(0, Math.min(1, (nowMs - (p.plantedAt || 0)) / Math.max(1, (p.crop.growTime || 30) * 1000)));
+        const stage = p.ready ? 'R' : String(Math.min(5, Math.floor(prog * 5)));
+        plotSig.push(p.crop.id + stage + (p.status || ''));
+      }
       const key = [
         G.season, wk, lv('workshop'), lv('greenhouse'), lv('barn'), lv('lab'),
-        n, plots.slice(0, 16).map(p => (p && p.crop ? p.crop.id + (p.ready ? 'R' : '') : '-')).join('.')
+        n, plotSig.join('.')
       ].join('|');
       if (!force && key === this._lastState) return;
       this._lastState = key;
@@ -1591,53 +1695,208 @@
     },
 
     _rebuildCrops(plots, n) {
-      // 清掉旧作物
       if (this._cropMeshes) { this._cropMeshes.forEach(m => this._scene.remove(m)); }
       this._cropMeshes = [];
-      const COLS = 4, ROWS = 4;
-      for (let i = 0; i < 16; i++) {
-        const c = i % COLS, r = Math.floor(i / COLS);
-        const x = -10.2 + c * 2.85;
-        const z = 2.0 + r * 2.55;
-        // 地块：薄土面（垄沟贴图），避免厚板感
-        const plotSoil = new T.Mesh(new T.PlaneGeometry(2.5, 2.3), new T.MeshStandardMaterial({ map: this._texCache.field, color: 0xb08c60, roughness: 1 }));
-        plotSoil.rotation.x = -Math.PI / 2; plotSoil.position.set(x, .035, z); plotSoil.receiveShadow = true;
-        this._scene.add(plotSoil); this._cropMeshes.push(plotSoil);
+      // 与农田网格一致：8 列 × 6 行 = 48 格（索引 i = r*8 + c，和农场 UI 同序）
+      const COLS = 8, ROWS = 6, PITCH = 1.34;
+      const CX = -3.6, CZ = 4.3;
+      const W = COLS * PITCH, H = ROWS * PITCH;
+      const now = Date.now();
+
+      // ---- 田块底板：每格一块土面，按状态合并（位置与作物严格一一对应）----
+      const TILE = PITCH * 0.90;
+      // 程序化土壤贴图（垄沟 + 颗粒），每个 3D 田块都带纹理，避免纯色看不出土
+      if (!this._soilTex3D) {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 256;
+        const c = cv.getContext('2d');
+        c.fillStyle = '#6b4f34'; c.fillRect(0, 0, 256, 256);
+        for (let row = 0; row < 256; row += 24) {
+          c.fillStyle = 'rgba(40,26,14,.55)'; c.fillRect(0, row, 256, 9);
+          c.fillStyle = 'rgba(160,124,84,.35)'; c.fillRect(0, row + 9, 256, 3);
+        }
+        for (let i = 0; i < 900; i++) {
+          const x = Math.random() * 256, y = Math.random() * 256;
+          const s2 = Math.random() > .5 ? 1.6 : 2.6;
+          c.fillStyle = Math.random() > .5 ? 'rgba(30,20,10,.35)' : 'rgba(190,156,110,.28)';
+          c.fillRect(x, y, s2, s2);
+        }
+        const tex = new T.CanvasTexture(cv);
+        tex.wrapS = tex.wrapT = T.RepeatWrapping;
+        tex.repeat.set(1.5, 1.5);
+        if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
+        this._soilTex3D = tex;
+      }
+      const SOIL = this._soilTex3D;
+      const tileMats = {
+        wild:    new T.MeshStandardMaterial({ color: 0x4e5c34, roughness: 1 }),
+        wild2:   new T.MeshStandardMaterial({ color: 0x465428, roughness: 1 }),
+        tilled:  new T.MeshStandardMaterial({ map: SOIL, color: 0xb99a72, roughness: 1 }),
+        tilled2: new T.MeshStandardMaterial({ map: SOIL, color: 0xa98a64, roughness: 1 }),
+        planted: new T.MeshStandardMaterial({ map: SOIL, color: 0x8a6a48, roughness: 1 }),
+        planted2:new T.MeshStandardMaterial({ map: SOIL, color: 0x7e6042, roughness: 1 }),
+        next:    new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a860, roughness: 1, emissive: 0x6a4a10, emissiveIntensity: .35 }),
+        ready:   new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a050, roughness: 1, emissive: 0x7a5410, emissiveIntensity: .5 }),
+        ready2:  new T.MeshStandardMaterial({ map: SOIL, color: 0xc49648, roughness: 1, emissive: 0x6a4a0c, emissiveIntensity: .45 })
+      };
+      const tileBuckets = {};
+      for (let i = 0; i < COLS * ROWS; i++) {
+        const col = i % COLS, row = Math.floor(i / COLS);
+        const px = CX - W / 2 + (col + .5) * PITCH;
+        const pz = CZ + H / 2 - (row + .5) * PITCH;
         const plot = plots[i];
-        const has = i < n && plot && plot.crop;
-        if (!has) {
-          // 空地块：野草
-          for (let k = 0; k < 5; k++) {
-            const gw = new T.Mesh(new T.ConeGeometry(.03, .25 + hash(i + k) * .2, 4), new T.MeshStandardMaterial({ color: '#7a8448' }));
-            gw.position.set(x - .8 + hash(i * 3 + k) * 1.6, .25, z - .8 + hash(i * 5 + k) * 1.6);
-            this._scene.add(gw); this._cropMeshes.push(gw);
+        const unlocked = i < n;
+        const planted = unlocked && plot && plot.crop;
+        let state = !unlocked ? (i === n ? 'next' : 'wild') : (planted ? (plot && plot.ready ? 'ready' : 'planted') : 'tilled');
+        if (state !== 'next' && state !== 'ready' && i % 2) state += '2';
+        const mat = tileMats[state] || tileMats.tilled;
+        const tile = new T.Mesh(new T.PlaneGeometry(TILE, TILE), mat);
+        tile.rotation.x = -Math.PI / 2;
+        tile.position.set(px, .04, pz);
+        tile.receiveShadow = true;
+        if (!tileBuckets[state]) tileBuckets[state] = new T.Group();
+        tileBuckets[state].add(tile);
+      }
+      Object.keys(tileBuckets).forEach(k => {
+        const m = mergeMeshes(tileBuckets[k]);
+        this._scene.add(m);
+        this._cropMeshes.push(m);
+      });
+
+      // ---- 3D：作物 / 野草 / 成熟光环 / 待扩建木桩 ----
+      const cropBucket = new T.Group();
+      const grassBucket = new T.Group();
+      const glowBucket = new T.Group();
+      this._readyGlowMats = [];
+      this._readySprites = [];
+      const markerBucket = new T.Group();
+      for (let i = 0; i < COLS * ROWS; i++) {
+        const col = i % COLS, row = Math.floor(i / COLS);
+        const px = CX - W / 2 + (col + .5) * PITCH;
+        const pz = CZ + H / 2 - (row + .5) * PITCH;
+        const plot = plots[i];
+        const unlocked = i < n;
+        const planted = unlocked && plot && plot.crop;
+        if (!unlocked) {
+          if (i !== n) {
+            for (let k = 0; k < 2; k++) {
+              const gw = new T.Mesh(new T.ConeGeometry(.035, .22 + hash(i + k) * .18, 4),
+                new T.MeshStandardMaterial({ color: '#77844a', roughness: 1 }));
+              gw.position.set(px - .35 + hash(i * 3 + k) * .7, .12, pz - .35 + hash(i * 5 + k) * .7);
+              gw.rotation.z = (hash(i + k * 2) - .5) * .5;
+              grassBucket.add(gw);
+            }
           }
           continue;
         }
-        const prog = plot.ready ? 1 : clamp((Date.now() - (plot.plantedAt || 0)) / Math.max(1, plot.crop.growTime * 1000), 0, 1);
-        const row = new T.Group();
-        for (let k = 0; k < 6; k++) {
-          const crop = cropGroup(plot.crop.id);
-          crop.scale.setScalar((1.15 + prog * .75) * (.9 + hash(i * 3 + k) * .25));
-          crop.position.set((k - 2.5) * .38, .09, (hash(i + k) - .5) * .7);
-          crop.rotation.y = hash(i * 7.7 + k) * 6.28;
-          row.add(crop);
+        if (!planted) continue;
+        const prog = plot.ready ? 1 : clamp((now - (plot.plantedAt || 0)) / Math.max(1, plot.crop.growTime * 1000), 0, 1);
+        const modelName = 'crop_' + plot.crop.id;
+        const cropModel = this._models && this._models[modelName];
+        const sc = .86 + prog * .44;
+        const offs = [[-.33, -.30], [.33, .20], [-.05, .38]];
+        for (let k = 0; k < offs.length; k++) {
+          const sx = px + offs[k][0] + (hash(i * 11 + k) - .5) * .16;
+          const sz = pz + offs[k][1] + (hash(i * 17 + k) - .5) * .16;
+          const rot = hash(i * 7.7 + k) * 6.28;
+          if (cropModel) {
+            const inst = cropModel.clone(true);
+            inst.scale.setScalar(sc * (.9 + hash(i * 3 + k) * .2));
+            inst.position.set(sx, .02, sz);
+            inst.rotation.y = rot;
+            cropBucket.add(inst);
+          } else {
+            const crop = cropGroup(plot.crop.id);
+            crop.scale.setScalar(sc * 1.3);
+            crop.position.set(sx, .06, sz);
+            crop.rotation.y = rot;
+            cropBucket.add(crop);
+          }
         }
-        row.position.set(x, 0, z);
-        row.scale.setScalar(1.0);
-        row.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-        const cs = new T.Mesh(new T.PlaneGeometry(2.4, 2.1), new T.MeshBasicMaterial({ map: this._shadowTex, transparent: true, depthWrite: false }));
-        cs.rotation.x = -Math.PI / 2; cs.position.set(x, .04, z);
-        this._scene.add(cs); this._cropMeshes.push(cs);
-        const mergedRow = mergeMeshes(row);
-        this._scene.add(mergedRow); this._cropMeshes.push(mergedRow);
-        // 成熟金光
         if (plot.ready) {
-          const l = new T.PointLight(0xffd27a, .7, 3.2); l.position.set(x, .9, z); this._scene.add(l); this._cropMeshes.push(l);
-          const halo = new T.Mesh(new T.SphereGeometry(.05, 6, 4), new T.MeshBasicMaterial({ color: 0xffe6a0 }));
-          halo.position.set(x, 1.1, z); this._scene.add(halo); this._cropMeshes.push(halo);
+          const ringMat = new T.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: .55, side: T.DoubleSide, depthWrite: false });
+          const ring = new T.Mesh(new T.RingGeometry(.34, .46, 24), ringMat);
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(px, .075, pz);
+          const ringMat2 = new T.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: .3, side: T.DoubleSide, depthWrite: false });
+          const ring2 = new T.Mesh(new T.RingGeometry(.52, .56, 24), ringMat2);
+          ring2.rotation.x = -Math.PI / 2;
+          ring2.position.set(px, .08, pz);
+          glowBucket.add(ring); glowBucket.add(ring2);
+          this._readyGlowMats.push(ringMat, ringMat2);
+          // 漂浮金色对勾（角标）
+          const spr = new T.Sprite(this._readyBadgeMat());
+          spr.scale.set(.34, .34, 1);
+          spr.position.set(px, 1.05, pz);
+          spr.userData.baseY = 1.05;
+          this._readySprites.push(spr);
+          this._scene.add(spr);
+          this._cropMeshes.push(spr);
         }
       }
+      // 下一块待扩建：四角木桩 + 绳
+      if (n < COLS * ROWS) {
+        const col = n % COLS, row = Math.floor(n / COLS);
+        const px = CX - W / 2 + (col + .5) * PITCH;
+        const pz = CZ + H / 2 - (row + .5) * PITCH;
+        let canAfford = false;
+        try {
+          const ucost = (typeof Farm !== 'undefined' && Farm.getUnlockCost) ? Farm.getUnlockCost(n) : null;
+          const fiberHave = (typeof Warehouse !== 'undefined' && Warehouse.getCount) ? Warehouse.getCount('fiber') : 0;
+          canAfford = !!ucost && GameState.gold >= ucost.gold && fiberHave >= (ucost.fiber || 0);
+        } catch (e) {}
+        const postMat = new T.MeshStandardMaterial({ color: canAfford ? '#ffd76a' : '#7a5a3a', roughness: 1, emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .6 : 0 });
+        for (const [dx, dz] of [[-.62, -.62], [.62, -.62], [-.62, .62], [.62, .62]]) {
+          const p = new T.Mesh(new T.BoxGeometry(.07, .62, .07), postMat);
+          p.position.set(px + dx, .31, pz + dz);
+          markerBucket.add(p);
+        }
+        const rope = new T.Mesh(new T.BoxGeometry(1.24, .025, .025), new T.MeshStandardMaterial({ color: canAfford ? '#ffe08a' : '#c8b070', emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .5 : 0 }));
+        rope.position.set(px, .5, pz - .62); markerBucket.add(rope);
+        const rope2 = rope.clone(); rope2.position.z = pz + .62; markerBucket.add(rope2);
+      }
+      const addMerged = (g) => {
+        if (!g.children.length) return;
+        const m = mergeMeshes(g);
+        this._scene.add(m);
+        this._cropMeshes.push(m);
+      };
+      // 田埂土垄（沿 x/z 每格边界），让 48 格网格在 3D 里可读
+      const ridgeMat = new T.MeshStandardMaterial({ color: '#7a5e3e', roughness: 1 });
+      for (let ci = 1; ci < COLS; ci++) {
+        const rx = CX - W / 2 + ci * PITCH;
+        const ridge = new T.Mesh(new T.BoxGeometry(.09, .05, H), ridgeMat);
+        ridge.position.set(rx, .035, CZ);
+        markerBucket.add(ridge);
+      }
+      for (let ri = 1; ri < ROWS; ri++) {
+        const rz = CZ - H / 2 + ri * PITCH;
+        const ridge = new T.Mesh(new T.BoxGeometry(W, .05, .09), ridgeMat);
+        ridge.position.set(CX, .035, rz);
+        markerBucket.add(ridge);
+      }
+      addMerged(cropBucket); addMerged(grassBucket); addMerged(glowBucket); addMerged(markerBucket);
+    },
+
+    // 成熟角标贴图（金色圆底 + 深色对勾），缓存复用
+    _readyBadgeTex() {
+      if (this._readyTex) return this._readyTex;
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      const c = cv.getContext('2d');
+      c.beginPath(); c.arc(32, 32, 29, 0, Math.PI * 2);
+      c.fillStyle = '#ffd76a'; c.fill();
+      c.lineWidth = 5; c.strokeStyle = '#8a5a10'; c.stroke();
+      c.beginPath(); c.moveTo(18, 34); c.lineTo(28, 44); c.lineTo(47, 21);
+      c.lineWidth = 8; c.strokeStyle = '#4a3008'; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke();
+      const tex = new T.CanvasTexture(cv);
+      if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
+      this._readyTex = tex;
+      return tex;
+    },
+    _readyBadgeMat() {
+      if (!this._readySpriteMat) this._readySpriteMat = new T.SpriteMaterial({ map: this._readyBadgeTex(), transparent: true, depthWrite: false });
+      return this._readySpriteMat;
     },
 
     _isNight() {
@@ -1658,6 +1917,7 @@
           this._renderer.setSize(cw, ch, false);
           this._camera.aspect = cw / ch; this._camera.updateProjectionMatrix();
           if (this._composer) this._composer.setSize(cw, ch);
+          if (this._illustration) this._illustration.uniforms.res.value.set(cw, ch);
           if (this._bloom) this._bloom.setSize(cw, ch);
         }
       }
@@ -1665,6 +1925,17 @@
       const dt = Math.min(.05, this._clock.getDelta());
       const t = now / 1000;
       this._syncState(false);
+      // 成熟光环呼吸 + 对勾上下浮动
+      if (this._readyGlowMats && this._readyGlowMats.length) {
+        const ga = .42 + Math.sin(t * 3.2) * .2;
+        for (let gi = 0; gi < this._readyGlowMats.length; gi++) this._readyGlowMats[gi].opacity = ga * (gi % 2 ? .62 : 1);
+      }
+      if (this._readySprites && this._readySprites.length) {
+        for (let si = 0; si < this._readySprites.length; si++) {
+          const spr = this._readySprites[si];
+          spr.position.y = (spr.userData.baseY || 1.05) + Math.sin(t * 2.2 + si) * .08;
+        }
+      }
       const ph = this._phase();
       const wk = (G.farmWeather && G.farmWeather.state) || G.weather || 'clear';
       const hour = ph.hr;
@@ -1684,8 +1955,8 @@
       const dayLight = Math.max(0, Math.sin(sunAngle)) * weatherDim;
       this._sun.intensity = .2 + dayLight * 2.3;
       this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffd8a8);
-      this._moon.intensity = nightF * .5;
-      this._hemi.intensity = .18 + dayLight * .55;
+      this._moon.intensity = nightF * .8;
+      this._hemi.intensity = .26 + dayLight * .55;
       this._hemi.color.setHex(ph.night ? 0x55688f : ph.dusk ? 0xc09070 : 0x9fb4d0);
       this._hemi.groundColor.setHex(ph.night ? 0x24242c : 0x3a3226);
       // 天空 uniform
@@ -1702,6 +1973,14 @@
       this._moonDisc.material.opacity = nightF * .9;
       this._stars.material.opacity = nightF * (wk === 'clear' ? .9 : .2);
       this._stars.visible = nightF > .05;
+      // 夜间田地补光：让 3D 农田的土壤与作物在夜里也有可读性
+      if (!this._fieldNightLight) {
+        this._fieldNightLight = new T.PointLight(0xbfd0e8, 0, 22, 1.6);
+        this._fieldNightLight.position.set(-3.8, 7.5, 5.6);
+        this._scene.add(this._fieldNightLight);
+      }
+      this._fieldNightLight.intensity = nightF * .55;
+
       // 雾
       this._scene.fog.density = lerp(this._scene.fog.density, WEATHER_FOG[wk] || .016, .06);
       const fogCol = ph.night ? 0x1c2434 : ph.dusk ? 0x8a5a44 : 0x8a8a80;
@@ -1737,14 +2016,14 @@
       this._mouse.y = lerp(this._mouse.y, this._mouse.ty, .04);
       const o = this._orbit || { yaw: 0, pitch: 0, idle: 99 };
       o.idle = (o.idle || 0) + dt;
-      const autoYaw = -0.04 + Math.sin(t * .045) * .16 + Math.sin(t * .021) * .06;
+      const autoYaw = -0.02 + Math.sin(t * .045) * .055 + Math.sin(t * .021) * .022;
       const yaw = autoYaw + o.yaw;
       const pitch = Math.max(-.35, Math.min(.35, o.pitch + Math.sin(t * .03) * .015));
-      const center = new T.Vector3(0.9, 1.2, -2.6);
-      const R = 19.2;
+      const center = new T.Vector3(-2.2, 1.1, 0.5);
+      const R = 18.4;
       const targetX = center.x + Math.sin(yaw) * R * Math.cos(pitch * .6) + this._mouse.x * 1.0;
       const targetZ = center.z + Math.cos(yaw) * R * Math.cos(pitch * .6);
-      const targetY = center.y + 2.9 + Math.sin(pitch) * 8 - this._mouse.y * .6;
+      const targetY = center.y + 4.35 + Math.sin(pitch) * 8 - this._mouse.y * .6;
       this._camera.position.x = lerp(this._camera.position.x, targetX, .06);
       this._camera.position.y = lerp(this._camera.position.y, targetY, .06);
       this._camera.position.z = lerp(this._camera.position.z, targetZ, .06);
@@ -1771,6 +2050,7 @@
       try { this._animateDecor(dt, t); } catch (e) {}
       // 水面微波
       if (this._water) { this._water.material.roughness = .16 + Math.sin(t * .8) * .04; }
+      if (this._illustration) this._illustration.uniforms.time.value = t;
       if (this._composer) this._composer.render();
       else this._renderer.render(this._scene, this._camera);
       return true;

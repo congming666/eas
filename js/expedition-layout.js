@@ -18,6 +18,20 @@ const ExpeditionLayout = {
     const btn = document.getElementById('startExpeditionBtn');
     btn.disabled = !ready;
     btn.textContent = ready ? '确认配置并出发' : weapons.length ? '金币不足' : '请先选择武器';
+    // 出征清单（左栏底部）
+    // 注意：清单元素在 .prep-content 内，MutationObserver 会监听它；
+    // 必须先比较再写入，避免"写入→观察器→再写入"的自激循环。
+    const setChk = (k, txt, ok) => {
+      const el = document.querySelector('[data-chk="' + k + '"]');
+      if (!el) return;
+      if (el.textContent !== txt) el.textContent = txt;
+      if (el.classList.contains('ok') !== !!ok) el.classList.toggle('ok', !!ok);
+    };
+    setChk('weapon', weapons.length + '/2', weapons.length > 0);
+    setChk('supply', types + '/6', types > 0);
+    const defCount = (GameState.defenseLoadout || []).length;
+    setChk('defense', defCount + '/6', defCount > 0);
+    setChk('map', map.name, true);
   },
   hud(g) {
     const conditions = document.getElementById('playerConditions');

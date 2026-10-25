@@ -191,6 +191,10 @@ const PlayerSkel = {
     }
   },
 };
+// 2026-10-23 复检：之前的"散件"截图实际是野猪/怪物压在玩家身上造成的误判；
+// 骨骼拼装的坐标/枢轴本身与 Canvas 版一致。这里修复 Pixi 侧 sway 缩放不一致后重新启用，
+// 并由 tools/verify-player-skel.js（Pixi + Canvas 双路径）回归把关。
+PlayerSkel.ENABLED = true;
 if (typeof window !== 'undefined') window.PlayerSkel = PlayerSkel;
 
 

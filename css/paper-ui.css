@@ -1,0 +1,208 @@
+/* ============================================================
+   UI 附加层（v5.9.35）
+   2026-10-23 试玩反馈：远征 HUD / 结算页恢复原有深色纸墨风格
+   本文件只保留：
+   - 全局楷体字体
+   - 弹窗 / 夺卡三选一 纸雕化
+   - 局部控件纸签（农场远征入口、toast、氛围音开关）
+   - Juice DOM 动画（收获/暴击；撤离成功只保留闪光/粒子/音效）
+   ============================================================ */
+
+:root {
+  --paper: #f1e7ce;
+  --paper-2: #e8dbbb;
+  --paper-ink: #2a2114;
+  --paper-ink-soft: #5a4a30;
+  --paper-line: #4a3a22;
+  --paper-accent: #b8863b;
+  --paper-grain: url("../assets/ui/paper-grain.png");
+  --ui-font: "KaiTi", "楷体", "STKaiti", "Kaiti SC", "Microsoft YaHei", serif;
+  --biome-accent: #c9a25a;
+}
+
+/* ---------- 全局字体：楷体作为界面语言 ---------- */
+html, body, button, input, select, textarea, kbd, summary {
+  font-family: var(--ui-font) !important;
+}
+body { letter-spacing: .3px; }
+
+/* ---------- 小标签统一墨线 ---------- */
+kbd {
+  background: var(--paper-2) !important;
+  color: var(--paper-ink) !important;
+  border: 1px solid var(--paper-line) !important;
+  border-bottom-width: 2px !important;
+  border-radius: 2px !important;
+  padding: 0 4px !important;
+  box-shadow: 1px 1px 0 rgba(0,0,0,.35) !important;
+}
+
+/* ============================================================
+   弹窗 / 夺卡三选一 / 商店 / 仓库：纸页
+   ============================================================ */
+.v58-overlay,
+.modal-overlay { background: rgba(14, 18, 10, .72) !important; }
+
+.v58-modal,
+.modal-window,
+.warehouse-modal,
+.greenhouse-modal,
+#v5Modal {
+  background-color: var(--paper) !important;
+  background-image: var(--paper-grain) !important;
+  background-blend-mode: multiply !important;
+  color: var(--paper-ink) !important;
+  border: 1px solid var(--paper-line) !important;
+  border-radius: 3px !important;
+  box-shadow: 4px 4px 0 rgba(18,12,5,.55), 0 18px 40px rgba(0,0,0,.35) !important;
+}
+.v58-modal-title,
+.modal-window h2, .modal-window h3,
+.warehouse-modal h2, .warehouse-modal h3,
+.greenhouse-modal h2, .greenhouse-modal h3 {
+  color: var(--paper-ink) !important;
+  font-family: var(--ui-font) !important;
+  letter-spacing: 2px;
+}
+.v58-modal-hint, .modal-window p, .warehouse-modal p { color: var(--paper-ink-soft) !important; }
+
+/* 夺卡卡牌：纸牌 */
+.v58-cap-card {
+  background-color: var(--paper) !important;
+  background-image: var(--paper-grain) !important;
+  background-blend-mode: multiply !important;
+  color: var(--paper-ink) !important;
+  border: 1px solid var(--paper-line) !important;
+  border-radius: 3px !important;
+  box-shadow: 3px 3px 0 rgba(18,12,5,.45) !important;
+}
+.v58-cap-card:hover { background-color: #f7efd7 !important; transform: translate(-1px,-1px); }
+.v58-cap-kind { color: var(--paper-ink-soft) !important; }
+.v58-cap-name { color: var(--paper-ink) !important; }
+.v58-cap-desc { color: var(--paper-ink-soft) !important; }
+.v58-cap-grey { filter: grayscale(.55) brightness(.92); }
+
+/* 弹窗内按钮纸签 */
+.v58-modal button,
+.warehouse-modal button,
+.greenhouse-modal button,
+#v5Modal button {
+  background-color: var(--paper-2) !important;
+  background-image: var(--paper-grain) !important;
+  background-blend-mode: multiply !important;
+  color: var(--paper-ink) !important;
+  border: 1px solid var(--paper-line) !important;
+  border-radius: 2px !important;
+  box-shadow: 1px 1px 0 rgba(18,12,5,.45) !important;
+  text-shadow: none !important;
+}
+
+/* ============================================================
+   Juice DOM 动画
+   ============================================================ */
+@keyframes juiceShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+}
+.juice-shake { animation: juiceShake .26s ease; }
+
+#juiceFlash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 95;
+  opacity: 0;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(255,240,200,.85), rgba(255,214,120,.25) 55%, rgba(255,214,120,0) 78%);
+  transition: opacity .07s linear;
+}
+#juiceFlash.on { opacity: 1; }
+#juiceFlash.crit {
+  background: radial-gradient(70% 70% at 50% 50%, rgba(255,232,160,.55), rgba(200,120,40,.16) 55%, rgba(0,0,0,0) 80%);
+}
+
+.juice-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 96;
+  font-size: 15px;
+  line-height: 1;
+  will-change: transform, opacity;
+  text-shadow: 0 1px 0 rgba(0,0,0,.35);
+}
+
+/* 农场连收横幅（保持纸签；只出现在农场层） */
+.juice-banner {
+  position: fixed;
+  left: 50%;
+  top: 26%;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  z-index: 97;
+  pointer-events: none;
+  padding: 12px 26px;
+  color: var(--paper-ink);
+  background-color: var(--paper);
+  background-image: var(--paper-grain);
+  background-blend-mode: multiply;
+  background-size: 128px 128px;
+  border: 2px solid var(--paper-line);
+  border-radius: 3px;
+  box-shadow: 4px 4px 0 rgba(18,12,5,.5);
+  font-family: var(--ui-font);
+  font-size: 22px;
+  letter-spacing: 4px;
+  font-weight: 700;
+  animation: juiceBannerIn .3s cubic-bezier(.2,1.4,.4,1) both;
+}
+@keyframes juiceBannerIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.7) rotate(-6deg); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+}
+
+/* 金币数值弹跳 */
+#goldDisplay.juice-pop, #prepGoldDisplay.juice-pop {
+  animation: juicePop .32s cubic-bezier(.2,1.6,.4,1);
+}
+@keyframes juicePop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.22); color: #ffd76a; }
+  100% { transform: scale(1); }
+}
+
+/* 氛围音开关（标题设置面板） */
+.ambience-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: #d8cfb6;
+  font-size: 12px;
+  font-family: var(--ui-font);
+}
+
+/* ============================================================
+   局部控件纸签（农场远征入口 / toast）
+   ============================================================ */
+#farmScreen .start-expedition-btn.gate-btn {
+  background-color: #e9d6a4 !important;
+  background-image: var(--paper-grain) !important;
+  background-blend-mode: multiply !important;
+  color: #5a3218 !important;
+  border: 2px solid var(--paper-line) !important;
+  border-radius: 3px !important;
+  box-shadow: 3px 3px 0 rgba(18,12,5,.5) !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px;
+}
+#farmScreen .start-expedition-btn.gate-btn * { color: inherit !important; }
+#farmScreen #farmExpansionToggle {
+  background-color: var(--paper-2) !important;
+  background-image: var(--paper-grain) !important;
+  background-blend-mode: multiply !important;
+  color: var(--paper-ink) !important;
+  border: 1px solid var(--paper-line) !important;
+  border-radius: 2px !important;
+  box-shadow: 1px 1px 0 rgba(18,12,5,.4) !important;
+}
