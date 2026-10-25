@@ -1,0 +1,368 @@
+{
+  "report": [
+    {
+      "file": "char_farmer.glb",
+      "heightM": 2.0,
+      "kind": "char",
+      "materialSlots": [
+        "cloth_brown",
+        "cloth_red",
+        "fur_dark",
+        "skin",
+        "straw"
+      ],
+      "bytes": 353828,
+      "imageMimes": [],
+      "triangles": 12000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.237031,
+      "norm_min_y": -0.128067,
+      "norm_max_x": 0.237031,
+      "norm_max_y": 0.128067
+    },
+    {
+      "file": "mob_bat.glb",
+      "heightM": 0.95,
+      "kind": "mob",
+      "materialSlots": [
+        "chitin_dark"
+      ],
+      "bytes": 313960,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": -0.0,
+      "norm_min_x": -0.863808,
+      "norm_min_y": -0.647417,
+      "norm_max_x": 0.863808,
+      "norm_max_y": 0.647417
+    },
+    {
+      "file": "mob_boar.glb",
+      "heightM": 1.05,
+      "kind": "mob",
+      "materialSlots": [
+        "fur_brown"
+      ],
+      "bytes": 306952,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.424434,
+      "norm_min_y": -0.579325,
+      "norm_max_x": 0.424434,
+      "norm_max_y": 0.579325
+    },
+    {
+      "file": "mob_boss.glb",
+      "heightM": 2.9,
+      "kind": "mob",
+      "materialSlots": [
+        "fur_dark",
+        "horn"
+      ],
+      "bytes": 572420,
+      "imageMimes": [],
+      "triangles": 18000,
+      "norm_height": 1.0,
+      "norm_min_z": -0.0,
+      "norm_min_x": -0.27404,
+      "norm_min_y": -0.224943,
+      "norm_max_x": 0.27404,
+      "norm_max_y": 0.224943
+    },
+    {
+      "file": "mob_locust.glb",
+      "heightM": 0.7,
+      "kind": "mob",
+      "materialSlots": [
+        "chitin_green"
+      ],
+      "bytes": 393616,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.590357,
+      "norm_min_y": -0.673266,
+      "norm_max_x": 0.590357,
+      "norm_max_y": 0.673266
+    },
+    {
+      "file": "mob_spider.glb",
+      "heightM": 0.85,
+      "kind": "mob",
+      "materialSlots": [
+        "chitin_dark"
+      ],
+      "bytes": 361880,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": -0.0,
+      "norm_min_x": -0.600626,
+      "norm_min_y": -0.724094,
+      "norm_max_x": 0.600626,
+      "norm_max_y": 0.724094
+    },
+    {
+      "file": "mob_wolf.glb",
+      "heightM": 1.35,
+      "kind": "mob",
+      "materialSlots": [
+        "fur_grey"
+      ],
+      "bytes": 295460,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.299214,
+      "norm_min_y": -0.436553,
+      "norm_max_x": 0.299214,
+      "norm_max_y": 0.436553
+    },
+    {
+      "file": "obs_bush.glb",
+      "heightM": 0.7,
+      "kind": "obs",
+      "materialSlots": [
+        "leaf"
+      ],
+      "bytes": 479960,
+      "imageMimes": [],
+      "triangles": 12000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.415795,
+      "norm_min_y": -0.493885,
+      "norm_max_x": 0.415795,
+      "norm_max_y": 0.493885
+    },
+    {
+      "file": "obs_deadTree.glb",
+      "heightM": 2.4,
+      "kind": "obs",
+      "materialSlots": [
+        "bark"
+      ],
+      "bytes": 363572,
+      "imageMimes": [],
+      "triangles": 10000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.416278,
+      "norm_min_y": -0.302622,
+      "norm_max_x": 0.416278,
+      "norm_max_y": 0.302622
+    },
+    {
+      "file": "obs_fence.glb",
+      "heightM": 1.0,
+      "kind": "obs",
+      "materialSlots": [
+        "wood",
+        "wood_dark"
+      ],
+      "bytes": 11328,
+      "imageMimes": [],
+      "triangles": 120,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.835165,
+      "norm_min_y": -0.104396,
+      "norm_max_x": 0.835165,
+      "norm_max_y": 0.104396
+    },
+    {
+      "file": "obs_hay.glb",
+      "heightM": 1.0,
+      "kind": "obs",
+      "materialSlots": [
+        "dark",
+        "straw"
+      ],
+      "bytes": 180060,
+      "imageMimes": [],
+      "triangles": 2596,
+      "norm_height": 1.0,
+      "norm_min_z": -0.0,
+      "norm_min_x": -0.523256,
+      "norm_min_y": -0.5,
+      "norm_max_x": 0.523256,
+      "norm_max_y": 0.5
+    },
+    {
+      "file": "obs_monolith.glb",
+      "heightM": 2.4,
+      "kind": "obs",
+      "materialSlots": [
+        "crystal_purple",
+        "monolith",
+        "stone_dark"
+      ],
+      "bytes": 6260,
+      "imageMimes": [],
+      "triangles": 36,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.1375,
+      "norm_min_y": -0.083333,
+      "norm_max_x": 0.1375,
+      "norm_max_y": 0.083333
+    },
+    {
+      "file": "obs_rock.glb",
+      "heightM": 0.9,
+      "kind": "obs",
+      "materialSlots": [
+        "rock"
+      ],
+      "bytes": 371060,
+      "imageMimes": [],
+      "triangles": 12000,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.425587,
+      "norm_min_y": -0.404907,
+      "norm_max_x": 0.425587,
+      "norm_max_y": 0.404907
+    },
+    {
+      "file": "obs_ruin.glb",
+      "heightM": 1.0,
+      "kind": "obs",
+      "materialSlots": [
+        "stone",
+        "stone_dark"
+      ],
+      "bytes": 21748,
+      "imageMimes": [],
+      "triangles": 276,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.850525,
+      "norm_min_y": -0.405806,
+      "norm_max_x": 0.850525,
+      "norm_max_y": 0.405806
+    },
+    {
+      "file": "obs_toxicCrystal.glb",
+      "heightM": 1.4,
+      "kind": "obs",
+      "materialSlots": [
+        "crystal_green",
+        "stone_dark"
+      ],
+      "bytes": 29444,
+      "imageMimes": [],
+      "triangles": 280,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.384615,
+      "norm_min_y": -0.365791,
+      "norm_max_x": 0.384615,
+      "norm_max_y": 0.365791
+    },
+    {
+      "file": "obs_tree.glb",
+      "heightM": 3.0,
+      "kind": "obs",
+      "materialSlots": [
+        "bark",
+        "leaf"
+      ],
+      "bytes": 464288,
+      "imageMimes": [],
+      "triangles": 12000,
+      "norm_height": 1.0,
+      "norm_min_z": -0.0,
+      "norm_min_x": -0.528814,
+      "norm_min_y": -0.505835,
+      "norm_max_x": 0.528814,
+      "norm_max_y": 0.505835
+    },
+    {
+      "file": "obs_voidCrystal.glb",
+      "heightM": 1.6,
+      "kind": "obs",
+      "materialSlots": [
+        "crystal_purple",
+        "monolith"
+      ],
+      "bytes": 21276,
+      "imageMimes": [],
+      "triangles": 200,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.333333,
+      "norm_min_y": -0.317019,
+      "norm_max_x": 0.333333,
+      "norm_max_y": 0.317019
+    },
+    {
+      "file": "weapon_sickle.glb",
+      "heightM": 1.05,
+      "kind": "weapon",
+      "materialSlots": [
+        "metal",
+        "wood",
+        "wood_dark"
+      ],
+      "bytes": 42060,
+      "imageMimes": [],
+      "triangles": 684,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.286981,
+      "norm_min_y": -0.060699,
+      "norm_max_x": 0.286981,
+      "norm_max_y": 0.060699
+    },
+    {
+      "file": "weapon_pea_repeater.glb",
+      "heightM": 0.95,
+      "kind": "weapon",
+      "materialSlots": [
+        "dark",
+        "leaf",
+        "metal",
+        "wood",
+        "wood_dark"
+      ],
+      "bytes": 51948,
+      "imageMimes": [],
+      "triangles": 1160,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.348062,
+      "norm_min_y": -0.155565,
+      "norm_max_x": 0.348062,
+      "norm_max_y": 0.155565
+    },
+    {
+      "file": "weapon_vine_staff.glb",
+      "heightM": 1.7,
+      "kind": "weapon",
+      "materialSlots": [
+        "crystal_green",
+        "leaf",
+        "metal",
+        "wood_dark"
+      ],
+      "bytes": 104764,
+      "imageMimes": [],
+      "triangles": 2448,
+      "norm_height": 1.0,
+      "norm_min_z": 0.0,
+      "norm_min_x": -0.075581,
+      "norm_min_y": -0.107417,
+      "norm_max_x": 0.075581,
+      "norm_max_y": 0.107417
+    }
+  ],
+  "failed": [],
+  "totalBytes": 4745884
+}

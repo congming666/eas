@@ -764,12 +764,27 @@
       cam.lookAt(-0.5, 1.2, -1.0);
       this._scene = scene; this._camera = cam;
       // Bloom 后处理（泛光：窗光/灯光/月光溢出）
-      this._composer = null; this._bloom = null;
+      // P5 电影链开关 farmPanoCine（auto/on/off）：on=HalfFloat HDR + ACES + 收敛 Bloom + 末尾 sRGB；
+      // off 完全保留旧 LDR 插画风链（墨线/纸纹/暖调），零行为回归。默认 auto=on。
+      const cineOn = (function () { try { return (localStorage.getItem('farmPanoCine') || 'auto').toLowerCase() !== 'off'; } catch (e) { return true; } })();
+      this._cineOn = cineOn;
+      this._composer = null; this._bloom = null; this._cine = null; this._srgb = null;
       try {
         if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
-          const comp = new T.EffectComposer(r);
+          let comp;
+          if (cineOn && T.HalfFloatType) {
+            // 线性 HDR 目标，避免 LDR 截断高光使 Bloom/ACES 失效
+            const rt = new T.WebGLRenderTarget(w, h, { minFilter: T.LinearFilter, magFilter: T.LinearFilter, format: T.RGBAFormat, type: T.HalfFloatType });
+            rt.texture.encoding = T.LinearEncoding;
+            comp = new T.EffectComposer(r, rt);
+          } else {
+            comp = new T.EffectComposer(r);
+          }
           comp.addPass(new T.RenderPass(scene, cam));
-          const bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .22, .46, .92);
+          // 电影链 Bloom 向 strength .32 / radius .62 / threshold .92 收敛；旧链维持 .22/.46/.92
+          const bloom = cineOn
+            ? new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .32, .62, .92)
+            : new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), .22, .46, .92);
           comp.addPass(bloom);
           this._composer = comp; this._bloom = bloom;
           // God rays：径向模糊的屏幕空间体积光
@@ -865,10 +880,64 @@
               gr.needsSwap = true;
               comp.addPass(gr);
               this._godrays = gr;
+
+              // P5 电影链：线性曝光 → ACES(Narkowicz) → 轻对比。不做主题染色/暗角/白平衡，
+              // 风格化（墨线/纸纹/暖调）仍完全交给后续 Illustration，最小扰动既有美术。
+              if (cineOn && T.ShaderPass) {
+                const cineShader = {
+                  // 昼夜自适应：白天通透明快、夜间自动压曝光+强化黑场塑形恢复夜感（uNight 由 frame 按 dayLight 注入）
+                  uniforms: {
+                    tDiffuse: { value: null }, uNight: { value: 0 },
+                    uExpDay: { value: 0.98 }, uExpNight: { value: 0.70 },
+                    uGammaDay: { value: 1.12 }, uGammaNight: { value: 1.50 },
+                    uConDay: { value: 1.10 }, uConNight: { value: 1.18 }
+                  },
+                  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+                  fragmentShader: [
+                    'uniform sampler2D tDiffuse; uniform float uNight,uExpDay,uExpNight,uGammaDay,uGammaNight,uConDay,uConNight;',
+                    'varying vec2 vUv;',
+                    'vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14;',
+                    '  return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0); }',
+                    'void main(){',
+                    '  float exposure=mix(uExpDay,uExpNight,uNight);',
+                    '  float gamma=mix(uGammaDay,uGammaNight,uNight);',
+                    '  float contrast=mix(uConDay,uConNight,uNight);',
+                    '  vec3 col=texture2D(tDiffuse,vUv).rgb*exposure;',
+                    '  col=aces(col);',
+                    '  col=pow(max(col,vec3(0.0)),vec3(gamma));',  // 黑场塑形：夜间强力压中暗部、白天轻微
+                    '  col=(col-0.18)*contrast+0.18;',
+                    '  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);',
+                    '}'
+                  ].join('\n')
+                };
+                this._cine = new T.ShaderPass(cineShader);
+                comp.addPass(this._cine);
+              }
+
               const il = new T.ShaderPass(illusShader);
               il.needsSwap = true;
+              if (cineOn) {
+                // HDR/ACES 自带胶片质感：减弱纸纹避免暗部噪点被黑场塑形放大，微补墨线维持版画轮廓
+                il.uniforms.grain.value = 0.018;
+                il.uniforms.lineStrength.value = 0.64;
+              }
               comp.addPass(il);
               this._illustration = il;
+
+              // 最末线性→sRGB 编码（r128 无 OutputPass；renderer.outputEncoding 保持 Linear 由此外置，杜绝双重编码）
+              if (cineOn && T.ShaderPass) {
+                const srgbShader = {
+                  uniforms: { tDiffuse: { value: null } },
+                  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+                  fragmentShader: [
+                    'uniform sampler2D tDiffuse; varying vec2 vUv;',
+                    'vec3 enc(vec3 c){ return mix(c*12.92/1.0,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c)); }',
+                    'void main(){ vec3 c=texture2D(tDiffuse,vUv).rgb; gl_FragColor=vec4(enc(clamp(c,0.0,1.0)),1.0); }'
+                  ].join('\n')
+                };
+                this._srgb = new T.ShaderPass(srgbShader);
+                comp.addPass(this._srgb);
+              }
             }
           } catch (e) { console.warn('[Pano3D] godrays disabled', e); }
 
@@ -2051,6 +2120,7 @@
       // 水面微波
       if (this._water) { this._water.material.roughness = .16 + Math.sin(t * .8) * .04; }
       if (this._illustration) this._illustration.uniforms.time.value = t;
+      if (this._cine) this._cine.uniforms.uNight.value = Math.max(0, Math.min(1, 1 - dayLight));
       if (this._composer) this._composer.render();
       else this._renderer.render(this._scene, this._camera);
       return true;

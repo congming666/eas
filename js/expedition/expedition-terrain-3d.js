@@ -80,7 +80,8 @@
       if (!this._insertCanvas()) { this.enabled = false; return false; }
       try {
         const r = new T.WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
-        r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        this._gcfg = window.GraphicsQuality ? window.GraphicsQuality.config() : null;
+        r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._gcfg ? this._gcfg.dpr : 1.5));
         r.setSize(this.canvas.width, this.canvas.height, false);
         r.setClearColor(0x000000, 0);
         r.shadowMap.enabled = true;
@@ -95,7 +96,7 @@
         this.scene.add(this._hemi);
         this._sun = new T.DirectionalLight(0xffe6b8, 2.45);
         this._sun.castShadow = true;
-        this._sun.shadow.mapSize.set(2048, 2048);
+        this._sun.shadow.mapSize.set(this._gcfg ? this._gcfg.shadowMap : 2048, this._gcfg ? this._gcfg.shadowMap : 2048);
         this._sun.shadow.camera.left = -1500;
         this._sun.shadow.camera.right = 1500;
         this._sun.shadow.camera.top = 1500;
@@ -108,6 +109,12 @@
         this.scene.add(this._sun.target);
         this.ready = true;
         this.enabled = true;
+        // 预热实时 3D 实体层（异步加载 GLB/PBR；失败内部自回退，不影响地形）
+        if (window.ThreeEntities && ThreeEntities.init) { try { ThreeEntities.init(); } catch (e) {} }
+        // 方案 C P4：影视级后处理（ACES/四主题/Bloom）；失败内部自回退直渲，不影响地形
+        if (window.ThreePostFX && ThreePostFX.init) {
+          try { ThreePostFX.init(r, this.scene, this.camera, this.canvas.width, this.canvas.height); } catch (e) {}
+        }
         return true;
       } catch (e) {
         console.warn('[Terrain3D] WebGL 初始化失败，回退 2D 地形：', e);
@@ -474,7 +481,9 @@
         if (terr) this.scene.add(terr);
         const water = this._buildWater(exp);
         if (water) this.scene.add(water);
-        this._buildProps(exp);
+        // GLB 实体层就绪后，tree/rock/bush/ruin 由真实模型承担，跳过程序化 InstancedMesh 避免重复
+        const glbObstaclesOn = window.ThreeEntities && ThreeEntities.ready && ThreeEntities.enabled;
+        if (!glbObstaclesOn) this._buildProps(exp); else this._propMeshes = [];
         const grass = this._buildGrass(exp);
         if (grass) this.scene.add(grass);
         return true;
@@ -484,6 +493,18 @@
         this.enabled = false;
         return false;
       }
+    },
+
+    // GLB 实体层就绪后调用：移除程序化 tree/rock/bush/ruin 实例（由真实 GLB 障碍接管）
+    suspendProps() {
+      const dispose = (obj) => {
+        if (!obj || !this.scene) return;
+        this.scene.remove(obj);
+        if (obj.geometry && obj.geometry.dispose) obj.geometry.dispose();
+        if (obj.material) { const mats = Array.isArray(obj.material) ? obj.material : [obj.material]; mats.forEach(m => m && m.dispose && m.dispose()); }
+      };
+      this._propMeshes.forEach(dispose);
+      this._propMeshes = [];
     },
 
     _shadeHex(hex, amt) {
@@ -520,7 +541,40 @@
         this._syncChunkTextures(exp, cam);
         if (this._waterU) this._waterU.uTime.value = this._time;
         this._updateEnv(exp);
-        this.renderer.render(this.scene, this.camera);
+        // 方案 C：实时 3D 实体层在同一 Three 场景内同步（失败/未就绪时静默跳过，实体留 Pixi/2D）
+        if (window.ThreeEntities) { try { ThreeEntities.sync(exp); } catch (e) {} }
+        // 方案 C P4：后处理可用时走 composer（含 ACES/Bloom/主题调色），否则直渲
+        const fx = window.ThreePostFX;
+        if (fx && fx.ready && fx.enabled) {
+          try {
+            const tier = (exp.map && exp.map.tier) || 1;
+            if (fx._targetTier !== tier) fx.setTier(tier);
+            if (this._fxW !== W || this._fxH !== H) { fx.setSize(W, H); this._fxW = W; this._fxH = H; }
+            if (!fx.render(1 / 60)) this.renderer.render(this.scene, this.camera);
+          } catch (e) { this.renderer.render(this.scene, this.camera); }
+        } else {
+          this.renderer.render(this.scene, this.camera);
+        }
+        // P6：真实墙钟帧时采样 + 档位热更新（DPR 即时生效；阴影/池容量下次进图生效）。
+        // 整段独立保护：画质监控任何异常都不得拖垮渲染主路径触发 2D 回退。
+        try {
+          if (window.GraphicsQuality) {
+            const gq = window.GraphicsQuality;
+            if (!this._gqBound) {
+              this._gqBound = true;
+              gq.onTierChange((t, cfg) => {
+                try {
+                  this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.dpr));
+                  this.renderer.setSize(this.canvas.width, this.canvas.height, false);
+                  if (window.ThreePostFX && ThreePostFX.setSize) ThreePostFX.setSize(this.canvas.width, this.canvas.height);
+                } catch (e) { gq.markFail('hotDpr', e); }
+              });
+            }
+            const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            if (this._gqLast) gq.recordFrame(now - this._gqLast);
+            this._gqLast = now;
+          }
+        } catch (gqErr) { try { window.GraphicsQuality && window.GraphicsQuality.markFail('monitor', gqErr); } catch (e) {} }
         return true;
       } catch (e) {
         if (!this._fallbackWarned) { this._fallbackWarned = true; console.warn('[Terrain3D] 渲染异常，回退 2D：', e); }
@@ -535,13 +589,65 @@
       const wet = /rain|storm/.test(w) ? 1 : (w === 'cloud' ? 0.35 : 0.12);
       const snow = w === 'snow' ? 1 : 0;
       const fog = w === 'fog' ? 1 : (/rain|storm/.test(w) ? 0.45 : w === 'cloud' ? 0.2 : 0);
+      const sunEl = (phase === 'night') ? 500 : 620;
+      const sunAz = (phase === 'dusk' || phase === 'dawn') ? 1.2 : 2.4;
+      const cx = exp.terrainHeight ? exp.terrainHeight.size / 2 : 1200;
+
+      // 方案 C P4：后处理就绪时，光照/雾走「四主题基线 × 昼夜/天气调制」；否则用原硬编码色表（回退）
+      const fxE = (window.ThreePostFX && ThreePostFX.ready && ThreePostFX.enabled) ? ThreePostFX.env() : null;
+      if (fxE) {
+        if (!this._fxTmp) { this._fxTmp = { sun: new T.Color(), hemi: new T.Color(), hg: new T.Color(), dusk: new T.Color(0xff9a55), night: new T.Color(0x9fb6ff), dawn: new T.Color(0xffb987), nfog: new T.Color(0x141c2c) }; }
+        const K = this._fxTmp;
+        // 相位强度/染色权重
+        const pK = phase === 'night' ? 0.68 : (phase === 'dusk' ? 0.8 : phase === 'dawn' ? 0.82 : 1);
+        const SUN_SCALE = 1.55; // Unity 主题光强（~1.5）标定到网页既有日光量级（~2.45）
+        if (this._sun) {
+          K.sun.setRGB(fxE.key.x, fxE.key.y, fxE.key.z);
+          if (phase === 'dusk') K.sun.lerp(K.dusk, 0.35);
+          else if (phase === 'dawn') K.sun.lerp(K.dawn, 0.3);
+          else if (phase === 'night') K.sun.lerp(K.night, 0.45).multiplyScalar(0.85);
+          this._sun.color.copy(K.sun);
+          this._sun.intensity = fxE.intensity * SUN_SCALE * pK;
+          this._sun.position.set(cx + Math.cos(sunAz) * 1500, sunEl, cx + Math.sin(sunAz) * 1200);
+          this._sun.target.position.set(cx, 0, cx);
+          this._sun.target.updateMatrixWorld();
+        }
+        if (this._hemi) {
+          K.hemi.setRGB(fxE.ambient.x, fxE.ambient.y, fxE.ambient.z);
+          if (phase === 'night') K.hemi.lerp(new T.Color(0x50607a), 0.4);
+          else if (phase === 'dusk' || phase === 'dawn') K.hemi.lerp(new T.Color(0xd8b48c), 0.3);
+          K.hg.setRGB(Math.min(fxE.ground.x, 1) * 0.38, Math.min(fxE.ground.y, 1) * 0.38, Math.min(fxE.ground.z, 1) * 0.38);
+          this._hemi.color.copy(K.hemi);
+          this._hemi.groundColor.copy(K.hg);
+          this._hemi.intensity = 1.12 * pK * (1 + fog * 0.15);
+        }
+        // 材质湿滑/雪、水 uniform 与原逻辑一致
+        const _fxMats = (this._terrainChunks || []).map(c => c.mat);
+        if (this._terrainMat) _fxMats.push(this._terrainMat);
+        _fxMats.forEach((m) => {
+          if (!m) return;
+          m.roughness = 0.95 - wet * 0.38;
+          m.metalness = wet * 0.05;
+          if (m.map) m.color.setRGB(1, 1, 1);
+        });
+        if (this._waterU) {
+          this._waterU.uWet.value = wet; this._waterU.uSnow.value = snow;
+          if (this._sun) this._waterU.uSunColor.value.copy(this._sun.color);
+        }
+        if (this.scene.fog) {
+          const base = ThreePostFX.fogBase();
+          this.scene.fog.color.setRGB(fxE.fog.x, fxE.fog.y, fxE.fog.z);
+          if (phase === 'night') { K.nfog.setRGB(0.078, 0.11, 0.17); this.scene.fog.color.lerp(K.nfog, 0.6); }
+          // Unity 米密度按相对比例映射到网页像素基准，再叠加既有天气/夜晚加权
+          this.scene.fog.density = base * fxE.fogScale + fog * 0.00045 + wet * 0.00008 + (phase === 'night' ? 0.00006 : 0);
+        }
+        return;
+      }
+
       let sunColor = 0xffe6b8, sunInt = 2.45, hemiInt = 1.12;
       if (phase === 'dusk') { sunColor = 0xff9a55; sunInt = 1.75; hemiInt = 0.75; }
       else if (phase === 'night') { sunColor = 0x9fb6ff; sunInt = 1.75; hemiInt = 0.95; }
       else if (phase === 'dawn') { sunColor = 0xffb987; sunInt = 1.6; hemiInt = 0.72; }
-      const sunEl = (phase === 'night') ? 500 : 620;
-      const sunAz = (phase === 'dusk' || phase === 'dawn') ? 1.2 : 2.4;
-      const cx = exp.terrainHeight ? exp.terrainHeight.size / 2 : 1200;
       if (this._sun) {
         this._sun.color.setHex(sunColor);
         this._sun.intensity = sunInt;
@@ -596,6 +702,8 @@
       this._terrainMesh = null; this._water = null; this._propMeshes = [];
       this._waterU = null; this._terrainMat = null;
       this._exp = null;
+      // 通知 3D 实体层回收本局实体（模板/材质保留）
+      if (window.ThreeEntities && ThreeEntities.onExpClear) { try { ThreeEntities.onExpClear(); } catch (e) {} }
       if (!keepRenderer) {
         this.ready = false;
         if (this.renderer) { try { this.renderer.dispose(); } catch (e) {} this.renderer = null; }

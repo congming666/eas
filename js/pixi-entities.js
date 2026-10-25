@@ -363,7 +363,62 @@ const PixiEntities = {
     return sp && sp.complete && sp.naturalWidth ? sp : null;
   },
 
+  // 3D 实体接管身体：Pixi 只画血条（字号/多语言/HUD 一致性），位置与 3D 实体同世界坐标
+  _updateTakenOverBar(w, obj, kind, exp) {
+    w.cont.visible = true;
+    w.cont.alpha = 1;
+    w.shadow.visible = false;
+    w.inner.visible = false;
+    w.body.visible = false;
+    if (w.body2) w.body2.visible = false;
+    w.weapon.visible = false;
+    w.glow.clear();
+    if (w.skel) w.skel.visible = false;
+    if (w.ghost) w.ghost.cont.visible = false;
+
+    const depth = exp.getDepthScale ? exp.getDepthScale(obj.y) : 1;
+    const lift = obj.visualZ || 0;
+    const kx = obj.knockX || 0, ky = obj.knockY || 0;
+    const _elev = (exp && exp.getElevationPx) ? exp.getElevationPx(obj.x, obj.y) : 0;
+    w.cont.position.set(obj.x + kx, obj.y + ky * .45 - lift - _elev);
+    w.cont.zIndex = obj.y;
+
+    // 用 GLB 像素高估算血条抬升，使其悬浮在头顶
+    const mm = window.EXP_MODELS && EXP_MODELS.models;
+    let h = 80;
+    if (mm) {
+      const mid = kind === 'player' ? 'char_farmer'
+        : ({ wolf:'mob_wolf', swift_wolf:'mob_wolf', bat:'mob_bat', gargoyle:'mob_bat', spider:'mob_spider',
+            brood_queen:'mob_spider', boar:'mob_boar', armored_boar:'mob_boar', herbivore:'mob_boar',
+            locust:'mob_locust', boss:'mob_boss' })[obj.type];
+      if (mid && mm[mid]) {
+        const elite = obj.elite ? 1.15 : 1;
+        const radiusScale = (kind === 'monster' && obj.type !== 'boss') ? (obj.radius / 18) : 1;
+        h = mm[mid].heightM * 40 * depth * elite * (kind === 'monster' ? radiusScale : 1);
+      }
+    }
+    const hpPct = Math.max(0, Math.min(1, obj.hp / obj.maxHp));
+    const barW = (kind === 'monster' && obj.elite) || kind === 'player' ? 52 : (obj.type === 'boss' ? 110 : 44);
+    const barY = -h - 8;
+    w.barBg.width = barW; w.barBg.height = 11;
+    w.barBg.position.set(0, barY);
+    w.barFill.width = barW; w.barFill.height = 7;
+    w.barFill.position.set(-barW / 2 + 2, barY);
+    w.barFill.scale.x = hpPct;
+    w.barFill.tint = hpPct > .35 ? (obj.type === 'boss' ? 0xff9a52 : 0x6fdd6a) : 0xe8483f;
+    const showBar = kind === 'player' || hpPct < 1 || obj.type === 'boss';
+    w.barBg.visible = showBar; w.barFill.visible = showBar;
+    if (!obj.hp && kind !== 'player') { w.barBg.visible = false; w.barFill.visible = false; }
+  },
+
   _updateCreature(w, obj, kind, exp) {
+    // 方案 C 混合层：3D 实体层接管身体时，Pixi 仅保留世界定位与血条，跳过一切身体/阴影/特效绘制
+    if (window.ThreeEntities && ThreeEntities.takesCreature && ThreeEntities.takesCreature(kind, obj)) {
+      this._updateTakenOverBar(w, obj, kind, exp);
+      return;
+    }
+    // 从 3D 接管态回退到 Pixi 绘制时，恢复 wrapper 各部件可见性
+    w.inner.visible = true; w.shadow.visible = true;
     if (kind === 'player' && typeof PlayerSkel !== 'undefined' && PlayerSkel.ENABLED !== false) {
       const sp = PlayerSkel.pose(obj);
       if (sp) { this._updatePlayerSkel(w, obj, exp, sp); return; }
