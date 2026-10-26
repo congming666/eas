@@ -31,6 +31,11 @@
     toxicCrystal: 'obs_toxicCrystal', crystal: 'obs_voidCrystal', voidCrystal: 'obs_voidCrystal',
   };
   const FLYERS = { mob_bat: 1, mob_locust: 1 };   // 飞行/悬浮单位
+  /* P9 方案B：拥有独立装饰高模 fx/<id>-decor.glb 的实体（6 怪 + 3 武器） */
+  const DECOR_IDS = {
+    mob_wolf: 1, mob_boar: 1, mob_bat: 1, mob_spider: 1, mob_locust: 1, mob_boss: 1,
+    weapon_sickle: 1, weapon_pea_repeater: 1, weapon_vine_staff: 1,
+  };
 
   const ThreeEntities = {
     ready: false,           // 模型与材质全部就绪
@@ -40,6 +45,7 @@
     _root: null,            // 实体总 Group，挂到 Terrain3D.scene
     _loader: null,
     _templates: {},         // modelId → 模板 Object3D（共享 geometry/material）
+    _decor: {},             // P9 modelId → 装饰高模模板 Object3D（fx/<id>-decor.glb）
     _matLib: {},            // 材质基名 → MeshStandardMaterial（全局共享）
     _texLoading: {},        // 纹理加载 Promise
     _creaturePool: [],      // 空闲生物实体
@@ -96,6 +102,8 @@
       const base = this._assetBase();
       // 先加载全部 GLB 几何（材质随后异步替换），关键模型任一失败即整体回退
       await Promise.all(ids.map(id => this._loadModel(id, base)));
+      // P9 装饰高模：独立于主清单，逐个容错加载（单个缺失/失败不阻断实体层）
+      await this._loadAllDecor(base);
       this.ready = true;
       this.enabled = true;
       if (Terrain3D.canvas) Terrain3D.canvas.dataset.entities3d = 'ready';
@@ -244,7 +252,109 @@
         if (Array.isArray(src)) obj.material = src.map(pick);
         else obj.material = pick(src);
       });
+      // P9：保存骨骼动画片段与皮肤标记，供实体克隆时建 AnimationMixer
+      let hasSkin = false;
+      scene.traverse((o) => { if (o.isSkinnedMesh) hasSkin = true; });
+      scene.userData.hasSkin = hasSkin;
+      scene.userData.clips = gltf.animations || [];
       this._templates[id] = scene;
+    },
+
+    /* ------------------------- P9 装饰高模加载 ------------------------- */
+    async _loadAllDecor(base) {
+      const ids = Object.keys(DECOR_IDS);
+      const results = await Promise.all(ids.map((id) =>
+        this._loadDecor(id, base).then(() => true).catch((err) => {
+          console.warn('[ThreeEntities] 装饰加载失败，跳过 ' + id, err && err.message);
+          return false;
+        })));
+      const ok = results.filter(Boolean).length;
+      console.info('[ThreeEntities] P9 装饰高模就绪 ' + ok + '/' + ids.length);
+    },
+
+    /* 装饰材质名直接就是 rework 库名（metal_rust/crystal_* 等）。与主体共用 'rw:<lib>' 缓存
+     * （同一 PBR 实例/纹理，全局唯一，避免装饰另建副本造成发光材质计数翻倍与内存浪费）；晶体打 glow 标。 */
+    async _getDecorMaterial(lib, base) {
+      const key = 'rw:' + lib;
+      if (this._matLib[key]) {
+        if (lib.indexOf('crystal_') === 0) this._matLib[key].userData.glow = true;
+        return this._matLib[key];
+      }
+      let mat;
+      try {
+        mat = await this._buildReworkMaterial(lib, base);
+      } catch (err) {
+        const proc = EXP_MODELS.proceduralSlots[lib];
+        mat = new T.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, metalness: 0.3 });
+        if (proc && proc.type === 'emissive') {
+          const green = lib.indexOf('green') >= 0;
+          mat.emissive = new T.Color(green ? 0x7dffb0 : 0xb69cff);
+          mat.emissiveIntensity = 2.2; mat.roughness = 0.2;
+          mat.userData.glow = true;
+        }
+      }
+      if (lib.indexOf('crystal_') === 0) mat.userData.glow = true;
+      mat.name = 'pbr_' + lib;
+      this._matLib[key] = mat;
+      return mat;
+    },
+
+    async _loadDecor(id, base) {
+      const url = base + 'fx/' + id + '-decor.glb';
+      const gltf = await new Promise((resolve, reject) => this._loader.load(url, resolve, undefined, reject));
+      const scene = gltf.scene || gltf.scenes[0];
+      const libs = new Set();
+      scene.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true; o.receiveShadow = true;
+        const geo = o.geometry;
+        if (geo && geo.attributes.uv && !geo.attributes.uv2) geo.setAttribute('uv2', geo.attributes.uv);
+        const pickName = (m) => (m && m.name ? m.name.replace(/^pbr_decor_/, '').replace(/^pbr_/, '') : '');
+        const src = o.material;
+        if (Array.isArray(src)) src.forEach((m) => libs.add(pickName(m)));
+        else libs.add(pickName(src));
+      });
+      const matByLib = {};
+      await Promise.all([...libs].filter(Boolean).map(async (lib) => {
+        matByLib[lib] = await this._getDecorMaterial(lib, base);
+      }));
+      scene.traverse((o) => {
+        if (!o.isMesh) return;
+        const pick = (m) => {
+          const lib = (m && m.name ? m.name.replace(/^pbr_decor_/, '').replace(/^pbr_/, '') : '');
+          return matByLib[lib] || m;
+        };
+        o.material = Array.isArray(o.material) ? o.material.map(pick) : pick(o.material);
+        // 发光晶体 mesh 打标，供 EntityFX 识别做每实体脉冲
+        const hasGlow = (Array.isArray(o.material) ? o.material : [o.material])
+          .some((m) => m && m.userData && m.userData.glow);
+        if (hasGlow) o.userData.fxGlow = true;
+      });
+      this._decor[id] = scene;
+    },
+
+    /* 骨骼感知克隆：普通 Object3D.clone 会让 SkinnedMesh 共享源 skeleton，
+       多实例会串骨。这里按同名/同序节点重建各自 Skeleton（boneInverses 复制），
+       geometry/material 仍共享，动画 clip 可共享（mixer 绑定各自克隆根）。 */
+    _cloneSkinned(src) {
+      const clone = src.clone(true);
+      const srcNodes = [], dstNodes = [];
+      src.traverse((a) => srcNodes.push(a));
+      clone.traverse((b) => dstNodes.push(b));
+      const byUuid = new Map();
+      for (let i = 0; i < srcNodes.length; i++) byUuid.set(srcNodes[i].uuid, dstNodes[i]);
+      clone.traverse((o) => {
+        if (!o.isSkinnedMesh || !o.skeleton) return;
+        const oldSkel = o.skeleton;
+        const bones = oldSkel.bones.map((b) => byUuid.get(b.uuid) || b);
+        const inverses = oldSkel.boneInverses.map((m) => m.clone());
+        const skel = new T.Skeleton(bones, inverses);
+        o.bind(skel);
+        o.skeleton = skel;
+      });
+      clone.userData.hasSkin = true;
+      clone.userData.clips = src.userData.clips || [];
+      return clone;
     },
 
     /* ------------------------- 软阴影纹理（共享） ------------------------- */
@@ -374,24 +484,49 @@
       ring.position.y = 0.4;
       root.add(ring);
       this._root.add(root);
-      return { root, model, shadow, ring, modelId: null, flashMats: null, weapon: null, baseMatOpacity: null };
+      return { root, model, shadow, ring, modelId: null, flashMats: null, weapon: null,
+               baseMatOpacity: null, mixer: null, walkAction: null, _skinned: false, _lastAt: 0 };
     },
 
     _setTemplate(e, modelId) {
       // 清掉旧模板克隆
       while (e.model.children.length) e.model.remove(e.model.children[0]);
       const tpl = this._templates[modelId];
-      const clone = tpl.clone(true);       // 共享 geometry 与共享材质
+      const hasSkin = !!tpl.userData.hasSkin;
+      const clone = hasSkin ? this._cloneSkinned(tpl) : tpl.clone(true);
       clone.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       e.model.add(clone);
       e.modelId = modelId;
       e.flashMats = null;
       e.weapon = null;
+      // 带骨骼动画：每实体独立 mixer，walk 片段默认暂停在中性站立帧
+      e.mixer = null; e.walkAction = null; e._skinned = false; e._lastAt = 0;
+      const clips = tpl.userData.clips || [];
+      if (hasSkin && clips.length && T.AnimationMixer) {
+        e.mixer = new T.AnimationMixer(clone);
+        e.walkAction = e.mixer.clipAction(clips[0], clone);
+        e.walkAction.setLoop(T.LoopRepeat, Infinity);
+        e.walkAction.play();
+        e.walkAction.paused = true;
+        e.walkAction.time = 0;
+        e.mixer.update(0);
+        e._skinned = true;
+      }
+      // P9：同单位空间叠加装饰高模（静态雕塑层），再初始化发光/粒子/法阵动态特效
+      const decorTpl = this._decor[modelId];
+      if (decorTpl) {
+        const d = decorTpl.clone(true);
+        d.name = 'decor';
+        d.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        clone.add(d);
+      }
+      if (window.EntityFX) window.EntityFX.onSpawn(e, modelId, modelId === 'char_farmer' ? 'player' : 'monster');
     },
 
     _poolCreature(e) {
       e.root.visible = false;
       this._restoreMaterials(e);
+      if (window.EntityFX) window.EntityFX.onDespawn(e);
       if (e.root.parent) e.root.parent.remove(e.root);
       this._creaturePool.push(e);
     },
@@ -487,6 +622,7 @@
 
       this._animate(e, o, kind, modelId, exp, pxH);
       this._syncWeapon(e, o, kind, exp, pxH);
+      if (window.EntityFX) window.EntityFX.onUpdate(e, o, kind, modelId, o.animTime || exp.elapsed || 0);
     },
 
     /* ------------------------- 程序化动画（复刻 Pixi 时序） ------------------------- */
@@ -503,6 +639,24 @@
 
       // 飞行单位悬浮
       const flyer = FLYERS[modelId] ? 1 : 0;
+
+      // P9 骨骼走路：玩家移动时播放 walk clip，静止回中性站立帧；死亡时冻结由外层倾倒
+      if (e._skinned && e.mixer && kind === 'player') {
+        const dt = Math.min(0.06, Math.max(0, at - (e._lastAt || at)));
+        e._lastAt = at;
+        const wa = e.walkAction;
+        if (moving && o.state !== 'death') {
+          wa.paused = false;
+          wa.timeScale = 1.0;
+          e.mixer.update(dt);
+        } else if (o.state === 'death') {
+          wa.paused = true;                       // 保持临终姿态，外层 model 容器负责倾倒/下沉
+        } else {
+          wa.paused = true;
+          wa.time = 0;
+          e.mixer.update(0);
+        }
+      }
 
       if (o.state === 'death' || (kind === 'monster' && o.deathTimer > 0 && o.state === 'death')) {
         const dt = o.deathTimer || 0;
@@ -537,13 +691,20 @@
           m.scale.set(pxH * 0.94, pxH * 1.06, pxH * 0.94);
           m.position.x = Math.sin(at * 30) * 1.2;
         } else if (moving) {
-          const step = kind === 'player' ? (o.walkDistance || 0) / 25 * Math.PI * 2 : at * 10;
-          const bob = kind === 'player' ? -Math.abs(Math.sin(step)) * 2.6 : Math.sin(step) * 2;
-          m.position.y = (o.visualZ || 0) + bob + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
-          m.rotation.z = Math.sin(step) * 0.03;
-          if (kind !== 'player') {
-            const s = Math.sin(step);
-            m.scale.set(pxH * (1 + s * 0.02), pxH * (1 - s * 0.01), pxH * (1 + s * 0.02));
+          if (kind === 'player' && e._skinned) {
+            // 骨骼 walk 已含摆臂/摆腿/骨盆起伏：外层不再整体下沉与左右晃，避免与骨骼动画叠加发怪
+            m.position.y = (o.visualZ || 0) + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
+            m.rotation.z = 0;
+            m.scale.set(pxH, pxH, pxH);
+          } else {
+            const step = kind === 'player' ? (o.walkDistance || 0) / 25 * Math.PI * 2 : at * 10;
+            const bob = kind === 'player' ? -Math.abs(Math.sin(step)) * 2.6 : Math.sin(step) * 2;
+            m.position.y = (o.visualZ || 0) + bob + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
+            m.rotation.z = Math.sin(step) * 0.03;
+            if (kind !== 'player') {
+              const s = Math.sin(step);
+              m.scale.set(pxH * (1 + s * 0.02), pxH * (1 - s * 0.01), pxH * (1 + s * 0.02));
+            }
           }
         } else {
           const breathe = Math.sin(at * 2.5);
@@ -579,10 +740,19 @@
         if (e.weapon) e.model.remove(e.weapon);
         const hold = new T.Group();
         const body = tpl.clone(true);
+        // P9 武器装饰与武器 GLB 同单位空间，挂进 body 随握持变换
+        const wd = this._decor[resName];
+        if (wd) {
+          const dc = wd.clone(true);
+          dc.name = 'decor';
+          dc.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+          body.add(dc);
+        }
         hold.add(body);
         e.model.add(hold);
         e.weapon = hold; e.weapon._wpnId = resName; e.weapon._body = body; e.weapon._resName = resName;
         this._poseWeapon(hold, body, resName, exp, pxH);
+        if (window.EntityFX) window.EntityFX.refreshGlow(e);
       }
       e.weapon.visible = true;
       this._poseWeapon(e.weapon, e.weapon._body, resName, exp, pxH);
