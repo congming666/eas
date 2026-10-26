@@ -248,7 +248,18 @@
     mistcloak: { defId: 'mistcloak', type: 'item', name: '雾隐斗篷', icon: '🌫️', rarity: 'epic',
       tags: ['wind', 'stealth', 'special'], element: 'wind', desc: '受击后 1.5 秒隐身（怪丢失目标），但能量回复 -40%。',
       effect: { onHitStealth: 1.5, energyRegenDown: 0.4 }, drawback: '能量回复 -40%',
-      niche: '高频脱仇：越战越能溜，技能节奏变慢。', source: 'chest' }
+      niche: '高频脱仇：越战越能溜，技能节奏变慢。', source: 'chest' },
+    /* ================= P10 冰控流补齐：原 ice 仅 2 张可装载卡，无法激活 3/4/5 阶协同；
+       新增 3 张 ice 道具使可装载达 5（skill1+item3+seed1），效果均在 v5.useConsumable 落地 ================= */
+    frost_charm: { defId: 'frost_charm', type: 'item', name: '冰心护符', icon: '🧊', rarity: 'common',
+      tags: ['ice', 'shield'], element: 'ice', desc: '获得 80 点寒霜护盾，吸收来袭伤害。',
+      effect: { shield: 80 }, niche: '前期廉价冰系保命护盾，同时堆叠冰控协同层数。', source: 'shop' },
+    frost_bomb: { defId: 'frost_bomb', type: 'item', name: '寒霜爆弹', icon: '❄️', rarity: 'rare',
+      tags: ['ice', 'aoe', 'throw', 'control'], element: 'ice', desc: '投掷寒霜爆弹，范围内造成 55 伤害并减速 4 秒。',
+      effect: { aoe: true, dmg: 55, range: 130, slow: 4 }, niche: '伤害略低于毒雾弹但减速更久，冰控流群体铺场起手。', source: 'shop' },
+    glacier_seal: { defId: 'glacier_seal', type: 'item', name: '冰川封印', icon: '🔷', rarity: 'epic',
+      tags: ['ice', 'control', 'special'], element: 'ice', desc: '冰封周围敌人：定身 2 秒（精英 1 秒）并减速 3 秒。',
+      effect: { aoe: true, range: 200, stun: 2, eliteStun: 1, slow: 3 }, niche: '高稀有团控硬直窗口，配合爆发收割，冰控满协同核心。', source: 'chest' }
   };
 
   /* ================= 24 种子卡（F1–F5 直接种植） ================= */

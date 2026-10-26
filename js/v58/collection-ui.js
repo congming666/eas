@@ -262,7 +262,9 @@
     overlay.innerHTML = '<div class="v58-modal coll-modal">'
       + '<div class="coll-header">'
       + '<div><h2 class="coll-title">📖 卡牌图鉴</h2>'
-      + '<div class="coll-subtitle">技能 16 · 道具 27 · 种子 24 · Boss 签名卡 12 —— 点击卡牌可翻面</div></div>'
+      + '<div class="coll-subtitle">技能 ' + prog.byType.skill.total + ' · 道具 ' + prog.byType.item.total
+      + ' · 种子 ' + prog.byType.seed.total + ' · Boss 签名卡 ' + prog.byType.signature.total
+      + ' —— 点击卡牌可翻面</div></div>'
       + '<button class="secondary-btn" id="collCloseBtn">返回农场</button></div>'
       + '<div class="coll-meter">'
       + '<div class="coll-meter-top"><span class="coll-meter-num"><b>' + prog.owned + '</b> / ' + prog.total + ' 已收藏</span>'

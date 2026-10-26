@@ -203,6 +203,10 @@
     { id: 'torch', name: '火把', icon: '🔥', key: '', value: 50, desc: '每支照明60秒（休闲120/普通60/困难40/噩梦30秒），耗尽自动续下一支；无火把视野极小，务必携带。' },
     { id: 'poison_bomb', name: '毒雾弹', icon: '☠️', key: '', value: 110, desc: '投掷后范围 60 伤害并减速 3 秒。' },
     { id: 'insecticide', name: '驱虫剂', icon: '🧪', key: '', value: 35, desc: '使用后 6 秒内身边怪物丢失目标（驱虫脱身），也可在农场治疗病虫害。' },
+    // —— P10 冰控流补齐（对应 CARD_DATA 三张 ice 道具，效果见 useConsumable 分支） ——
+    { id: 'frost_charm', name: '冰心护符', icon: '🧊', key: '', value: 70, desc: '获得 80 点寒霜护盾，吸收来袭伤害。' },
+    { id: 'frost_bomb', name: '寒霜爆弹', icon: '❄️', key: '', value: 110, desc: '投掷后范围 55 伤害并减速 4 秒。' },
+    { id: 'glacier_seal', name: '冰川封印', icon: '🔷', key: '', value: 180, desc: '冰封周围敌人，定身 2 秒（精英 1 秒）并减速 3 秒。' },
   ];
   const oldConsumableIds = new Set((CONFIG.consumables || []).map(c => c.id));
   NEW_CONSUMABLES.forEach(c => { if (!oldConsumableIds.has(c.id)) CONFIG.consumables.push(c); });
@@ -1334,6 +1338,21 @@
         this.spawnAoeEffect(p.x, p.y, 120, '#9be86b', 'ring'); showToast('驱虫剂：怪物丢失目标 6 秒', 'success'); break;
       case 'death_pardon':
         showToast('免死令为被动道具，阵亡时自动生效', 'warning'); used = false; break;
+      // —— P10 冰控流三张 ice 道具：与 CARD_DATA / NEW_CONSUMABLES 一一对应 ——
+      case 'frost_charm':
+        this.v5.shield = Math.max(this.v5.shield, 80); this.v5.shieldT = Math.max(this.v5.shieldT || 0, 10);
+        this.spawnAoeEffect(p.x, p.y, 65, '#9fe8ff', 'ring'); showToast('寒霜护盾 +80', 'success'); break;
+      case 'frost_bomb': {
+        enemies(this).forEach(m => { const d = Math.hypot(m.x - a.x, m.y - a.y); if (d < 130) { this_damage(this, m, 55, '#8fd8ff', true); m.slow = Math.max(m.slow || 0, 4); } });
+        this.spawnAoeEffect(a.x, a.y, 130, '#8fd8ff', 'ring'); break; }
+      case 'glacier_seal':
+        enemies(this).forEach(m => {
+          if (Math.hypot(m.x - p.x, m.y - p.y) < 200) {
+            if (!m.stunImmune) m.stunned = Math.max(m.stunned || 0, m.elite ? 1 : 2);
+            m.slow = Math.max(m.slow || 0, 3);
+          }
+        });
+        this.spawnAoeEffect(p.x, p.y, 200, '#bfefff', 'ring'); showToast('冰川封印：周围敌人冰封', 'success'); break;
     }
     if (used) {
       this.consumables[id]--;
