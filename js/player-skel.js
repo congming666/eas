@@ -102,21 +102,28 @@ const PlayerSkel = {
     // 迈步抬脚：正/背面靠屈膝把脚抬起来，侧身靠前后摆
     const lift = (1 - lat);
     // 腿 0 = 图左半（侧身时是后腿），腿 1 = 图右半（前腿）。
-    // 旋转正方向让脚往后摆，所以「向前迈」对应 s<0（腿0）/ s>0（腿1）；
-    // 屈膝和抬脚必须跟着「前摆的那条腿」，之前写反了，导致迈步像顺拐。
-    const fwd0 = Math.max(0, -s);   // 腿0 前摆量
-    const fwd1 = Math.max(0, s);    // 腿1 前摆量
+    // 旋转正方向让脚往后摆，所以「向前迈」对应 s<0（腿0）/ s>0（腿1）。
+    // P11 真实步态塑形：大腿前后位置仍走平滑正弦（保证连续/遮挡稳定），但屈膝与提脚改为
+    // 「摆动相钟形」驱动——摆动相（约 40% 周期）集中屈膝抬腿、支撑相腿近伸直，到脚跟着地时
+    // 回落到 0，与 3D walk 动画的 bell 屈膝同源，消除纯正弦“整条腿等速机械画圈”的观感。
+    const bell = (ph, c, half) => {
+      const d = Math.abs(ph - c);
+      const t = Math.max(0, Math.min(1, 1 - d / half));
+      return t * t * (3 - 2 * t);
+    };
+    const sw1 = bell(phase, 0.18, 0.18) * motion;   // 腿1 摆动相（峰值在途中，0.5 处着地回 0）
+    const sw0 = bell(phase, 0.68, 0.18) * motion;   // 腿0 摆动相（相差半周期）
     return {
       dir, parts: p, meta: this.meta[dir], phase, bob, moving,
       // 叠加「把立绘里已经画好的步幅拉回垂直」的中性偏移，腿才会真正前后交替
       swing0: (this.meta[dir].n0 || 0) + s * swingAmp,
       swing1: (this.meta[dir].n1 || 0) - s * swingAmp,
-      bend0: fwd0 * kneeAmp + Math.max(0, s) * kneeAmp * 0.12,
-      bend1: fwd1 * kneeAmp + Math.max(0, -s) * kneeAmp * 0.12,
+      bend0: kneeAmp * (0.12 * motion + 0.88 * sw0),   // 支撑微屈、摆动大幅屈膝；静止回直腿中立
+      bend1: kneeAmp * (0.12 * motion + 0.88 * sw1),
       order: s >= 0 ? 0 : 1,   // 先画哪条腿：后摆的那条在下面
       sway: s * 1.2 * lift,   // 正/背面轻微左右换重心
-      lift0: fwd0 * 2.6 * lift,   // 抬脚高度（正/背面靠整体上提）
-      lift1: fwd1 * 2.6 * lift,
+      lift0: sw0 * 3.0 * lift,   // 摆动中段提脚最高（正/背面靠整体上提）
+      lift1: sw1 * 3.0 * lift,
     };
   },
 

@@ -2,6 +2,15 @@
 class Expedition {
   constructor(mapId) {
     this.map = CONFIG.maps.find(m => m.id === mapId);
+    // P11-6 分档扩图：按所选地图单点覆写本局世界边长。全仓所有模块仍统一读
+    // CONFIG.expedition.mapSize（高度场/区块缓存/相机边界/刷怪/小地图/雾），故一处生效全局跟随；
+    // cleanup 退场时还原基准值。开关 farmBigMapsV11=0 可一键回退旧的固定 2400 正方形。
+    if (CONFIG.expedition.mapSizeBase == null) CONFIG.expedition.mapSizeBase = CONFIG.expedition.mapSize;
+    let _bigMaps = true;
+    try { _bigMaps = localStorage.getItem('farmBigMapsV11') !== '0'; } catch (e) {}
+    this.worldSize = CONFIG.expedition.mapSizeBase;
+    if (_bigMaps && window.MapThemes && this.map) this.worldSize = MapThemes.worldSizeFor(this.map);
+    CONFIG.expedition.mapSize = this.worldSize;
     // v3.5 加载地图背景图
     this.mapBgImg = new Image();
     this.mapBgLoaded = false;
@@ -459,6 +468,8 @@ class Expedition {
   }
 
   cleanup() {
+    // P11-6 还原世界边长基准，避免大图尺寸泄漏到农场/菜单等非远征界面
+    if (CONFIG.expedition.mapSizeBase != null) CONFIG.expedition.mapSize = CONFIG.expedition.mapSizeBase;
     window.removeEventListener('keydown', this.keydownHandler);
     window.removeEventListener('keyup', this.keyupHandler);
     window.removeEventListener('blur', this.blurHandler);

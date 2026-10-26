@@ -416,24 +416,77 @@
       return meshes;
     },
 
-    /* ---------------- 风动草（P2）：草甸/密林里的低模草簇 ---------------- */
+    /* P11-7 写实草丛几何：若干片绕轴交叉、带自然弯曲的细长草叶合并为单一 BufferGeometry，
+       一个 InstancedMesh = 一丛草，仍是单 draw call；替代旧版俯视可见的绿色三棱锥。 */
+    _makeGrassTuftGeometry(blades) {
+      const positions = [], normals = [], uvs = [], indices = [];
+      const H = 20, w0 = 1.9, w1 = 1.05, hm = H * 0.55, bend = 3.2;
+      const rotY = (x, y, z, ang) => {
+        const c = Math.cos(ang), s = Math.sin(ang);
+        return [x * c + z * s, y, -x * s + z * c];
+      };
+      for (let j = 0; j < blades; j++) {
+        const base = positions.length / 3;
+        const ang = (j / blades) * Math.PI * 2 + (j * 0.73);
+        const curve = bend * (0.8 + (j % 3) * 0.18);
+        // 单片叶 5 顶点：根左右 / 腰左右 / 尖
+        const leaf = [
+          [-w0, 0, 0], [w0, 0, 0],
+          [-w1, hm, curve * 0.7], [w1, hm, curve * 0.7],
+          [0, H, curve * 1.55],
+        ];
+        for (let k = 0; k < leaf.length; k++) {
+          const p = rotY(leaf[k][0], leaf[k][1], leaf[k][2], ang);
+          positions.push(p[0], p[1], p[2]);
+          const n = rotY(0, 0.85, 0.4, ang);
+          const nl = Math.hypot(n[0], n[1], n[2]) || 1;
+          normals.push(n[0] / nl, n[1] / nl, n[2] / nl);
+          uvs.push(k === 1 || k === 3 ? 1 : 0, k < 2 ? 0 : (k === 4 ? 1 : 0.55));
+        }
+        // 根部四边形（两三角）+ 腰部到尖的三角
+        indices.push(base, base + 1, base + 3, base, base + 3, base + 2,
+                     base + 2, base + 3, base + 4);
+      }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('normal', new T.Float32BufferAttribute(normals, 3));
+      geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeBoundingSphere();
+      return geo;
+    },
+
+    /* ---------------- P11 写实风动草丛（按地图主题变色/变密度/荧光） ---------------- */
     _buildGrass(exp) {
       const hf = exp.terrainHeight;
       if (!hf) return null;
       const ELEV = window.TERRAIN_ELEV_WORLD;
-      const N = 1300;
-      const geo = new T.ConeGeometry(5.5, 17, 3);
-      geo.translate(0, 8.5, 0);
+      const theme = (window.MapThemes && MapThemes.get(exp.map)) || null;
+      const g = theme ? theme.grass : { density: 1, hMin: 12, hMax: 22, blades: 5, glow: 0 };
+      const N_MAX = 1900;
+      const N = Math.max(0, Math.min(N_MAX, Math.round(1300 * (g.density != null ? g.density : 1))));
+      if (N <= 0) { this._grassMesh = null; return null; }
+      const blades = Math.max(3, Math.min(7, g.blades || 5));
+      const geo = this._makeGrassTuftGeometry(blades);
       this._windU = { value: 0 };
-      const mat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
+      const mat = new T.MeshStandardMaterial({
+        color: 0xffffff, roughness: 0.92, metalness: 0, side: T.DoubleSide,
+      });
+      // 高危/绝境图的草丛带与地图同调的微弱自发光（荧光草），亮图 glow=0 完全不发光
+      if (theme && g.glow > 0) {
+        mat.emissive = new T.Color(theme.tint);
+        mat.emissiveIntensity = g.glow;
+      }
       mat.onBeforeCompile = (shader) => {
         shader.uniforms.uTime = this._windU;
         shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
           '#include <begin_vertex>',
           '#include <begin_vertex>\n' +
           'float _wx = instanceMatrix[3].x; float _wz = instanceMatrix[3].z;\n' +
-          'float _sway = sin(uTime * 1.7 + _wx * 0.045 + _wz * 0.031) * 0.16 + sin(uTime * 3.2 + _wx * 0.12) * 0.07;\n' +
-          'transformed.x += _sway * max(0.0, transformed.y);'
+          'float _hgt = max(0.0, transformed.y) / 20.0;\n' +
+          'float _sway = (sin(uTime * 1.5 + _wx * 0.04 + _wz * 0.028) * 0.22 + sin(uTime * 3.0 + _wx * 0.11) * 0.08) * _hgt * _hgt;\n' +
+          'transformed.x += _sway * 14.0;\n' +
+          'transformed.z += _sway * 6.0;'
         );
       };
       const mesh = new T.InstancedMesh(geo, mat, N);
@@ -442,18 +495,21 @@
       const hash = (i, s) => { const x = Math.sin(i * 127.1 + s * 311.7) * 43758.5453; return x - Math.floor(x); };
       let placed = 0;
       const size = hf.size;
-      for (let i = 0; i < N * 4 && placed < N; i++) {
+      const yMin = (g.hMin != null ? g.hMin : 12) / 20, yMax = (g.hMax != null ? g.hMax : 22) / 20;
+      for (let i = 0; i < N * 6 && placed < N; i++) {
         const x = hash(i, 1) * size, y = hash(i, 2) * size;
         const type = exp.getTerrainTypeId ? exp.getTerrainTypeId(x, y) : 0;
         if (type !== 0 && type !== 3) continue;   // 只长在草甸/密林
         const e = exp.getElevation ? exp.getElevation(x, y) : 0;
-        dummy.position.set(x, e * ELEV, y);
+        dummy.position.set(x, e * ELEV - 0.5, y);
         dummy.rotation.set(0, hash(i, 3) * 6.28, 0);
-        const s = 0.7 + hash(i, 4) * 0.9;
-        dummy.scale.set(s, s * (0.8 + hash(i, 5) * 0.7), s);
+        const sy = yMin + hash(i, 5) * (yMax - yMin);
+        const sx = 0.8 + hash(i, 4) * 0.5;
+        dummy.scale.set(sx, sy, sx * (0.9 + hash(i, 9) * 0.25));
         dummy.updateMatrix();
         mesh.setMatrixAt(placed, dummy.matrix);
-        col.setHSL(0.23 + hash(i, 6) * 0.07, 0.34 + hash(i, 7) * 0.22, 0.32 + hash(i, 8) * 0.14);
+        if (window.MapThemes && theme) MapThemes.grassColor(theme, hash(i, 6), hash(i, 7), hash(i, 8), col);
+        else col.setHSL(0.25, 0.4, 0.32);
         col.convertSRGBToLinear();
         mesh.setColorAt(placed, col);
         placed++;
@@ -476,7 +532,12 @@
         this._terrainChunks = [];
         this._exp = exp;
         this._mapId = (exp.map && exp.map.id) || 'map';
+        this._theme = (window.MapThemes && exp.map) ? MapThemes.get(exp.map) : null;
+        this._themeTint = this._theme ? new T.Color(this._theme.tint) : null;
         this._time = 0;
+        if (this._themeTint && this.scene.fog) {   // 进图首帧雾色即贴合主题，避免闪一下默认绿雾
+          this.scene.fog.color.copy(this._themeTint).lerp(new T.Color(0x2a3428), 0.55);
+        }
         const terr = this._buildTerrain(exp);
         if (terr) this.scene.add(terr);
         const water = this._buildWater(exp);
@@ -641,6 +702,7 @@
           // Unity 米密度按相对比例映射到网页像素基准，再叠加既有天气/夜晚加权
           this.scene.fog.density = base * fxE.fogScale + fog * 0.00045 + wet * 0.00008 + (phase === 'night' ? 0.00006 : 0);
         }
+        this._applyMapTheme(phase);
         return;
       }
 
@@ -678,6 +740,29 @@
         const nightK = phase === 'night' ? 1 : (phase === 'dusk' || phase === 'dawn' ? 0.5 : 0);
         this.scene.fog.color.setHex(nightK ? 0x141c2c : 0x2a3428);
         this.scene.fog.density = 0.0001 + fog * 0.00045 + wet * 0.00008 + nightK * 0.00006;
+      }
+      this._applyMapTheme(phase);
+    },
+
+    /* P11-5 逐图氛围：在 tier 光照/雾基线（PostFX 或硬编码）算出当帧最终色之后，再按本图主题
+       轻微染色并调整光强/雾密度。每帧从基线重新 lerp，权重恒定，不会逐帧累积漂移。 */
+    _applyMapTheme(phase) {
+      const th = this._theme, tint = this._themeTint;
+      if (!th || !tint) return;
+      const pk = phase === 'night' ? 0.5 : (phase === 'dusk' || phase === 'dawn' ? 0.75 : 1);
+      const w = (th.tintWeight || 0) * pk;
+      if (this._sun) {
+        this._sun.color.lerp(tint, w * 0.55);
+        this._sun.intensity *= (th.sunMul != null ? th.sunMul : 1);
+      }
+      if (this._hemi) {
+        this._hemi.color.lerp(tint, w * 0.4);
+        this._hemi.groundColor.lerp(tint, w * 0.25);
+        this._hemi.intensity *= (th.hemiMul != null ? th.hemiMul : 1);
+      }
+      if (this.scene.fog) {
+        this.scene.fog.color.lerp(tint, w * 0.7);
+        this.scene.fog.density *= (th.fogMul != null ? th.fogMul : 1);
       }
     },
 

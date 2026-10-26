@@ -74,6 +74,12 @@ Object.assign(Expedition.prototype, {
   },
   generateTerrainRegions() {
     const s = CONFIG.expedition.mapSize;
+    // P11-6 扩图密度补偿：以旧基准 2400 为锚，线性/面积/密度三档系数。
+    // 生态区与静态障碍按线性尺度 _kDens 温和加密（封顶 1.5 防数量爆炸），地表笔触按面积补，
+    // 战斗/经济数值（怪物/宝箱计数）不动——怪物由导演在玩家身边动态刷新，大图不会跑空。
+    const _kLin = s / 2400;
+    const _kArea = _kLin * _kLin;
+    const _kDens = Math.min(1.5, Math.sqrt(_kArea));
     const rng = this.mapSeedPRNG();
     const tier = this.map.tier || 1;
     const id = (this.map && this.map.id) || 'default';
@@ -107,8 +113,9 @@ Object.assign(Expedition.prototype, {
       seed: 1 + Math.floor(rng() * 97), main: true
     });
 
-    // 2) 其余生态区：拒绝采样保证互不重叠、分布错开
-    const want = arche.count[0] + Math.floor(rng() * (arche.count[1] - arche.count[0] + 1));
+    // 2) 其余生态区：拒绝采样保证互不重叠、分布错开；大图按线性尺度增补生态区（更丰富但不碎）
+    const baseWant = arche.count[0] + Math.floor(rng() * (arche.count[1] - arche.count[0] + 1));
+    const want = baseWant + Math.round(baseWant * (_kDens - 1) * 0.8);
     for (let attempt = 0; attempt < 90 && this.terrainRegions.length < want; attempt++) {
       const type = arche.types[Math.floor(rng() * arche.types.length)];
       const x = s * (0.14 + rng() * 0.72);
@@ -146,7 +153,7 @@ Object.assign(Expedition.prototype, {
       const my = (r.y + ey) / 2 + (rng() - .5) * s * .18;
       this.terrainRoads.push({
         x1: r.x, y1: r.y, x2: ex, y2: ey, cx: mx, cy: my,
-        width: 22 + rng() * 14
+        width: (22 + rng() * 14) * (0.85 + 0.15 * _kLin),   // 大路网随世界尺度适度加宽
       });
     }
 
@@ -161,8 +168,8 @@ Object.assign(Expedition.prototype, {
       });
     }
 
-    // 5) 地表装饰：按所处地形选不同笔触（草/碎石/秸秆/裂缝），数量随 tier 增加
-    const decorN = 70 + tier * 18;
+    // 5) 地表装饰：按所处地形选不同笔触（草/碎石/秸秆/裂缝），数量随 tier 与世界面积增加
+    const decorN = Math.round((70 + tier * 18) * (0.35 + 0.65 * _kArea));
     for (let i = 0; i < decorN; i++) {
       const x = s * (0.03 + rng() * 0.94), y = s * (0.03 + rng() * 0.94);
       const reg = this.terrainRegions.find(r => this.regionContains(r, x, y));
@@ -193,10 +200,10 @@ Object.assign(Expedition.prototype, {
     };
     for (const r of this.terrainRegions) {
       let count = 0;
-      if (r.type === 'forest') count = Math.round(30 * arche.tree);
-      else if (r.type === 'ruins') count = Math.round(16 * (arche.rock * .9));
-      else if (r.type === 'highland') count = Math.round(9 * arche.rock);
-      else if (r.type === 'mud') count = Math.round(7 * arche.rock);
+      if (r.type === 'forest') count = Math.round(30 * arche.tree * _kDens);
+      else if (r.type === 'ruins') count = Math.round(16 * (arche.rock * .9) * _kDens);
+      else if (r.type === 'highland') count = Math.round(9 * arche.rock * _kDens);
+      else if (r.type === 'mud') count = Math.round(7 * arche.rock * _kDens);
       else if (r.type === 'water') count = 0;
       for (let i = 0; i < count; i++) {
         const a = i * 2.399963, d = .36 + .57 * Math.sqrt((i + .5) / Math.max(1, count));
@@ -208,8 +215,8 @@ Object.assign(Expedition.prototype, {
         pushObstacle(type, x, y);
       }
     }
-    // 区外零散障碍：荒原/台地多石，密林多树
-    const scatter = Math.round(10 + tier * 3);
+    // 区外零散障碍：荒原/台地多石，密林多树；大图按密度系数补点，避免边缘空旷
+    const scatter = Math.round((10 + tier * 3) * _kDens);
     for (let i = 0; i < scatter; i++) {
       const x = s * (0.06 + rng() * 0.88), y = s * (0.06 + rng() * 0.88);
       const t = rng() < (arche.tree > 1 ? .6 : .35) ? 'tree' : 'rock';

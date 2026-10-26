@@ -14,6 +14,17 @@
   const DEATH_TIME = 0.42;          // 与 Pixi 死亡时序一致
   const HIT_TIME = 0.14;
   const MAX_CREATURES = 80;         // 同屏生物池上限
+  const TAU = Math.PI * 2;
+  // ---- P11 真实 locomotion 常量（Blender 实测/标定，详见 tools/blender/measure_stride.py）----
+  const STRIDE_UNITS = 0.687;       // walk 一个完整周期（左右各一步）的作者意图前进距离，模型单位
+  const LOCO_TMAX = 4.5;            // 步频时间缩放上软顶：常用移速线性零滑，冲刺极速限幅防“螺旋腿”
+  const BLEND_RATE = 12.0;          // walk<->idle 交叉淡入速率（/s）
+  const TURN_RATE = 16.0;           // 朝向最短弧跟随速率（/s），消除瞬切生硬
+  const FOOT_GAP_PX = 2.0;          // 鞋底最低点离地超过该像素才触发贴地下沉
+  const FOOT_FIX_MAX = 4.0;         // 单帧足部贴地下沉上限（世界像素）
+  const LOCO_ENABLED = (function () {
+    try { return localStorage.getItem('farmLocomotionV11') !== '0'; } catch (e) { return true; }
+  })();
 
   /* 业务怪物类型 → GLB 模型 id（规则同 LowPolyArt，未命中的精英留 Pixi） */
   const MONSTER_MODEL = {
@@ -357,6 +368,55 @@
       return clone;
     },
 
+    /* P11 缓存玩家 SkinnedMesh 的踝/趾骨引用，供 mixer 更新后的轻量足部贴地补偿。
+       只读骨骼、不改动画曲线；任何异常都回退为纯步频映射（_feet=null）。 */
+    _cacheFeetBones(e, clone) {
+      try {
+        let sm = null;
+        clone.traverse((o) => { if (!sm && o.isSkinnedMesh && o.skeleton) sm = o; });
+        if (!sm || !sm.skeleton) return;
+        const find = (n) => sm.skeleton.bones.find((b) => b.name === n) || null;
+        const footL = find('foot_L'), footR = find('foot_R');
+        if (!footL || !footR) return;
+        e._feet = {
+          sm, footL, footR,
+          toeL: find('toe_L'), toeR: find('toe_R'),
+        };
+        e._groundClone = clone;
+        e._v3 = new T.Vector3();
+        e._rootV = new T.Vector3();
+      } catch (err) {
+        e._feet = null; e._groundClone = null;
+      }
+    },
+
+    /* P11 足部贴地：mixer 更新后取双脚（优先趾尖）世界最低点，相对实体根（地面）若悬空间隙
+       超阈值，则把皮肤克隆整体微量下沉（作用于缩放子层，不碰阴影/金环/武器与地形高度）。
+       只下沉、不上抬，幅度有界，try/catch 失败立即归零，绝不破坏动画主路径。 */
+    _applyFootGround(e, pxH, wantWalk) {
+      const cl = e._groundClone;
+      if (!cl) return;
+      if (!e._feet || !wantWalk) { cl.position.y = 0; return; }
+      try {
+        let fix = 0;
+        const v = e._v3, rv = e._rootV;
+        e.root.getWorldPosition(rv);
+        const { toeL, toeR, footL, footR } = e._feet;
+        const candidates = [toeL || footL, toeR || footR, footL, footR];
+        let minY = Infinity;
+        for (const b of candidates) {
+          if (!b) continue;
+          b.getWorldPosition(v);
+          if (v.y < minY) minY = v.y;
+        }
+        const gap = minY - rv.y;
+        if (gap > FOOT_GAP_PX) fix = -(Math.min(FOOT_FIX_MAX, gap - FOOT_GAP_PX));
+        cl.position.y = fix / pxH;   // model 以 pxH 缩放，世界像素偏移换算回模型单位
+      } catch (err) {
+        cl.position.y = 0;
+      }
+    },
+
     /* ------------------------- 软阴影纹理（共享） ------------------------- */
     _getShadowTexture() {
       if (this._shadowTex) return this._shadowTex;
@@ -485,7 +545,9 @@
       root.add(ring);
       this._root.add(root);
       return { root, model, shadow, ring, modelId: null, flashMats: null, weapon: null,
-               baseMatOpacity: null, mixer: null, walkAction: null, _skinned: false, _lastAt: 0 };
+               baseMatOpacity: null, mixer: null, walkAction: null, idleAction: null,
+               _skinned: false, _lastAt: 0, _walkDur: 1, _ww: 0, _iw: 1, _yaw: null,
+               _yawAt: null, _feet: null, _groundClone: null, _v3: null, _rootV: null };
     },
 
     _setTemplate(e, modelId) {
@@ -499,18 +561,40 @@
       e.modelId = modelId;
       e.flashMats = null;
       e.weapon = null;
-      // 带骨骼动画：每实体独立 mixer，walk 片段默认暂停在中性站立帧
-      e.mixer = null; e.walkAction = null; e._skinned = false; e._lastAt = 0;
+      // P11 带骨骼动画：每实体独立 mixer，按名绑定 walk / idle 两片段，初始进入 idle 站立
+      e.mixer = null; e.walkAction = null; e.idleAction = null; e._skinned = false; e._lastAt = 0;
+      e._ww = 0; e._iw = 1; e._feet = null; e._groundClone = null;
+      e._yaw = null; e._yawAt = null;   // 池化复用时首帧重新对齐朝向，不从旧朝向滑入
       const clips = tpl.userData.clips || [];
       if (hasSkin && clips.length && T.AnimationMixer) {
         e.mixer = new T.AnimationMixer(clone);
-        e.walkAction = e.mixer.clipAction(clips[0], clone);
-        e.walkAction.setLoop(T.LoopRepeat, Infinity);
-        e.walkAction.play();
-        e.walkAction.paused = true;
-        e.walkAction.time = 0;
+        const findClip = (n) => clips.find((c) => c && c.name === n) || null;
+        let walkClip = findClip('walk');
+        const idleClip = findClip('idle');
+        if (!walkClip && clips.length) walkClip = clips[0];   // 旧单片段资产兼容
+        if (walkClip) {
+          e.walkAction = e.mixer.clipAction(walkClip, clone);
+          e.walkAction.setLoop(T.LoopRepeat, Infinity);
+          e._walkDur = walkClip.duration || 1;
+        }
+        if (idleClip) {
+          e.idleAction = e.mixer.clipAction(idleClip, clone);
+          e.idleAction.setLoop(T.LoopRepeat, Infinity);
+        }
+        if (e.idleAction) {
+          e.idleAction.play(); e.idleAction.setEffectiveWeight(1); e.idleAction.setEffectiveTimeScale(1);
+          e._iw = 1;
+        }
+        if (e.walkAction) {
+          e.walkAction.play();
+          e._ww = e.idleAction ? 0 : 1;
+          e.walkAction.setEffectiveWeight(e._ww);
+          e.walkAction.setEffectiveTimeScale(1);
+          if (!e.idleAction) { e.walkAction.paused = true; e.walkAction.time = 0; }
+        }
         e.mixer.update(0);
         e._skinned = true;
+        this._cacheFeetBones(e, clone);
       }
       // P9：同单位空间叠加装饰高模（静态雕塑层），再初始化发光/粒子/法阵动态特效
       const decorTpl = this._decor[modelId];
@@ -591,7 +675,20 @@
       let facing = o.facing;
       if (kind === 'player') facing = (o.facing !== undefined ? o.facing : (o.angle || 0));
       if (facing === undefined || facing === null || !Number.isFinite(facing)) facing = 0;
-      e.root.rotation.y = Math.PI / 2 - facing;
+      // P11 朝向沿最短弧平滑跟随（死亡冻结），替代硬切，转身不再瞬跳
+      const targetYaw = Math.PI / 2 - facing;
+      if (e._yaw === null || !Number.isFinite(e._yaw)) {
+        e._yaw = targetYaw;
+      } else if (o.state !== 'death') {
+        const nowT = exp.elapsed || 0;
+        const dtY = Math.max(0, Math.min(0.066, nowT - (e._yawAt == null ? nowT : e._yawAt)));
+        e._yawAt = nowT;
+        let diff = targetYaw - e._yaw;
+        while (diff > Math.PI) diff -= TAU;
+        while (diff < -Math.PI) diff += TAU;
+        e._yaw += diff * (1 - Math.exp(-TURN_RATE * dtY));
+      }
+      e.root.rotation.y = e._yaw;
 
       // model：单位 GLB 缩放到像素高
       e.model.scale.set(pxH, pxH, pxH);
@@ -640,21 +737,49 @@
       // 飞行单位悬浮
       const flyer = FLYERS[modelId] ? 1 : 0;
 
-      // P9 骨骼走路：玩家移动时播放 walk clip，静止回中性站立帧；死亡时冻结由外层倾倒
+      // P11 真实 locomotion：walk/idle 权重交叉淡入；播放速率按“实际移速 / 动画自然周期移速”
+      // 映射，使一步迈出的世界距离等于播放周期内的位移，从根上消除滑步；死亡冻结由外层倾倒。
       if (e._skinned && e.mixer && kind === 'player') {
         const dt = Math.min(0.06, Math.max(0, at - (e._lastAt || at)));
         e._lastAt = at;
-        const wa = e.walkAction;
-        if (moving && o.state !== 'death') {
-          wa.paused = false;
-          wa.timeScale = 1.0;
+        const wa = e.walkAction, ia = e.idleAction;
+        const death = o.state === 'death';
+        const wantWalk = moving && !death;
+        if (death) {
+          if (wa) wa.paused = true;
+          if (ia) ia.paused = true;               // 保持临终姿态，外层 model 容器负责倾倒/下沉
+        } else if (LOCO_ENABLED && wa) {
+          wa.paused = false; if (ia) ia.paused = false;
+          // timeScale=1 时一个 walk 周期自然前进 STRIDE_UNITS*pxH 像素；周期时长取 clip.duration
+          const vNat = STRIDE_UNITS * pxH / Math.max(0.01, e._walkDur || 1);
+          let ts = (o.moveSpeed || 0) / Math.max(1, vNat);
+          ts = Math.max(0, Math.min(LOCO_TMAX, ts));
+          wa.setEffectiveTimeScale(Math.max(0.02, ts));
+          if (ia) ia.setEffectiveTimeScale(1);
+          const blend = 1 - Math.exp(-BLEND_RATE * dt);
+          e._ww += ((wantWalk ? 1 : 0) - e._ww) * blend;
+          e._iw += ((wantWalk ? 0 : 1) - e._iw) * blend;
+          if (e._ww < 0.001) e._ww = 0;
+          if (e._iw < 0.001) e._iw = 0;
+          if (ia) {
+            wa.setEffectiveWeight(e._ww);
+            ia.setEffectiveWeight(e._iw);
+          } else {
+            wa.setEffectiveWeight(1);
+            if (!wantWalk) { wa.paused = true; wa.time = 0; }
+          }
           e.mixer.update(dt);
-        } else if (o.state === 'death') {
-          wa.paused = true;                       // 保持临终姿态，外层 model 容器负责倾倒/下沉
-        } else {
-          wa.paused = true;
-          wa.time = 0;
-          e.mixer.update(0);
+          this._applyFootGround(e, pxH, wantWalk);
+        } else if (wa) {
+          // 回退档（开关关闭或旧单片段资产）：移动恒速播放，静止回中性站立帧
+          if (ia) ia.setEffectiveWeight(0);
+          if (moving) {
+            wa.paused = false; wa.setEffectiveWeight(1); wa.setEffectiveTimeScale(1);
+            e.mixer.update(dt);
+          } else {
+            wa.paused = true; wa.time = 0; e.mixer.update(0);
+          }
+          if (e._groundClone) e._groundClone.position.y = 0;
         }
       }
 
@@ -707,9 +832,16 @@
             }
           }
         } else {
-          const breathe = Math.sin(at * 2.5);
-          m.position.y = (o.visualZ || 0) + breathe * 1.2 + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
-          m.scale.set(pxH, pxH * (1 + breathe * 0.01), pxH);
+          if (kind === 'player' && e._skinned && LOCO_ENABLED) {
+            // idle 骨骼片段已含呼吸/重心，外层容器不再叠加，避免双重起伏
+            m.rotation.z = 0;
+            m.position.y = (o.visualZ || 0) + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
+            m.scale.set(pxH, pxH, pxH);
+          } else {
+            const breathe = Math.sin(at * 2.5);
+            m.position.y = (o.visualZ || 0) + breathe * 1.2 + (flyer ? Math.sin(at * 2.2) * 3.5 + 6 : 0);
+            m.scale.set(pxH, pxH * (1 + breathe * 0.01), pxH);
+          }
         }
       }
       this._setEntityAlpha(e, alpha);
