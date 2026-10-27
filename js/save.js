@@ -80,26 +80,49 @@ const SaveSystem = {
       GameState.labUnlocked = !!data.labUnlocked;
       GameState.buildings = (data.buildings && typeof data.buildings === 'object') ? data.buildings : GameState.buildings;
 
-      if (Array.isArray(data.farmPlots) && data.farmPlots.length === 36) {
-        GameState.farmPlots = data.farmPlots.map(plot => ({
-          crop: plot.cropId ? CONFIG.crops.find(crop => crop.id === plot.cropId) || null : null,
-          plantedAt: Number(plot.plantedAt) || 0,
-          status: ['drought', 'pest', 'weeds', 'burn', 'beast'].includes(plot.status) ? plot.status : null,
-          ready: false,
-          moisture: Number.isFinite(plot.moisture) ? plot.moisture : 80,
-          quality: ['common','fine','rare','legendary'].includes(plot.quality) ? plot.quality : 'common',
-          harvestCount: Number(plot.harvestCount) || 0,
-          fertilized: !!plot.fertilized,
-          tier: clamp(Number(plot.tier) || 0, 0, 3), // W1c 土地等级
-        }));
-      }
-      // 确保 farmPlots 始终为 36 格（修复存档损坏或首次加载时空数组的问题）
-      if (!Array.isArray(GameState.farmPlots) || GameState.farmPlots.length !== 36) {
+      // 农田格数：v5.1 起为 48 格（8×6）。旧实现这里写死 36 判等，
+      // 而 save() 已按 48 格写出 —— 导致 48 格存档整段不恢复、作物全丢，
+      // 随后 Farm.init() 的"初始种一些"+save() 会把玩家存档覆盖成 3 株默认作物。
+      // 修复：按当前格数容错恢复（旧 36 格存档自动补齐，不重置已有作物）。
+      const PLOT_TOTAL = (typeof Farm !== 'undefined' && Farm.PLOT_COUNT) ? Farm.PLOT_COUNT : 48;
+      const srcPlots = Array.isArray(data.farmPlots) ? data.farmPlots : null;
+      if (srcPlots && srcPlots.length) {
+        const findCrop = (id) => {
+          if (!id) return null;
+          const c = CONFIG.crops.find(crop => crop.id === id);
+          if (c) return c;
+          try {
+            if (typeof CropExpansion !== 'undefined' && Array.isArray(CropExpansion.NEW_CROPS)) {
+              return CropExpansion.NEW_CROPS.find(crop => crop.id === id) || null;
+            }
+          } catch (e) {}
+          return null;
+        };
         GameState.farmPlots = [];
-        for (let i = 0; i < 36; i++) {
-          GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null, moisture: 80, quality: 'common', harvestCount: 0, fertilized: false });
+        for (let i = 0; i < PLOT_TOTAL; i++) {
+          const plot = srcPlots[i] || {};
+          GameState.farmPlots.push({
+            crop: findCrop(plot.cropId),
+            plantedAt: Number(plot.plantedAt) || 0,
+            status: ['drought', 'pest', 'weeds', 'burn', 'beast'].includes(plot.status) ? plot.status : null,
+            ready: false,
+            moisture: Number.isFinite(plot.moisture) ? plot.moisture : 80,
+            quality: ['common','fine','rare','legendary'].includes(plot.quality) ? plot.quality : 'common',
+            harvestCount: Number(plot.harvestCount) || 0,
+            fertilized: !!plot.fertilized,
+            tier: clamp(Number(plot.tier) || 0, 0, 3), // W1c 土地等级
+          });
         }
       }
+      // 确保 farmPlots 始终为完整格数（修复存档损坏或首次加载时空数组的问题）
+      if (!Array.isArray(GameState.farmPlots) || GameState.farmPlots.length !== PLOT_TOTAL) {
+        GameState.farmPlots = [];
+        for (let i = 0; i < PLOT_TOTAL; i++) {
+          GameState.farmPlots.push({ crop: null, plantedAt: 0, ready: false, status: null, moisture: 80, quality: 'common', harvestCount: 0, fertilized: false, tier: 0 });
+        }
+      }
+      // 标记本次是"读档进入"，Farm.init() 据此不再补种初始作物（只对真正的新档生效）
+      GameState._saveLoaded = !!(srcPlots && srcPlots.length);
       // v2.0 农场大更新字段
       GameState.weather = ['sunny','rain','fog','storm'].includes(data.weather) ? data.weather : 'sunny';
       GameState.weatherTimer = Number.isFinite(data.weatherTimer) ? data.weatherTimer : 120;

@@ -1,4 +1,4 @@
-﻿const Farm = {
+const Farm = {
   PLOT_COUNT: 48,
   init() {
     if (!GameState.unlockedCrops.includes('oil_sedge')) GameState.unlockedCrops.push('oil_sedge');
@@ -18,14 +18,16 @@
     if (!GameState.farmBeauty) GameState.farmBeauty = 0;
     if (!GameState.visitorState) { GameState.visitorState = 'none'; GameState.visitorTimer = 120; GameState.visitorName = ''; }
     if (GameState.waterCooldown === undefined) GameState.waterCooldown = 0;
-    // 初始种一些
-    for (let i = 0; i < 3; i++) {
-      const idx = randInt(0, GameState.unlockedPlots - 1);
-      if (!GameState.farmPlots[idx].crop) {
-        GameState.farmPlots[idx].crop = CONFIG.crops[0];
-        GameState.farmPlots[idx].plantedAt = Date.now() - rand(5000, 20000);
-        GameState.farmPlots[idx].moisture = 80;
-        GameState.farmPlots[idx].quality = 'common';
+    // 初始种一些（仅新档；读档进入时不补种，避免向玩家田地塞初始作物）
+    if (!GameState._saveLoaded) {
+      for (let i = 0; i < 3; i++) {
+        const idx = randInt(0, GameState.unlockedPlots - 1);
+        if (!GameState.farmPlots[idx].crop) {
+          GameState.farmPlots[idx].crop = CONFIG.crops[0];
+          GameState.farmPlots[idx].plantedAt = Date.now() - rand(5000, 20000);
+          GameState.farmPlots[idx].moisture = 80;
+          GameState.farmPlots[idx].quality = 'common';
+        }
       }
     }
     SaveSystem.save();
