@@ -26,7 +26,24 @@
 
   const T = THREE;
   const CROP_KINDS = ['wheat', 'corn', 'watermelon', 'pumpkin', 'sunflower', 'cabbage', 'carrot', 'moon_rice'];
+  // P13-b 25 作物 × 4 阶段（farmCropsP13）：种子堆/苗/成株/成熟按生长进度切换 GLB 内 stage 组，
+  // ready 格按品质给成熟模型叠加品质色自发光。关闭即回到单阶段全量模型。
+  const FARM_CROPS_P13 = (function () { try { const v = (localStorage.getItem('farmCropsP13') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
+  // P13-c 建筑按等级差异化（farmBuildingsP13）：主屋按四建筑总级分 4 档，畜舍/温室/工坊/实验室按各自等级
+  // 叠加 Blender 生成的等级扩展件（farmhouse_l1..l3、barn_l2..l4 等）。关闭即回到单档 GLB 外观。
+  const FARM_BUILDINGS_P13 = (function () { try { const v = (localStorage.getItem('farmBuildingsP13') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
+  // P13-d 废土环境（farmEnvP13）：农场外围追加废土氛围——废车残骸/焦土斑块/废油桶/核废料桶/
+  // 破损围栏/倾斜电线杆/近地灰雾，只落在外围条带不侵占操作区。关闭即回到现有环境。
+  const FARM_ENV_P13 = (function () { try { const v = (localStorage.getItem('farmEnvP13') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
+  // P13-e 全局统一与性能预算（farmGradeP13）：场景静态道具（接触阴影/桶箱/断墙/水塔/路灯/废土件等）
+  // 统一打标后按材质合并，draw call 预算目标 ≤120。关闭即回到逐件独立绘制。
+  const FARM_GRADE_P13 = (function () { try { const v = (localStorage.getItem('farmGradeP13') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
   const WEATHER_FOG = { clear: 0.012, cloud: 0.016, rain: 0.022, heavy_rain: 0.030, storm: 0.034, fog: 0.055, snow: 0.026 };
+  // P12-e 后期统一（farmGradeP12）：白天去发白（收雾/收天空/提对比饱和/微暖做旧）、黄昏暗部抬黑。关闭即完全回到原值。
+  const FARM_GRADE_P12 = (function () { try { const v = (localStorage.getItem('farmGradeP12') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
+  // P13-a 农田重铸（farmFieldP13）：PBR 土壤（bump/roughness 贴图）、田块厚土板几何、湿度/状态材质变体、
+  // 品质色成熟环、田埂土垄 + 金属灌溉渠、待扩建围栏 + 公告板。关闭即回到 P12 田块表现。
+  const FARM_FIELD_P13 = (function () { try { const v = (localStorage.getItem('farmFieldP13') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
 
   function hash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -125,6 +142,94 @@
         c.fillRect(x, y, 1, 2 + Math.random() * 3);
       }
     }, [4, 4]);
+  }
+
+  /* ---------- P13-a PBR 土壤贴图组（color / bump / roughness）---------- */
+  // 颜色：深褐废土基调 + 横向垄沟明暗 + 碎石 + 干裂纹 + 湿度深斑；bump：垄沟顶亮沟暗；rough：碎石高粗、湿区低粗。
+  function soilPbrTextures() {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 512;
+    const c = cv.getContext('2d');
+    // ---- color ----
+    const g = c.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0, '#4a3826'); g.addColorStop(.5, '#3f3020'); g.addColorStop(1, '#33271a');
+    c.fillStyle = g; c.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 9000; i++) {
+      const x = Math.random() * 512, y = Math.random() * 512;
+      c.fillStyle = Math.random() > .5 ? 'rgba(120,96,64,.20)' : 'rgba(24,18,10,.22)';
+      c.fillRect(x, y, 1 + Math.random() * 2.4, 1 + Math.random() * 2);
+    }
+    for (let row = 0; row < 9; row++) {
+      const y = 30 + row * 55;
+      c.fillStyle = 'rgba(18,13,8,.35)'; c.fillRect(0, y, 512, 10);
+      c.fillStyle = 'rgba(196,164,112,.10)'; c.fillRect(0, y - 4, 512, 4);
+      for (let i = 0; i < 120; i++) {
+        c.fillStyle = 'rgba(16,12,8,.28)';
+        c.fillRect(Math.random() * 512, y + Math.random() * 10, 2 + Math.random() * 4, 1.4);
+      }
+    }
+    for (let i = 0; i < 220; i++) {
+      c.fillStyle = `rgba(${90 + Math.random() * 40},${80 + Math.random() * 30},${64 + Math.random() * 20},.5)`;
+      c.beginPath(); c.ellipse(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 3, 1 + Math.random() * 2, Math.random() * 3, 0, 7); c.fill();
+    }
+    for (let i = 0; i < 30; i++) {
+      c.strokeStyle = 'rgba(18,12,6,.30)'; c.lineWidth = 1;
+      const x = Math.random() * 512, y = Math.random() * 512;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + (Math.random() - .5) * 80, y + (Math.random() - .5) * 80); c.stroke();
+    }
+    // 湿度深斑（低 moisture 表现用干区，湿润时整体乘深色）
+    for (let i = 0; i < 40; i++) {
+      c.fillStyle = 'rgba(15,10,6,.28)';
+      c.beginPath(); c.ellipse(Math.random() * 512, Math.random() * 512, 6 + Math.random() * 20, 4 + Math.random() * 14, Math.random() * 3, 0, 7); c.fill();
+    }
+    const colorTex = new T.CanvasTexture(cv);
+    colorTex.wrapS = colorTex.wrapT = T.RepeatWrapping;
+    colorTex.repeat.set(1.6, 1.6);
+    colorTex.anisotropy = 4;
+    if (T.sRGBEncoding) colorTex.encoding = T.sRGBEncoding;
+    // ---- bump（灰阶：垄沟顶亮、沟内暗，碎石噪点）----
+    const bv = document.createElement('canvas'); bv.width = bv.height = 512;
+    const bc = bv.getContext('2d');
+    bc.fillStyle = '#808080'; bc.fillRect(0, 0, 512, 512);
+    for (let row = 0; row < 9; row++) {
+      const y = 30 + row * 55;
+      const grd = bc.createLinearGradient(0, y - 6, 0, y + 12);
+      grd.addColorStop(0, '#c8c8c8'); grd.addColorStop(.45, '#999999'); grd.addColorStop(1, '#505050');
+      bc.fillStyle = grd; bc.fillRect(0, y - 6, 512, 18);
+      for (let i = 0; i < 110; i++) {
+        bc.fillStyle = '#3c3c3c';
+        bc.fillRect(Math.random() * 512, y + Math.random() * 14, 2 + Math.random() * 4, 1.4);
+      }
+    }
+    for (let i = 0; i < 240; i++) {
+      bc.fillStyle = Math.random() > .5 ? '#a0a0a0' : '#5a5a5a';
+      bc.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 2.6, 1 + Math.random() * 1.6);
+    }
+    const bumpTex = new T.CanvasTexture(bv);
+    bumpTex.wrapS = bumpTex.wrapT = T.RepeatWrapping;
+    bumpTex.repeat.set(1.6, 1.6);
+    bumpTex.anisotropy = 2;
+    // ---- roughness（R 通道：碎石/干土 255 高粗，湿润低粗 90）----
+    const rv = document.createElement('canvas'); rv.width = rv.height = 512;
+    const rc = rv.getContext('2d');
+    rc.fillStyle = '#d8d8d8'; rc.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 260; i++) {
+      rc.fillStyle = '#f0f0f0';
+      rc.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 3, 1 + Math.random() * 2);
+    }
+    for (let i = 0; i < 46; i++) {
+      rc.fillStyle = '#5c5c5c';
+      rc.beginPath(); rc.ellipse(Math.random() * 512, Math.random() * 512, 7 + Math.random() * 22, 5 + Math.random() * 16, Math.random() * 3, 0, 7); rc.fill();
+    }
+    const roughTex = new T.CanvasTexture(rv);
+    roughTex.wrapS = roughTex.wrapT = T.RepeatWrapping;
+    roughTex.repeat.set(1.6, 1.6);
+    return { color: colorTex, bump: bumpTex, rough: roughTex };
+  }
+
+  // 品质 → 成熟环 / 对勾主色（与农场 UI 品质配色一致）
+  function qualityGlowColor(q) {
+    const qc = { common: 0xffd76a, rare: 0x6ee7ff, epic: 0xc792ff, legendary: 0xff5a5a, mythic: 0xffd76a }[(q || 'common').toLowerCase()];
+    return qc || 0xffd76a;
   }
 
 
@@ -888,13 +993,15 @@
                   // 昼夜自适应：白天通透明快、夜间自动压曝光+强化黑场塑形恢复夜感（uNight 由 frame 按 dayLight 注入）
                   uniforms: {
                     tDiffuse: { value: null }, uNight: { value: 0 },
-                    uExpDay: { value: 0.98 }, uExpNight: { value: 0.70 },
-                    uGammaDay: { value: 1.12 }, uGammaNight: { value: 1.50 },
-                    uConDay: { value: 1.10 }, uConNight: { value: 1.18 }
+                    uExpDay: { value: FARM_GRADE_P12 ? 0.94 : 0.98 }, uExpNight: { value: FARM_GRADE_P12 ? 0.76 : 0.70 },
+                    uGammaDay: { value: FARM_GRADE_P12 ? 1.08 : 1.12 }, uGammaNight: { value: FARM_GRADE_P12 ? 1.40 : 1.50 },
+                    uConDay: { value: FARM_GRADE_P12 ? 1.16 : 1.10 }, uConNight: { value: FARM_GRADE_P12 ? 1.16 : 1.18 },
+                    uSatDay: { value: FARM_GRADE_P12 ? 1.14 : 1.0 }, uSatNight: { value: FARM_GRADE_P12 ? 1.06 : 1.0 },
+                    uWarmDay: { value: FARM_GRADE_P12 ? 0.10 : 0.0 }, uWarmNight: { value: 0.0 }
                   },
                   vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
                   fragmentShader: [
-                    'uniform sampler2D tDiffuse; uniform float uNight,uExpDay,uExpNight,uGammaDay,uGammaNight,uConDay,uConNight;',
+                    'uniform sampler2D tDiffuse; uniform float uNight,uExpDay,uExpNight,uGammaDay,uGammaNight,uConDay,uConNight,uSatDay,uSatNight,uWarmDay,uWarmNight;',
                     'varying vec2 vUv;',
                     'vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14;',
                     '  return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0); }',
@@ -902,10 +1009,15 @@
                     '  float exposure=mix(uExpDay,uExpNight,uNight);',
                     '  float gamma=mix(uGammaDay,uGammaNight,uNight);',
                     '  float contrast=mix(uConDay,uConNight,uNight);',
+                    '  float sat=mix(uSatDay,uSatNight,uNight);',
+                    '  float warm=mix(uWarmDay,uWarmNight,uNight);',
                     '  vec3 col=texture2D(tDiffuse,vUv).rgb*exposure;',
                     '  col=aces(col);',
                     '  col=pow(max(col,vec3(0.0)),vec3(gamma));',  // 黑场塑形：夜间强力压中暗部、白天轻微
                     '  col=(col-0.18)*contrast+0.18;',
+                    '  float lum=dot(col,vec3(0.299,0.587,0.114));',  // P12-e 饱和回升去发白
+                    '  col=mix(vec3(lum),col,sat);',
+                    '  col*=mix(vec3(1.0),vec3(1.045,1.0,0.92),warm);',  // P12-e 微暖做旧
                     '  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);',
                     '}'
                   ].join('\n')
@@ -1150,6 +1262,7 @@
         }
         g.position.set(x, 0, z); g.rotation.y = hash(x + z) * 6.28;
         g.userData.prop = 'barrel';
+        g.userData.static = true;
         g.traverse(o => { if (o.isMesh) o.castShadow = true; });
         this._scene.add(g);
       };
@@ -1157,6 +1270,7 @@
         const c = new T.Mesh(new T.BoxGeometry(.6 * s, .5 * s, .6 * s), propWood);
         c.position.set(x, .25 * s, z); c.rotation.y = ry; c.castShadow = true;
         c.userData.prop = 'crate';
+        c.userData.static = true;
         this._scene.add(c);
       };
       addBarrel(-4.6, -3.2, 1); addBarrel(-4.1, -3.6, .85); addBarrel(5.6, -6.4, 1.1);
@@ -1169,6 +1283,7 @@
         const wall = new T.Mesh(new T.BoxGeometry(1.1, .5 + hash(i) * .25, .45), new T.MeshStandardMaterial({ color: '#4a463c', roughness: 1 }));
         wall.position.set(-12.4 + i * 1.15, .3, 12.1); wall.rotation.y = (hash(i) - .5) * .08;
         wall.castShadow = true; wall.receiveShadow = true;
+        wall.userData.static = true;
         this._scene.add(wall);
       }
       // 水塔
@@ -1184,16 +1299,17 @@
         cap.position.y = 4.55; tower.add(cap);
         tower.position.set(-15.5, 0, -5.5);
         tower.userData.prop = 'watertower';
+        tower.userData.static = true;
         tower.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         this._scene.add(tower);
       }
       // 筒仓
       {
         const silo = new T.Mesh(new T.CylinderGeometry(1.1, 1.1, 4.2, 14), clampedTexMat('rust', '#9a8a70', [2, 2], .8, .2));
-        silo.position.set(-18.5, 2.1, -9.5); silo.castShadow = true; silo.userData.prop = 'silo';
+        silo.position.set(-18.5, 2.1, -9.5); silo.castShadow = true; silo.userData.prop = 'silo'; silo.userData.static = true;
         this._scene.add(silo);
         const dome = new T.Mesh(new T.SphereGeometry(1.12, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), propDark);
-        dome.position.set(-18.5, 4.2, -9.5); this._scene.add(dome);
+        dome.position.set(-18.5, 4.2, -9.5); dome.userData.static = true; this._scene.add(dome);
       }
       // 板车（两轮）
       {
@@ -1209,6 +1325,7 @@
         }
         cart.position.set(-5.6, 0, 2.6); cart.rotation.y = .35;
         cart.userData.prop = 'cart';
+        cart.userData.static = true;
         cart.traverse(o => { if (o.isMesh) o.castShadow = true; });
         this._scene.add(cart);
       }
@@ -1216,12 +1333,12 @@
       this._lampLights = [];
       const addLamp = (x, z) => {
         const post = new T.Mesh(new T.CylinderGeometry(.06, .09, 2.2, 6), propDark);
-        post.position.set(x, 1.1, z); post.castShadow = true; this._scene.add(post);
+        post.position.set(x, 1.1, z); post.castShadow = true; post.userData.static = true; this._scene.add(post);
         const arm = new T.Mesh(new T.BoxGeometry(.5, .06, .06), propDark);
-        arm.position.set(x + .22, 2.15, z); this._scene.add(arm);
+        arm.position.set(x + .22, 2.15, z); arm.userData.static = true; this._scene.add(arm);
         const bulbMat = new T.MeshStandardMaterial({ color: '#ffcf8a', emissive: new T.Color('#ffb85a'), emissiveIntensity: 0, roughness: .4 });
         const bulb = new T.Mesh(new T.BoxGeometry(.26, .2, .26), bulbMat);
-        bulb.position.set(x + .44, 2.02, z); this._scene.add(bulb);
+        bulb.position.set(x + .44, 2.02, z); bulb.userData.static = true; this._scene.add(bulb);
         const pl = new T.PointLight(0xffb85a, 0, 6.5);
         pl.position.set(x + .44, 1.95, z); this._scene.add(pl);
         this._lampLights.push({ mat: bulbMat, light: pl });
@@ -1238,24 +1355,26 @@
         });
         pathTex.repeat.set(2, 10);
         const road = new T.Mesh(new T.PlaneGeometry(3.0, 17), new T.MeshStandardMaterial({ map: pathTex, roughness: 1, color: 0x9a7a52 }));
-        road.rotation.x = -Math.PI / 2; road.position.set(3.4, .03, 3.6); road.receiveShadow = true;
+        road.rotation.x = -Math.PI / 2; road.position.set(3.4, .03, 3.6); road.receiveShadow = true; road.userData.static = true;
         this._scene.add(road);
         const rutMat = new T.MeshBasicMaterial({ color: 0x4a3a24, transparent: true, opacity: .35, depthWrite: false });
         for (const dx of [-.5, .5]) {
           const rut = new T.Mesh(new T.PlaneGeometry(.16, 16), rutMat);
           rut.rotation.x = -Math.PI / 2; rut.position.set(3.4 + dx, .045, 3.6);
+          rut.userData.static = true;
           this._scene.add(rut);
         }
       }
       // 田块木桩边界（让 16 块地更可读）
       for (let i = 0; i < 5; i++) {
         const post = new T.Mesh(new T.BoxGeometry(.1, .5, .1), propWood);
-        post.position.set(-11.6 + i * 3.2, .25, 13.0); post.castShadow = true; this._scene.add(post);
+        post.position.set(-11.6 + i * 3.2, .25, 13.0); post.castShadow = true; post.userData.static = true; this._scene.add(post);
       }
       // 道具接触阴影（保底落地感）
       const csPlane = (x, z, sx, sz) => {
         const m = new T.Mesh(new T.PlaneGeometry(sx, sz), new T.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: .85 }));
         m.rotation.x = -Math.PI / 2; m.position.set(x, .05, z);
+        m.userData.static = true;
         this._scene.add(m);
       };
       csPlane(-4.6, -3.2, 1.1, 1.0); csPlane(-4.1, -3.6, .9, .9); csPlane(5.6, -6.4, 1.2, 1.1);
@@ -1278,6 +1397,145 @@
         scene.add(mergeMeshes(fenceRoot));
       }
 
+      // ===== P13-d 废土环境（外围氛围件，farmEnvP13）=====
+      if (FARM_ENV_P13) {
+        const envRust = clampedTexMat('rust', '#6a5c48', [2, 1], .9, .25);
+        const envDark = new T.MeshStandardMaterial({ color: '#2c2822', roughness: 1 });
+        // 焦土斑块（深褐黑径向纹理贴地）
+        try {
+          const burnTex = canvasTex(128, 128, (c, w, h) => {
+            const g = c.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2);
+            g.addColorStop(0, 'rgba(18,14,10,.78)'); g.addColorStop(.55, 'rgba(30,22,14,.45)'); g.addColorStop(1, 'rgba(30,22,14,0)');
+            c.fillStyle = g; c.fillRect(0, 0, w, h);
+            for (let i = 0; i < 160; i++) {
+              c.fillStyle = 'rgba(8,6,4,.5)';
+              c.beginPath(); c.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 3, 0, 7); c.fill();
+            }
+          });
+          const burns = [[-6, -14.5, 2.6, 2.0], [2, -15.8, 3.2, 2.4], [8, -14, 2.2, 1.8], [-12, -16.2, 2.8, 2.2], [12.5, -15.6, 2.4, 1.9], [-1.5, -17.4, 2.0, 1.6]];
+          burns.forEach(([bx, bz, bw, bd], i) => {
+            const b = new T.Mesh(new T.PlaneGeometry(bw, bd), new T.MeshBasicMaterial({ map: burnTex, transparent: true, depthWrite: false, opacity: .9 }));
+            b.rotation.x = -Math.PI / 2; b.position.set(bx, .035 + i * .001, bz);
+            this._scene.add(b);
+          });
+        } catch (e) {}
+        // 核废料桶（黄黑警示，辐射符号画在侧面纹理）
+        try {
+          const hazTex = canvasTex(64, 96, (c, w, h) => {
+            c.fillStyle = '#d8b23a'; c.fillRect(0, 0, w, h);
+            c.fillStyle = '#23201a';
+            for (let i = 0; i < 8; i++) { if (i % 2 === 0) c.fillRect(i * 8, 0, 4, h); }
+            c.fillStyle = '#1c1a14';
+            c.beginPath(); c.moveTo(w / 2, 18); c.lineTo(w / 2 - 9, 44); c.lineTo(w / 2 + 9, 44); c.closePath(); c.fill();
+            for (let a = 0; a < 3; a++) {
+              const ang = -Math.PI / 2 + a * Math.PI * 2 / 3;
+              c.beginPath();
+              c.arc(w / 2, 44, 20, ang, ang + Math.PI / 3);
+              c.lineTo(w / 2 + Math.cos(ang + Math.PI / 6) * 8, 44 + Math.sin(ang + Math.PI / 6) * 8);
+              c.closePath(); c.fill();
+            }
+            c.beginPath(); c.arc(w / 2, 44, 3.5, 0, 7); c.fill();
+          });
+          hazTex.repeat.set(1.6, 1);
+          const hazMat = new T.MeshStandardMaterial({ map: hazTex, roughness: .85 });
+          const hazSpec = [[3, -16.5, 1], [-4, -16.2, .9], [7.5, -17.6, .95], [-10, -16.8, 1.05]];
+          hazSpec.forEach(([hx, hz, hs], i) => {
+            const hk = new T.Mesh(new T.CylinderGeometry(.42 * hs, .38 * hs, .9 * hs, 12), hazMat);
+            hk.position.set(hx, .45 * hs, hz); hk.rotation.y = hash(i * 7.7) * 6.28; hk.castShadow = true;
+            hk.userData.prop = 'hazard'; this._scene.add(hk);
+            const cap = new T.Mesh(new T.CylinderGeometry(.46 * hs, .46 * hs, .08 * hs, 12), envDark);
+            cap.position.set(hx, .9 * hs, hz); this._scene.add(cap);
+          });
+        } catch (e) {}
+        // 废车残骸 ×2（锈车身 + 轮 + 碎玻璃，倾斜翻倒感）
+        const addWreck = (x, z, ry, tilt) => {
+          const wk = new T.Group();
+          const body = new T.Mesh(new T.BoxGeometry(2.3, .55, 1.15), envRust);
+          body.position.y = .5; wk.add(body);
+          const cabin = new T.Mesh(new T.BoxGeometry(1.6, .5, 1.05), envRust);
+          cabin.position.set(-.3, 1.0, 0); wk.add(cabin);
+          const hood = new T.Mesh(new T.BoxGeometry(1.0, .14, 1.0), envDark);
+          hood.position.set(.9, .82, 0); hood.rotation.x = .25; wk.add(hood);
+          for (const side of [-1, 1]) {
+            for (const px of [-.55, .55]) {
+              const wh = new T.Mesh(new T.TorusGeometry(.3, .09, 6, 12), envDark);
+              wh.position.set(px, .32, side * .58); wh.rotation.y = Math.PI / 2; wk.add(wh);
+            }
+            const glass = new T.Mesh(new T.BoxGeometry(.9, .18, .02), new T.MeshStandardMaterial({ color: '#7a8a92', roughness: .15, metalness: .3, transparent: true, opacity: .55 }));
+            glass.position.set(-.3, 1.02, side * .53); wk.add(glass);
+          }
+          wk.position.set(x, 0, z); wk.rotation.y = ry; wk.rotation.z = tilt;
+          wk.userData.prop = 'wreck';
+          wk.traverse(o => { if (o.isMesh) o.castShadow = true; });
+          this._scene.add(wk);
+        };
+        addWreck(6.2, -14.6, .5, .06); addWreck(-8.5, -16.4, -.35, -.08);
+        // 废油桶堆（倒伏/半埋）
+        const oilSpec = [[11.5, -13.6, 1.1, 1], [14.2, -12.6, .9, .3], [-12.5, -14.2, .95, -.4], [9.8, -16.6, .85, 1.4], [-14.6, -15.4, 1.0, 2.2]];
+        oilSpec.forEach(([ox, oz, os, orz], i) => {
+          const drum = new T.Mesh(new T.CylinderGeometry(.3 * os, .3 * os, .8 * os, 10), envRust);
+          drum.position.set(ox, .4 * os, oz); drum.rotation.z = orz; drum.castShadow = true;
+          drum.userData.prop = 'oilDrum'; this._scene.add(drum);
+        });
+        // 破损围栏 ×2 段（倾斜立柱 + 断横杆）
+        const addBrokenFence = (x0, z, span, dir) => {
+          const fr = new T.Group();
+          for (let i = 0; i < 5; i++) {
+            const p = new T.Mesh(new T.BoxGeometry(.1, 1.0 + hash(i * 3.1) * .3, .1), envDark);
+            p.position.set(x0 + i * span / 4, .5, z);
+            p.rotation.z = (hash(i * 5.3) - .5) * .5; p.rotation.x = dir * (hash(i * 7.1) - .5) * .35;
+            fr.add(p);
+          }
+          const rail = new T.Mesh(new T.BoxGeometry(span, .08, .08), envRust);
+          rail.position.set(x0 + span / 2, 1.05, z); rail.rotation.z = .18; fr.add(rail);
+          fr.traverse(o => { if (o.isMesh) o.castShadow = true; });
+          fr.userData.prop = 'brokenFence'; this._scene.add(fr);
+        };
+        addBrokenFence(-14.5, -13.2, 5.5, 1); addBrokenFence(7.8, -15.2, 4.8, -1);
+        // 倾斜电线杆 ×2（杆 + 横担 + 垂落电线）
+        const addPole = (x, z, dir) => {
+          const pg = new T.Group();
+          const pole = new T.Mesh(new T.CylinderGeometry(.06, .1, 3.6, 7), envDark);
+          pole.position.y = 1.8; pg.add(pole);
+          const arm = new T.Mesh(new T.BoxGeometry(1.4, .07, .07), envDark);
+          arm.position.set(0, 3.1, 0); pg.add(arm);
+          const curve = new T.CatmullRomCurve3([
+            new T.Vector3(-.7, 3.05, 0), new T.Vector3(-.35, 2.35, 0), new T.Vector3(0, 2.55, 0),
+            new T.Vector3(.35, 2.0, 0), new T.Vector3(.7, 2.45, 0)
+          ]);
+          const wire = new T.Mesh(new T.TubeGeometry(curve, 8, .018, 4, false), envDark);
+          pg.add(wire);
+          pg.position.set(x, 0, z); pg.rotation.z = dir * .14; pg.rotation.y = hash(x) * 6.28;
+          pg.userData.prop = 'pole';
+          pg.traverse(o => { if (o.isMesh) o.castShadow = true; });
+          this._scene.add(pg);
+        };
+        addPole(-13.2, -15.2, -1); addPole(13.4, -16.8, 1);
+        // 近地灰雾带（外围低矮，加深废土氛围）
+        try {
+          const dustTex = canvasTex(256, 64, (c, w, h) => {
+            const g = c.createLinearGradient(0, 0, 0, h);
+            g.addColorStop(0, 'rgba(120,116,104,0)'); g.addColorStop(.5, 'rgba(128,124,110,.4)'); g.addColorStop(1, 'rgba(122,118,106,0)');
+            c.fillStyle = g; c.fillRect(0, 0, w, h);
+            for (let i = 0; i < 60; i++) {
+              c.fillStyle = 'rgba(150,146,132,' + (.05 + Math.random() * .08) + ')';
+              c.beginPath(); c.ellipse(Math.random() * w, h * (.2 + Math.random() * .6), 20 + Math.random() * 50, 3 + Math.random() * 6, 0, 0, 7); c.fill();
+            }
+          });
+          const dust = new T.Mesh(new T.PlaneGeometry(44, 5), new T.MeshBasicMaterial({ map: dustTex, transparent: true, depthWrite: false, opacity: .5 }));
+          dust.rotation.x = -Math.PI / 2; dust.position.set(0, .12, -13.5);
+          dust.userData.prop = 'envDust';
+          dust.userData.static = true;
+          this._scene.add(dust);
+        } catch (e) {}
+        // P13-e：废土件统一打标进入静态合并
+        if (FARM_GRADE_P13) {
+          this._scene.traverse(o => {
+            if (o.userData && o.userData.prop && /hazard|wreck|oilDrum|brokenFence|pole|envDust/.test(o.userData.prop)) o.userData.static = true;
+          });
+        }
+      }
+
       // 河流（右侧）
       const water = new T.Mesh(new T.PlaneGeometry(16, 26), new T.MeshStandardMaterial({ color: 0x2a4a52, roughness: .18, metalness: .65 }));
       water.rotation.x = -Math.PI / 2; water.position.set(14, .03, 3); water.receiveShadow = true;
@@ -1288,6 +1546,8 @@
       this._snow = this._makeSnow(scene);
       this._ash = this._makeAsh(scene);
       this._fogPts = this._makeFog(scene);
+      // P13-e：静态道具统一打标（_addModelDecor/_replacePropsWithModels 的 GLB 也标 static）；
+      // 合并统一在 _onModelsReady 末尾执行一次，避免重复几何与替换失效。
 
       // 事件
       this._onResize = () => this._resize();
@@ -1461,6 +1721,16 @@
               this._applyModelMaterials(root);
               root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
               this._models[name] = root;
+              // P13-b：拆出 4 阶段子组（s0 种子堆 / s1 苗 / s2 成株 / s3 成熟），按需单独 clone
+              try {
+                this._cropStages = this._cropStages || {};
+                const stages = {};
+                ['s0', 's1', 's2', 's3'].forEach(s => {
+                  const g = root.getObjectByName(s);
+                  if (g) stages[s] = g;
+                });
+                if (Object.keys(stages).length) this._cropStages[name] = stages;
+              } catch (e) {}
             } catch (e) { console.warn('[Pano3D] model prep fail', name, String(e).slice(0, 120)); }
             finish();
           }, (err) => { console.warn('[Pano3D] glb parse fail', name, String(err).slice(0, 120)); finish(); });
@@ -1471,7 +1741,24 @@
       this._modelsReady = true; this._modelsLoading = false;
       try { this._replacePropsWithModels(); } catch (e) {}
       try { this._addModelDecor(); } catch (e) {}
+      // P13-e：模型就绪后统一执行静态道具合并（GLB 装饰/替换件已在场景内）
+      try { this._mergeStaticPass(); } catch (e) { console.warn('[P13-e] static merge failed', e); }
       try { this._syncState(true); } catch (e) {}
+    },
+    // P13-e：收集 scene 中所有 userData.static 的 mesh 并按材质合并为单个 Group
+    _mergeStaticPass() {
+      if (!FARM_GRADE_P13) return;
+      const statics = [];
+      this._scene.traverse(o => { if (o.userData && o.userData.static && o.isMesh) statics.push(o); });
+      if (!statics.length) return;
+      statics.forEach(o => { if (o.parent) o.parent.remove(o); });
+      const bucket = new T.Group();
+      statics.forEach(o => bucket.add(o));
+      const merged = mergeMeshes(bucket);
+      // 静态道具不进实时阴影 pass（落地感由接触阴影 csPlane 承担），否则 draw call 翻倍
+      merged.traverse(o => { if (o.isMesh) o.castShadow = false; });
+      merged.userData.staticMerged = '1';
+      this._scene.add(merged);
     },
     _addModelDecor() {
       const add = (name, x, z, ry, s) => {
@@ -1482,7 +1769,8 @@
         inst.rotation.y = ry || 0;
         inst.scale.setScalar(s || 1);
         inst.userData.isModelProp = '1';
-        inst.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        inst.userData.static = true;
+        inst.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.static = true; } });
         this._scene.add(inst);
         return inst;
       };
@@ -1583,6 +1871,8 @@
         inst.position.set(old.position.x, 0, old.position.z);
         inst.rotation.y = old.rotation.y || 0;
         inst.userData.isModelProp = '1';
+        inst.userData.static = true;
+        inst.traverse(o => { if (o.isMesh) o.userData.static = true; });
         if (old.parent) old.parent.remove(old);
         this._scene.add(inst);
       });
@@ -1595,7 +1885,26 @@
       c.scale.setScalar(1.15);
       return c;
     },
+    // P13-c：基础建筑 GLB + 按等级叠加扩展件（同一坐标系，同 1.15 缩放）
+    _modelCloneWithLevel(name, extCount) {
+      const root = this._models && this._models[name];
+      if (!root) return null;
+      const g = new T.Group();
+      const c = root.clone(true);
+      c.scale.setScalar(1.15);
+      g.add(c);
+      const n = Math.max(0, Math.min(8, extCount | 0));
+      for (let i = 1; i <= n; i++) {
+        const ext = this._models && this._models[name + '_l' + i];
+        if (!ext) continue;
+        const e = ext.clone(true);
+        e.scale.setScalar(1.15);
+        g.add(e);
+      }
+      return g;
+    },
     _modelTexture(key) {
+      if (this._modelTexCache && this._modelTexCache[key]) return this._modelTexCache[key];
       let src = null;
       try {
         if (key === 'wood') src = woodTex();
@@ -1605,19 +1914,25 @@
         else if (key === 'grass') src = this._texCache.grass || (this._texCache.grass = grassTexture());
       } catch (e) { src = null; }
       if (!src) return null;
+      // P13-e：按 key 缓存共享实例（原逐 mesh clone 产生独立 uuid，阻断静态合并，draw call 翻倍）
       const t = src.clone();
       t.needsUpdate = true;
       t.wrapS = t.wrapT = T.RepeatWrapping;
       t.repeat.set(3, 3);
+      if (!this._modelTexCache) this._modelTexCache = {};
+      this._modelTexCache[key] = t;
       return t;
     },
     _modelNormal(key) {
       try {
         if (!NORMALCACHE[key]) return null;
+        if (this._modelNrmCache && this._modelNrmCache[key]) return this._modelNrmCache[key];
         const n = NORMALCACHE[key].clone();
         n.needsUpdate = true;
         n.wrapS = n.wrapT = T.RepeatWrapping;
         n.repeat.set(3, 3);
+        if (!this._modelNrmCache) this._modelNrmCache = {};
+        this._modelNrmCache[key] = n;
         return n;
       } catch (e) { return null; }
     },
@@ -1633,8 +1948,11 @@
         return m;
       }
       if (name.indexOf('emissive') >= 0) {
-        m.emissive = new T.Color(name.indexOf('cyan') >= 0 ? 0x7fdcff : 0xffb45a);
-        m.emissiveIntensity = name.indexOf('cyan') >= 0 ? .7 : .5;
+        // P13-b：作物自发光（crop_ 前缀）在 HDR+Bloom 下易过曝，收敛到弱光；建筑/道具保持原强度
+        const isCrop = name.indexOf('crop_') === 0;
+        const cyan = name.indexOf('cyan') >= 0;
+        m.emissive = new T.Color(cyan ? 0x7fdcff : 0xffb45a);
+        m.emissiveIntensity = isCrop ? (cyan ? .24 : .18) : (cyan ? .7 : .5);
         return m;
       }
       const TABLE = {
@@ -1646,7 +1964,12 @@
         crop_stem: [null, 0x9aab5a], crop_leaf: [null, 0x8cc45e], crop_leaf_dark: [null, 0x6f9c48],
         crop_gold: [null, 0xf0d078], crop_green: [null, 0x86c25a], crop_green_dark: [null, 0x5f9440],
         crop_orange: [null, 0xf0a850], crop_root: [null, 0xe09048], crop_flower: [null, 0xffe066],
-        crop_disc: [null, 0x9a7438], crop_rice: [null, 0xe6ecdc], crop_rice_glow: [null, 0xf6fff0]
+        crop_disc: [null, 0x9a7438], crop_rice: [null, 0xe6ecdc], crop_rice_glow: [null, 0xf6fff0],
+        // P13-b 新增作物材质
+        crop_red: [null, 0xe85848], crop_red_dark: [null, 0xb03828],
+        crop_white: [null, 0xe8e2d0], crop_pink: [null, 0xec9aa8],
+        crop_dark: [null, 0x4a4060], crop_blue: [null, 0x5a8ac8],
+        crop_needle: [null, 0x6a8c40], crop_ash: [null, 0x8a9480], crop_sand: [null, 0x94a858]
       };
       const cfg = TABLE[name] || ['wood', 0xbfa080];
       if (cfg[0]) {
@@ -1734,11 +2057,17 @@
       const h = new T.Group();
       // 主屋等级 = 四建筑总级
       const total = lv('workshop') + lv('greenhouse') + lv('barn') + lv('lab');
-      this._swapBuilding('house', this._modelClone('farmhouse') || houseModel(total));
-      if (lv('barn') > 0) this._swapBuilding('barn', this._modelClone('barn') || barnModel());
-      if (lv('greenhouse') > 0) this._swapBuilding('greenhouse', this._modelClone('greenhouse') || greenhouseModel(lv('greenhouse')));
-      if (lv('workshop') > 0) this._swapBuilding('workshop', this._modelClone('workshop') || workshopModel(lv('workshop')));
-      if (lv('lab') > 0) this._swapBuilding('lab', this._modelClone('lab') || labModel(lv('lab')));
+      // P13-c：主屋按总级分 4 档（0-3/4-7/8-11/12-15），建筑按各自等级叠加扩展件
+      const houseLvl = FARM_BUILDINGS_P13 ? Math.min(3, Math.floor(total / 4)) : 0;
+      const barnLvl = FARM_BUILDINGS_P13 ? lv('barn') - 1 : 0;
+      const ghLvl = FARM_BUILDINGS_P13 ? lv('greenhouse') - 1 : 0;
+      const wsLvl = FARM_BUILDINGS_P13 ? lv('workshop') - 1 : 0;
+      const labLvl = FARM_BUILDINGS_P13 ? lv('lab') - 1 : 0;
+      this._swapBuilding('house', this._modelCloneWithLevel('farmhouse', houseLvl) || houseModel(total));
+      if (lv('barn') > 0) this._swapBuilding('barn', this._modelCloneWithLevel('barn', barnLvl) || barnModel());
+      if (lv('greenhouse') > 0) this._swapBuilding('greenhouse', this._modelCloneWithLevel('greenhouse', ghLvl) || greenhouseModel(lv('greenhouse')));
+      if (lv('workshop') > 0) this._swapBuilding('workshop', this._modelCloneWithLevel('workshop', wsLvl) || workshopModel(lv('workshop')));
+      if (lv('lab') > 0) this._swapBuilding('lab', this._modelCloneWithLevel('lab', labLvl) || labModel(lv('lab')));
       // 作物重建
       this._rebuildCrops(plots, n);
       try { this._applyModelNight(night); } catch (e) {}
@@ -1757,6 +2086,10 @@
       if (!old || !model) return;
       const pos = old.position.clone(), rot = old.rotation.y;
       this._scene.remove(old);
+      // P13-e：建筑组内按材质合并（共享纹理缓存后同材质可合并），draw call 从每 mesh 降到每材质
+      if (FARM_GRADE_P13) {
+        try { model = mergeMeshes(model); } catch (e) { /* 保留未合并版 */ }
+      }
       model.position.copy(pos); model.rotation.y = rot;
       model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       this._scene.add(model);
@@ -1797,17 +2130,81 @@
         this._soilTex3D = tex;
       }
       const SOIL = this._soilTex3D;
-      const tileMats = {
-        wild:    new T.MeshStandardMaterial({ color: 0x4e5c34, roughness: 1 }),
-        wild2:   new T.MeshStandardMaterial({ color: 0x465428, roughness: 1 }),
-        tilled:  new T.MeshStandardMaterial({ map: SOIL, color: 0xb99a72, roughness: 1 }),
-        tilled2: new T.MeshStandardMaterial({ map: SOIL, color: 0xa98a64, roughness: 1 }),
-        planted: new T.MeshStandardMaterial({ map: SOIL, color: 0x8a6a48, roughness: 1 }),
-        planted2:new T.MeshStandardMaterial({ map: SOIL, color: 0x7e6042, roughness: 1 }),
-        next:    new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a860, roughness: 1, emissive: 0x6a4a10, emissiveIntensity: .35 }),
-        ready:   new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a050, roughness: 1, emissive: 0x7a5410, emissiveIntensity: .5 }),
-        ready2:  new T.MeshStandardMaterial({ map: SOIL, color: 0xc49648, roughness: 1, emissive: 0x6a4a0c, emissiveIntensity: .45 })
-      };
+      const FIELD13 = FARM_FIELD_P13;
+      // P13-a：PBR 土壤贴图组缓存（color/bump/roughness）
+      if (FIELD13 && !this._soilPbr) this._soilPbr = soilPbrTextures();
+      const SPBR = FIELD13 ? this._soilPbr : null;
+      // P13-a：厚土板几何（顶部垄沟起伏 + 边缘碎石感），共享缓存，48 格复用同一 BufferGeometry
+      if (FIELD13 && !this._tileGeoP13) {
+        const seg = 6, sz = TILE, dep = .20;
+        const geo = new T.BoxGeometry(sz, dep, sz, seg, 1, seg);
+        const pos = geo.attributes.position;
+        const col = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+          // 只动顶面（y > 0）：沿 z 做两条垄沟起伏 + 随机微扰
+          if (y > 0) {
+            const nz = z / sz;
+            let yy = -Math.abs(Math.sin(nz * Math.PI * 2)) * .045;   // 两条垄沟
+            yy += (hash(Math.floor(x * 7) + Math.floor(z * 5) * 13) - .5) * .018;
+            pos.setY(i, y + yy);
+          }
+          // 顶点 AO：沟底暗、边缘与微扰处略暗、顶面亮
+          let ao = 1;
+          if (y <= 0) ao = .55;
+          else {
+            const nz = z / sz;
+            ao = .82 + Math.abs(Math.sin(nz * Math.PI * 2)) * .16;   // 垄背亮
+            ao *= .94 + (hash(Math.floor(x * 7) + Math.floor(z * 5) * 13)) * .06;
+            if (Math.abs(x) > sz * .42 || Math.abs(z) > sz * .42) ao *= .9; // 边缘风化
+          }
+          col[i * 3] = ao; col[i * 3 + 1] = ao; col[i * 3 + 2] = ao;
+        }
+        geo.setAttribute('color', new T.BufferAttribute(col, 3));
+        this._tileGeoP13 = geo;
+      }
+      // P13-a 品质 → 状态/湿度/异常联动材质（bucket key 由 状态+湿度档+异常 组合，draw call 有界）
+      const tileMats = {};
+      const tileMats13 = {};
+      const moistOf = (p) => { const m = (p && p.moisture != null) ? p.moisture : 80; return m < 35 ? 'dry' : (m > 65 ? 'moist' : ''); };
+      const statusOf = (p) => (p && p.status) || '';
+      if (FIELD13) {
+        const mk13 = (key, o) => { tileMats13[key] = new T.MeshStandardMaterial(o); };
+        const baseSoil = { map: SPBR.color, bumpMap: SPBR.bump, bumpScale: .09, roughnessMap: SPBR.rough, vertexColors: true };
+        mk13('wild',   { map: grassTexture(), roughness: 1, vertexColors: true, color: 0x9aa05e });
+        mk13('wild2',  { map: grassTexture(), roughness: 1, vertexColors: true, color: 0x8a9052 });
+        mk13('tilled',   Object.assign({ color: 0xb99a72, roughness: .92 }, baseSoil));
+        mk13('tilled2',  Object.assign({ color: 0xa98a64, roughness: .92 }, baseSoil));
+        mk13('tilled-dry',   Object.assign({ color: 0xc9a878, roughness: 1 }, baseSoil));
+        mk13('tilled2-dry',  Object.assign({ color: 0xb99868, roughness: 1 }, baseSoil));
+        mk13('tilled-moist',   Object.assign({ color: 0x6b5038, roughness: .6 }, baseSoil));
+        mk13('tilled2-moist',  Object.assign({ color: 0x604a34, roughness: .6 }, baseSoil));
+        mk13('planted',   Object.assign({ color: 0x8a6a48, roughness: .9 }, baseSoil));
+        mk13('planted2',  Object.assign({ color: 0x7e6042, roughness: .9 }, baseSoil));
+        mk13('planted-dry',   Object.assign({ color: 0xa5845c, roughness: 1 }, baseSoil));
+        mk13('planted2-dry',  Object.assign({ color: 0x967a52, roughness: 1 }, baseSoil));
+        mk13('planted-moist', Object.assign({ color: 0x5d4430, roughness: .55 }, baseSoil));
+        mk13('planted2-moist',Object.assign({ color: 0x553e2c, roughness: .55 }, baseSoil));
+        mk13('planted-burn', Object.assign({ color: 0x241a10, roughness: 1 }, baseSoil));
+        mk13('planted2-burn',Object.assign({ color: 0x20160e, roughness: 1 }, baseSoil));
+        mk13('planted-weeds', Object.assign({ color: 0x7a7a4a, roughness: .95 }, baseSoil));
+        mk13('planted2-weeds',Object.assign({ color: 0x6e6e42, roughness: .95 }, baseSoil));
+        mk13('planted-pest', Object.assign({ color: 0x7a5a3a, roughness: .95 }, baseSoil));
+        mk13('planted2-pest',Object.assign({ color: 0x6e5234, roughness: .95 }, baseSoil));
+        mk13('next',   Object.assign({ color: 0xd0a860, roughness: .85, emissive: 0x6a4a10, emissiveIntensity: .35 }, baseSoil));
+        mk13('ready',  Object.assign({ color: 0xd0a050, roughness: .8, emissive: 0x7a5410, emissiveIntensity: .5 }, baseSoil));
+        mk13('ready2', Object.assign({ color: 0xc49648, roughness: .8, emissive: 0x6a4a0c, emissiveIntensity: .45 }, baseSoil));
+      } else {
+        tileMats['wild']    = new T.MeshStandardMaterial({ color: 0x4e5c34, roughness: 1 });
+        tileMats['wild2']   = new T.MeshStandardMaterial({ color: 0x465428, roughness: 1 });
+        tileMats['tilled']  = new T.MeshStandardMaterial({ map: SOIL, color: 0xb99a72, roughness: 1 });
+        tileMats['tilled2'] = new T.MeshStandardMaterial({ map: SOIL, color: 0xa98a64, roughness: 1 });
+        tileMats['planted'] = new T.MeshStandardMaterial({ map: SOIL, color: 0x8a6a48, roughness: 1 });
+        tileMats['planted2']= new T.MeshStandardMaterial({ map: SOIL, color: 0x7e6042, roughness: 1 });
+        tileMats['next']    = new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a860, roughness: 1, emissive: 0x6a4a10, emissiveIntensity: .35 });
+        tileMats['ready']   = new T.MeshStandardMaterial({ map: SOIL, color: 0xd0a050, roughness: 1, emissive: 0x7a5410, emissiveIntensity: .5 });
+        tileMats['ready2']  = new T.MeshStandardMaterial({ map: SOIL, color: 0xc49648, roughness: 1, emissive: 0x6a4a0c, emissiveIntensity: .45 });
+      }
       const tileBuckets = {};
       for (let i = 0; i < COLS * ROWS; i++) {
         const col = i % COLS, row = Math.floor(i / COLS);
@@ -1818,13 +2215,26 @@
         const planted = unlocked && plot && plot.crop;
         let state = !unlocked ? (i === n ? 'next' : 'wild') : (planted ? (plot && plot.ready ? 'ready' : 'planted') : 'tilled');
         if (state !== 'next' && state !== 'ready' && i % 2) state += '2';
-        const mat = tileMats[state] || tileMats.tilled;
-        const tile = new T.Mesh(new T.PlaneGeometry(TILE, TILE), mat);
-        tile.rotation.x = -Math.PI / 2;
-        tile.position.set(px, .04, pz);
+        let key = state, mat = null;
+        if (FIELD13) {
+          // P13-a：湿度/异常联动 key（planted 系叠加；tilled 只吃湿度；next/ready 保持金芒）
+          let suf = '';
+          if (state.indexOf('planted') === 0 || state.indexOf('tilled') === 0) {
+            const st = statusOf(plot);
+            if (st) suf = '-' + st;
+            else suf = '-' + moistOf(plot);
+          }
+          key = state + (suf && suf !== '-dry' ? suf : (suf === '-dry' ? suf : ''));
+          mat = tileMats13[key] || tileMats13[state + '-dry'] || tileMats13[state] || tileMats13.tilled;
+        } else {
+          mat = tileMats[state] || tileMats.tilled;
+        }
+        const tile = new T.Mesh(FIELD13 ? this._tileGeoP13 : new T.PlaneGeometry(TILE, TILE), mat);
+        if (FIELD13) { tile.position.set(px, 0, pz); tile.castShadow = true; }
+        else { tile.rotation.x = -Math.PI / 2; tile.position.set(px, .04, pz); }
         tile.receiveShadow = true;
-        if (!tileBuckets[state]) tileBuckets[state] = new T.Group();
-        tileBuckets[state].add(tile);
+        if (!tileBuckets[key]) tileBuckets[key] = new T.Group();
+        tileBuckets[key].add(tile);
       }
       Object.keys(tileBuckets).forEach(k => {
         const m = mergeMeshes(tileBuckets[k]);
@@ -1862,6 +2272,9 @@
         const prog = plot.ready ? 1 : clamp((now - (plot.plantedAt || 0)) / Math.max(1, plot.crop.growTime * 1000), 0, 1);
         const modelName = 'crop_' + plot.crop.id;
         const cropModel = this._models && this._models[modelName];
+        // P13-b：按生长进度选 4 阶段子组（种子堆 → 苗 → 成株 → 成熟）
+        const stages = FARM_CROPS_P13 && this._cropStages && this._cropStages[modelName];
+        const stageKey = stages ? (plot.ready || prog >= .8 ? 's3' : prog < .12 ? 's0' : prog < .45 ? 's1' : 's2') : null;
         const sc = .86 + prog * .44;
         const offs = [[-.33, -.30], [.33, .20], [-.05, .38]];
         for (let k = 0; k < offs.length; k++) {
@@ -1869,7 +2282,11 @@
           const sz = pz + offs[k][1] + (hash(i * 17 + k) - .5) * .16;
           const rot = hash(i * 7.7 + k) * 6.28;
           if (cropModel) {
-            const inst = cropModel.clone(true);
+            let inst = null;
+            if (stages && stageKey && stages[stageKey]) inst = stages[stageKey].clone(true);
+            else inst = cropModel.clone(true);
+            // 作物本体不加品质光（P13-b 实测：全株 emissive 在 HDR Bloom 下过曝成白斑）；
+            // 品质表达由 P13-a 的品质色成熟环 + 对勾徽章承担。
             inst.scale.setScalar(sc * (.9 + hash(i * 3 + k) * .2));
             inst.position.set(sx, .02, sz);
             inst.rotation.y = rot;
@@ -1883,18 +2300,20 @@
           }
         }
         if (plot.ready) {
-          const ringMat = new T.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: .55, side: T.DoubleSide, depthWrite: false });
+          // P13-a：成熟环按品质着色（common 金 / rare 青 / epic 紫 / legendary 红），对勾徽章同色
+          const qc = qualityGlowColor(plot.quality);
+          const ringMat = new T.MeshBasicMaterial({ color: qc, transparent: true, opacity: .55, side: T.DoubleSide, depthWrite: false });
           const ring = new T.Mesh(new T.RingGeometry(.34, .46, 24), ringMat);
           ring.rotation.x = -Math.PI / 2;
           ring.position.set(px, .075, pz);
-          const ringMat2 = new T.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: .3, side: T.DoubleSide, depthWrite: false });
+          const ringMat2 = new T.MeshBasicMaterial({ color: qc, transparent: true, opacity: .3, side: T.DoubleSide, depthWrite: false });
           const ring2 = new T.Mesh(new T.RingGeometry(.52, .56, 24), ringMat2);
           ring2.rotation.x = -Math.PI / 2;
           ring2.position.set(px, .08, pz);
           glowBucket.add(ring); glowBucket.add(ring2);
           this._readyGlowMats.push(ringMat, ringMat2);
-          // 漂浮金色对勾（角标）
-          const spr = new T.Sprite(this._readyBadgeMat());
+          // 漂浮品质色对勾（角标）
+          const spr = new T.Sprite(this._readyBadgeMat(qc));
           spr.scale.set(.34, .34, 1);
           spr.position.set(px, 1.05, pz);
           spr.userData.baseY = 1.05;
@@ -1915,14 +2334,46 @@
           canAfford = !!ucost && GameState.gold >= ucost.gold && fiberHave >= (ucost.fiber || 0);
         } catch (e) {}
         const postMat = new T.MeshStandardMaterial({ color: canAfford ? '#ffd76a' : '#7a5a3a', roughness: 1, emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .6 : 0 });
-        for (const [dx, dz] of [[-.62, -.62], [.62, -.62], [-.62, .62], [.62, .62]]) {
-          const p = new T.Mesh(new T.BoxGeometry(.07, .62, .07), postMat);
-          p.position.set(px + dx, .31, pz + dz);
-          markerBucket.add(p);
+        if (FARM_FIELD_P13) {
+          // P13-a：待扩建 → 围栏（四立柱 + 双横杆）+ 木公告板（桩 + 板 + 未翻耕草斑）
+          const woodMat = new T.MeshStandardMaterial({ color: canAfford ? '#c9a05a' : '#7a5a3a', roughness: .9, emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .4 : 0 });
+          for (const [dx, dz] of [[-.62, -.62], [.62, -.62], [-.62, .62], [.62, .62]]) {
+            const p = new T.Mesh(new T.BoxGeometry(.08, .72, .08), woodMat);
+            p.position.set(px + dx, .36, pz + dz);
+            markerBucket.add(p);
+          }
+          for (const [dx, dy, dz] of [[-.62, .62, 0], [.62, .62, 0], [0, .62, -.62], [0, .62, .62]]) {
+            const rail = new T.Mesh(new T.BoxGeometry(dx ? .06 : 1.30, .06, dz ? .06 : 1.30), woodMat);
+            rail.position.set(px + (dx ? dx : 0), dy, pz + (dz ? dz : 0));
+            markerBucket.add(rail);
+          }
+          // 公告板：两根短桩 + 一块横木板
+          for (const dz of [-.2, .2]) {
+            const leg = new T.Mesh(new T.BoxGeometry(.05, .5, .05), woodMat);
+            leg.position.set(px + .62, .34, pz + dz);
+            markerBucket.add(leg);
+          }
+          const board = new T.Mesh(new T.BoxGeometry(.05, .42, .42), new T.MeshStandardMaterial({ color: canAfford ? '#e0c080' : '#8a6a44', roughness: .85, emissive: canAfford ? 0x8a5a10 : 0x000000, emissiveIntensity: canAfford ? .5 : 0 }));
+          board.position.set(px + .62, .55, pz);
+          markerBucket.add(board);
+          // 未翻耕的草斑（三簇）
+          for (let k = 0; k < 3; k++) {
+            const gw = new T.Mesh(new T.ConeGeometry(.05, .26 + hash(n * 3 + k) * .16, 5),
+              new T.MeshStandardMaterial({ color: '#6b7644', roughness: 1 }));
+            gw.position.set(px - .4 + hash(n * 13 + k) * .8, .14, pz - .4 + hash(n * 7 + k) * .8);
+            gw.rotation.z = (hash(n + k * 2) - .5) * .5;
+            markerBucket.add(gw);
+          }
+        } else {
+          for (const [dx, dz] of [[-.62, -.62], [.62, -.62], [-.62, .62], [.62, .62]]) {
+            const p = new T.Mesh(new T.BoxGeometry(.07, .62, .07), postMat);
+            p.position.set(px + dx, .31, pz + dz);
+            markerBucket.add(p);
+          }
+          const rope = new T.Mesh(new T.BoxGeometry(1.24, .025, .025), new T.MeshStandardMaterial({ color: canAfford ? '#ffe08a' : '#c8b070', emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .5 : 0 }));
+          rope.position.set(px, .5, pz - .62); markerBucket.add(rope);
+          const rope2 = rope.clone(); rope2.position.z = pz + .62; markerBucket.add(rope2);
         }
-        const rope = new T.Mesh(new T.BoxGeometry(1.24, .025, .025), new T.MeshStandardMaterial({ color: canAfford ? '#ffe08a' : '#c8b070', emissive: canAfford ? 0x6a4a08 : 0x000000, emissiveIntensity: canAfford ? .5 : 0 }));
-        rope.position.set(px, .5, pz - .62); markerBucket.add(rope);
-        const rope2 = rope.clone(); rope2.position.z = pz + .62; markerBucket.add(rope2);
       }
       const addMerged = (g) => {
         if (!g.children.length) return;
@@ -1930,42 +2381,82 @@
         this._scene.add(m);
         this._cropMeshes.push(m);
       };
-      // 田埂土垄（沿 x/z 每格边界），让 48 格网格在 3D 里可读
-      const ridgeMat = new T.MeshStandardMaterial({ color: '#7a5e3e', roughness: 1 });
-      for (let ci = 1; ci < COLS; ci++) {
-        const rx = CX - W / 2 + ci * PITCH;
-        const ridge = new T.Mesh(new T.BoxGeometry(.09, .05, H), ridgeMat);
-        ridge.position.set(rx, .035, CZ);
-        markerBucket.add(ridge);
-      }
-      for (let ri = 1; ri < ROWS; ri++) {
-        const rz = CZ - H / 2 + ri * PITCH;
-        const ridge = new T.Mesh(new T.BoxGeometry(W, .05, .09), ridgeMat);
-        ridge.position.set(CX, .035, rz);
-        markerBucket.add(ridge);
+      // 田埂土垄（沿 x/z 每格边界），让 48 格网格在 3D 里可读；P13-a 升级为宽土垄 + 外圈金属灌溉渠
+      if (FARM_FIELD_P13) {
+        const ridgeMat = new T.MeshStandardMaterial({ map: SPBR.color, bumpMap: SPBR.bump, bumpScale: .1, roughnessMap: SPBR.rough, color: 0x9a7a52, roughness: .95, vertexColors: true });
+        for (let ci = 1; ci < COLS; ci++) {
+          const rx = CX - W / 2 + ci * PITCH;
+          const ridge = new T.Mesh(new T.BoxGeometry(.14, .22, H), ridgeMat);
+          ridge.position.set(rx, .11, CZ);
+          markerBucket.add(ridge);
+        }
+        for (let ri = 1; ri < ROWS; ri++) {
+          const rz = CZ - H / 2 + ri * PITCH;
+          const ridge = new T.Mesh(new T.BoxGeometry(W, .22, .14), ridgeMat);
+          ridge.position.set(CX, .11, rz);
+          markerBucket.add(ridge);
+        }
+        // 外圈围垄（四边）
+        const bd = .16, bh = .26;
+        for (const [dx, dz, lx, lz] of [[0, -(H / 2 + .08), W + bd, bd], [0, H / 2 + .08, W + bd, bd], [-(W / 2 + .08), 0, bd, H + bd], [W / 2 + .08, 0, bd, H + bd]]) {
+          const ridge = new T.Mesh(new T.BoxGeometry(lx, bh, lz), ridgeMat);
+          ridge.position.set(CX + dx, bh / 2, CZ + dz);
+          markerBucket.add(ridge);
+        }
+        // 金属灌溉渠（沿田块左右两侧，锈色金属）
+        const irrMat = new T.MeshStandardMaterial({ color: 0x8a7a5a, metalness: .75, roughness: .45 });
+        for (const dx of [-(W / 2 + .34), W / 2 + .34]) {
+          const trough = new T.Mesh(new T.BoxGeometry(.16, .12, H + .3), irrMat);
+          trough.position.set(CX + dx, .3, CZ);
+          markerBucket.add(trough);
+          // 支撑腿
+          for (let k = 0; k < 4; k++) {
+            const leg = new T.Mesh(new T.BoxGeometry(.05, .3, .05), irrMat);
+            leg.position.set(CX + dx, .15, CZ - H / 2 + .1 + k * (H / 3));
+            markerBucket.add(leg);
+          }
+        }
+      } else {
+        const ridgeMat = new T.MeshStandardMaterial({ color: '#7a5e3e', roughness: 1 });
+        for (let ci = 1; ci < COLS; ci++) {
+          const rx = CX - W / 2 + ci * PITCH;
+          const ridge = new T.Mesh(new T.BoxGeometry(.09, .05, H), ridgeMat);
+          ridge.position.set(rx, .035, CZ);
+          markerBucket.add(ridge);
+        }
+        for (let ri = 1; ri < ROWS; ri++) {
+          const rz = CZ - H / 2 + ri * PITCH;
+          const ridge = new T.Mesh(new T.BoxGeometry(W, .05, .09), ridgeMat);
+          ridge.position.set(CX, .035, rz);
+          markerBucket.add(ridge);
+        }
       }
       addMerged(cropBucket); addMerged(grassBucket); addMerged(glowBucket); addMerged(markerBucket);
     },
 
-    // 成熟角标贴图（金色圆底 + 深色对勾），缓存复用
-    _readyBadgeTex() {
-      if (this._readyTex) return this._readyTex;
+    // 成熟角标贴图（品质色圆底 + 深色对勾），按颜色缓存复用
+    _readyBadgeTex(color) {
+      const key = '#' + (color || 0xffd76a).toString(16);
+      if (this._readyTexMap && this._readyTexMap[key]) return this._readyTexMap[key];
       const cv = document.createElement('canvas');
       cv.width = cv.height = 64;
       const c = cv.getContext('2d');
       c.beginPath(); c.arc(32, 32, 29, 0, Math.PI * 2);
-      c.fillStyle = '#ffd76a'; c.fill();
-      c.lineWidth = 5; c.strokeStyle = '#8a5a10'; c.stroke();
+      c.fillStyle = key; c.fill();
+      c.lineWidth = 5; c.strokeStyle = '#4a3008'; c.stroke();
       c.beginPath(); c.moveTo(18, 34); c.lineTo(28, 44); c.lineTo(47, 21);
-      c.lineWidth = 8; c.strokeStyle = '#4a3008'; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke();
+      c.lineWidth = 8; c.strokeStyle = '#221a06'; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke();
       const tex = new T.CanvasTexture(cv);
       if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
-      this._readyTex = tex;
+      if (!this._readyTexMap) this._readyTexMap = {};
+      this._readyTexMap[key] = tex;
       return tex;
     },
-    _readyBadgeMat() {
-      if (!this._readySpriteMat) this._readySpriteMat = new T.SpriteMaterial({ map: this._readyBadgeTex(), transparent: true, depthWrite: false });
-      return this._readySpriteMat;
+    _readyBadgeMat(color) {
+      const key = '#' + (color || 0xffd76a).toString(16);
+      if (!this._readySpriteMatMap) this._readySpriteMatMap = {};
+      if (!this._readySpriteMatMap[key]) this._readySpriteMatMap[key] = new T.SpriteMaterial({ map: this._readyBadgeTex(color), transparent: true, depthWrite: false });
+      return this._readySpriteMatMap[key];
     },
 
     _isNight() {
@@ -2025,13 +2516,15 @@
       this._sun.intensity = .2 + dayLight * 2.3;
       this._sun.color.setHex(ph.dusk ? 0xffb070 : ph.dawn ? 0xffc0a0 : 0xffd8a8);
       this._moon.intensity = nightF * .8;
-      this._hemi.intensity = .26 + dayLight * .55;
+      this._hemi.intensity = (FARM_GRADE_P12 ? .22 + dayLight * .46 : .26 + dayLight * .55);
       this._hemi.color.setHex(ph.night ? 0x55688f : ph.dusk ? 0xc09070 : 0x9fb4d0);
       this._hemi.groundColor.setHex(ph.night ? 0x24242c : 0x3a3226);
       // 天空 uniform
       const skyTop = ph.night ? 0x0c1424 : ph.dusk ? 0x3a3a5e : ph.dawn ? 0x4a5a78 : 0x3f5d7a;
-      const skyMid = ph.night ? 0x1d2740 : ph.dusk ? 0xa06a5a : ph.dawn ? 0xb08a86 : 0x8fa0a8;
-      const skyBot = ph.night ? 0x2a2f3e : ph.dusk ? 0xe09050 : ph.dawn ? 0xe8c0a0 : 0xd9b48a;
+      // P12-e：白天天空地平（mid/bot）压暗并略带色，避免整片过曝发白
+      // 注：setHex 在 r128 被当作线性值，经末级 sRGB pass 会提亮约 25%，故 P12 白天用更低的线性值
+      const skyMid = ph.night ? 0x1d2740 : ph.dusk ? 0xa06a5a : ph.dawn ? 0xb08a86 : (FARM_GRADE_P12 ? 0x223759 : 0x8fa0a8);
+      const skyBot = ph.night ? 0x2a2f3e : ph.dusk ? 0xe09050 : ph.dawn ? 0xe8c0a0 : (FARM_GRADE_P12 ? 0x7b4b1b : 0xd9b48a);
       this._sky.material.uniforms.top.value.setHex(skyTop);
       this._sky.material.uniforms.mid.value.setHex(skyMid);
       this._sky.material.uniforms.bot.value.setHex(skyBot);
@@ -2050,9 +2543,10 @@
       }
       this._fieldNightLight.intensity = nightF * .55;
 
-      // 雾
-      this._scene.fog.density = lerp(this._scene.fog.density, WEATHER_FOG[wk] || .016, .06);
-      const fogCol = ph.night ? 0x1c2434 : ph.dusk ? 0x8a5a44 : 0x8a8a80;
+      // 雾（P12-e：白天收雾密度 + 雾色由亮灰白压为带青绿的中性灰，去发白）
+      const _fogTarget = (WEATHER_FOG[wk] || .016) * (FARM_GRADE_P12 ? 0.70 : 1.0);
+      this._scene.fog.density = lerp(this._scene.fog.density, _fogTarget, .06);
+      const fogCol = ph.night ? 0x1c2434 : ph.dusk ? 0x8a5a44 : (FARM_GRADE_P12 ? 0x273022 : 0x8a8a80);
       this._scene.fog.color.lerp(new T.Color(fogCol), .04);
       // 阴天/雾天天空再压一点
       if (wk === 'fog' || wk === 'storm' || wk === 'heavy_rain') {

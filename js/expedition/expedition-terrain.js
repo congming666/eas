@@ -1,5 +1,10 @@
 ﻿/* Expedition 原型混合：地形/迷雾/碰撞/地图生成与空间查询（由 expedition.js 拆分） */
 
+// P12-c 视野迷雾柔化（宽羽化、低噪声，消除 3D 俯视下硬边点状"绿圆盘"）
+const FOG_READABLE_P12 = (function () { try { return localStorage.getItem('farmReadableP12') !== '0'; } catch (e) { return true; } })();
+// P12-e 后期统一：白天记忆迷雾进一步去灰（未探索遮罩略降、已探索区更通透）；夜景不动黑场。
+const GRADE_P12 = (function () { try { const v = (localStorage.getItem('farmGradeP12') || 'on').toLowerCase(); return !(v === '0' || v === 'off' || v === 'false' || v === 'no'); } catch (e) { return true; } })();
+
 // ===== 地表细节工具（世界锚定确定性哈希：跨 chunk 接缝连续，烘焙零运行时成本） =====
 function terrainHash(x, y, salt) {
   let h = (x * 374761393 + y * 668265263 + (salt || 0) * 1274126177) | 0;
@@ -93,12 +98,14 @@ Object.assign(Expedition.prototype, {
       // ① 未探索区域：全遮
       fogCtx.globalCompositeOperation = 'source-over';
       fogCtx.globalAlpha = 1;
-      fogCtx.fillStyle = nightNow ? 'rgba(6,8,20,.93)' : 'rgba(10,16,24,.80)';
+      const _dayFog = !FOG_READABLE_P12 ? 0.80 : (GRADE_P12 ? 0.66 : 0.72);
+      fogCtx.fillStyle = nightNow ? 'rgba(6,8,20,.93)' : ('rgba(10,16,24,' + _dayFog + ')');
       fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
       // ② 已探索（视野外）：半遮——记忆迷雾，去过的地方留下暗淡地形轮廓
       const mask = this._exploredFogMask();
       fogCtx.globalCompositeOperation = 'destination-out';
-      fogCtx.globalAlpha = .40;
+      // P12-e：已探索记忆区更通透（白天去灰）；夜间仍保持较暗以保留夜晚氛围
+      fogCtx.globalAlpha = nightNow ? .34 : (FOG_READABLE_P12 ? (GRADE_P12 ? .52 : .40) : .40);
       fogCtx.drawImage(mask, -this.camera.x * fz, -this.camera.y * fz, CONFIG.expedition.mapSize * fz, CONFIG.expedition.mapSize * fz);
       fogCtx.globalAlpha = 1;
       // ③ 当前视野：完全透明洞（裁剪到地图矩形内，边界外始终保持全雾）
@@ -107,9 +114,10 @@ Object.assign(Expedition.prototype, {
       fogCtx.beginPath();
       fogCtx.rect(-this.camera.x * fz, -this.camera.y * fz, _ms * fz, _ms * fz);
       fogCtx.clip();
-      const clearVision = fogCtx.createRadialGradient(px, py, radius * .82 * fz, px, py, radius * 1.08 * fz);
+      const vIn = FOG_READABLE_P12 ? .55 : .82, vOut = FOG_READABLE_P12 ? 1.22 : 1.08, vFull = FOG_READABLE_P12 ? .5 : .78;
+      const clearVision = fogCtx.createRadialGradient(px, py, radius * vIn * fz, px, py, radius * vOut * fz);
       clearVision.addColorStop(0, 'rgba(0,0,0,1)');
-      clearVision.addColorStop(.78, 'rgba(0,0,0,1)');
+      clearVision.addColorStop(vFull, 'rgba(0,0,0,1)');
       clearVision.addColorStop(1, 'rgba(0,0,0,0)');
       fogCtx.fillStyle = clearVision;
       fogCtx.beginPath();
@@ -121,14 +129,15 @@ Object.assign(Expedition.prototype, {
         const nt = document.createElement('canvas');
         nt.width = nt.height = 128;
         const nc = nt.getContext('2d');
-        for (let i = 0; i < 46; i++) {   // 侵蚀团块：中高 alpha，制造深度缺口
+        const _nBlob = FOG_READABLE_P12 ? 26 : 46, _nGrain = FOG_READABLE_P12 ? 380 : 900;
+        for (let i = 0; i < _nBlob; i++) {   // 侵蚀团块：中高 alpha，制造深度缺口
           const x = Math.random() * 128, y = Math.random() * 128;
           nc.fillStyle = `rgba(255,255,255,${(.30 + Math.random() * .55).toFixed(3)})`;
           nc.beginPath();
           nc.ellipse(x, y, 3 + Math.random() * 7, 2 + Math.random() * 5, Math.random() * 3, 0, Math.PI * 2);
           nc.fill();
         }
-        for (let i = 0; i < 900; i++) {  // 细颗粒：整体锯齿化
+        for (let i = 0; i < _nGrain; i++) {  // 细颗粒：整体锯齿化
           nc.fillStyle = `rgba(255,255,255,${(.15 + Math.random() * .35).toFixed(3)})`;
           nc.fillRect(Math.random() * 128, Math.random() * 128, 1.6, 1.6);
         }
@@ -137,13 +146,13 @@ Object.assign(Expedition.prototype, {
       {
         fogCtx.save();
         fogCtx.beginPath();
-        fogCtx.arc(px, py, radius * 1.12 * fz, 0, Math.PI * 2);
-        fogCtx.arc(px, py, radius * .80 * fz, 0, Math.PI * 2, true);
+        fogCtx.arc(px, py, radius * (FOG_READABLE_P12 ? 1.24 : 1.12) * fz, 0, Math.PI * 2);
+        fogCtx.arc(px, py, radius * (FOG_READABLE_P12 ? .55 : .80) * fz, 0, Math.PI * 2, true);
         fogCtx.clip('evenodd');
         const pat = fogCtx.createPattern(this._fogEdgeNoise, 'repeat');
         const off = terrainHash(Math.round(this.player.x / 96), Math.round(this.player.y / 96), 7);
         fogCtx.translate(-((off * 128) | 0), -(((1 - off) * 128) | 0));
-        fogCtx.globalAlpha = .55;
+        fogCtx.globalAlpha = FOG_READABLE_P12 ? .30 : .55;
         fogCtx.fillStyle = pat;
         fogCtx.fillRect(-140, -140, this.fogCanvas.width + 280, this.fogCanvas.height + 280);
         fogCtx.restore();
@@ -276,6 +285,11 @@ Object.assign(Expedition.prototype, {
     }
     ctx.restore();
 
+    // P12-a 宏观生态斑块：大尺度软边色差分区，打破单张 tile 平铺的重复感（2D + 3D 烘焙同步）
+    if (typeof GroundDetail !== 'undefined' && GroundDetail.enabled()) {
+      GroundDetail.renderMacro(ctx, this, cam, viewW, viewH);
+    }
+
     // 稳定的世界空间地表纹理：不随屏幕重复，提供草地颗粒、泥点和小石块层次。
     ctx.save();
     const cell = 26;
@@ -381,6 +395,11 @@ Object.assign(Expedition.prototype, {
       ctx.restore();
     }
     ctx.restore();
+
+    // P12-a 主题化贴地贴花：落叶/碎石/水洼/苔藓/焦痕/骨屑/车辙/裂缝，成簇分布
+    if (typeof GroundDetail !== 'undefined' && GroundDetail.enabled()) {
+      GroundDetail.renderDecals(ctx, this, cam, viewW, viewH);
+    }
 
     this.terrainPatches.forEach(patch => {
       const sx = patch.x - cam.x, sy = patch.y - cam.y;

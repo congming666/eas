@@ -4,18 +4,66 @@
 
   // 2026-10-23 作物 3D 阶段立绘：由 tools/crop3d 离线渲染（幼苗→成熟 5 帧），
   // 让每种作物在田里都有独立的 3D 造型与生长过程；图缺失时回退旧 2D 插画。
+  // P12 修复（2026-10-27）：① 缓存戳动态跟随 GAME_VERSION，不再写死旧版本导致长期命中历史缓存；
+  // ② 图片异步 onload 后立即用 rAF 合并触发一次 Farm.render，冷启动/慢网络/file 协议下
+  //   首帧即便先落到旧 2D 兜底，也会在图就绪的同一帧（约一帧内）自动切换为 3D 立绘，
+  //   不再只依赖 1s 一次的农场定时器、不再持续停留在旧样子；③ 进入游戏后对当前在田作物后台预热。
   const STAGE3D_SIZE = [30, 38, 46, 56, 66];
+  const STAGE3D_VER = (typeof GAME_VERSION !== 'undefined' && GAME_VERSION) ? GAME_VERSION : '5.9.70';
+  const STAGE3D_SPRITES = [0, 1, 3, 4]; // 实际会用到的精灵阶段（UI 1..4 → s0/s1/s3/s4）
   const stage3dImgs = {};
+  let _redrawQueued = false;
+
+  function scheduleFarmRedraw() {
+    if (_redrawQueued) return;
+    // 仅在农场屏触发；同一帧内多张图陆续 onload 只合并为一次全量重绘，避免重绘风暴
+    try {
+      if (typeof GameState !== 'undefined' && GameState && GameState.screen !== 'farm') return;
+    } catch (e) { return; }
+    _redrawQueued = true;
+    const raf = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+    raf(function () {
+      _redrawQueued = false;
+      try {
+        if (typeof Farm !== 'undefined' && Farm && typeof Farm.render === 'function') Farm.render();
+      } catch (e) { /* 忽略：下一帧/1s 定时器仍会兜底重绘 */ }
+    });
+  }
+
   function stage3dImg(cropId, stage) {
     const k = cropId + '_s' + stage;
     let im = stage3dImgs[k];
     if (!im) {
       im = new Image();
-      im.src = 'assets/crops/stages/' + k + '.png?v=5.9.46';
       im.alt = '';
+      im.onload = function () { if (im.naturalWidth > 0) scheduleFarmRedraw(); };
+      // onerror 不重绘：naturalWidth 为 0 时渲染侧自然回退旧 2D，且同一 Image 只请求一次，不会反复刷
+      im.src = 'assets/crops/stages/' + k + '.png?v=' + STAGE3D_VER;
       stage3dImgs[k] = im;
     }
     return im;
+  }
+
+  // 后台预热指定作物（或当前在田作物）会用到的阶段图，只填浏览器缓存、不挂 DOM
+  function warmup(cropIds) {
+    let ids = cropIds;
+    if (!ids) {
+      ids = [];
+      try {
+        if (typeof GameState !== 'undefined' && GameState && GameState.farmPlots) {
+          const seen = {};
+          GameState.farmPlots.forEach(function (p) {
+            if (!p || !p.crop) return;
+            const id = (typeof p.crop === 'object') ? p.crop.id : p.crop;
+            if (id && !seen[id]) { seen[id] = 1; ids.push(id); }
+          });
+        }
+      } catch (e) { return; }
+    }
+    (ids || []).forEach(function (id) {
+      if (!id) return;
+      STAGE3D_SPRITES.forEach(function (sp) { stage3dImg(id, sp); });
+    });
   }
   function stage3dHtml(cropId, stage, icon, index) {
     // UI 阶段 1..4 → 精灵阶段：1 发芽=s0，2 幼苗=s1，3 开花=s3，4 结果=s4
@@ -171,7 +219,10 @@
 
     _getCropDef(id) {
       return CONFIG.crops.find(c => c.id === id) || CropExpansion.NEW_CROPS.find(c => c.id === id);
-    }
+    },
+
+    // P12：主动预热阶段立绘（不传参则预热当前在田作物），供进入农场/选种前提前填缓存
+    warmup
   };
 
   // 注入CSS
@@ -210,4 +261,8 @@
   // 初始化
   injectCSS();
   window.CropRenderExt = CropRenderExt;
+  // P12：分两次延迟预热当前在田作物的阶段图，覆盖存档早/晚加载两种时序；
+  // 仅 new Image 填缓存，真正挂载仍由 renderPlot 决定，失败时渲染侧照常回退旧 2D。
+  setTimeout(function () { try { warmup(); } catch (e) {} }, 300);
+  setTimeout(function () { try { warmup(); } catch (e) {} }, 1500);
 })();

@@ -67,6 +67,44 @@
     }
   ];
 
+  // P12-e 后期与全局视觉统一：四 tier 基线对齐世界观六族（绿野 / 枯废墟 / 焦土灾变 / 绝境荧光），
+  // 白天去灰提通透、夜景抬黑保暗部、修正 T3「冰雪冷蓝」与焦土/血色/毒沼暖色 tint 冷暖对冲。
+  // localStorage.farmGradeP12 = off（或 0/false/no）→ 完全回退上方原 THEMES。
+  function _gradeP12() {
+    try {
+      const v = (localStorage.getItem('farmGradeP12') || 'on').toLowerCase();
+      return !(v === '0' || v === 'off' || v === 'false' || v === 'no');
+    } catch (e) { return true; }
+  }
+  const GRADE_P12 = _gradeP12();
+  // 按 tier index 0..3 覆盖；颜色为线性 RGB 0..1（与 THEMES 同口径），仅列需覆盖字段。
+  const GRADE_P12_OV = [
+    { // T1 绿野：白天去灰、提对比/饱和、阳光更通透，减弱暗角
+      key: [1.02, 0.97, 0.87], intensity: 1.60,
+      fog: [0.42, 0.58, 0.45], bg: [0.55, 0.72, 0.55], ambient: [0.60, 0.66, 0.60], ground: [1.06, 1.06, 0.98],
+      bloom: 0.28, bloomThresh: 0.92, sat: 17, contrast: 13, vignette: 0.22,
+      grade: [1.03, 1.01, 0.94], gradeStr: 0.16, lift: 1.03
+    },
+    { // T2 枯废墟：琥珀黄昏做旧，保留层次与暖光
+      key: [1.00, 0.86, 0.62], intensity: 1.58,
+      fog: [0.55, 0.47, 0.32], bg: [0.55, 0.44, 0.27], ambient: [0.60, 0.53, 0.40], ground: [1.05, 1.00, 0.90],
+      bloom: 0.36, bloomThresh: 0.86, sat: 17, contrast: 12, vignette: 0.26,
+      grade: [1.10, 0.97, 0.75], gradeStr: 0.27, lift: 1.01
+    },
+    { // T3 灾变：原「冰雪冷蓝」→中性暖灰褐，与焦土/血色/毒沼逐图 tint 同向，暗部抬到可见
+      key: [1.00, 0.84, 0.66], intensity: 1.40,
+      fog: [0.48, 0.41, 0.36], bg: [0.40, 0.34, 0.30], ambient: [0.50, 0.44, 0.40], ground: [1.04, 0.98, 0.92],
+      bloom: 0.36, bloomThresh: 0.82, sat: 12, contrast: 11, vignette: 0.28,
+      grade: [1.08, 0.98, 0.84], gradeStr: 0.30, lift: 0.86
+    },
+    { // T4 绝境：抬黑（lift/ambient 提），保留冷夜氛围与荧光高光
+      key: [0.74, 0.82, 1.00], intensity: 1.20,
+      fog: [0.17, 0.20, 0.34], bg: [0.11, 0.13, 0.22], ambient: [0.34, 0.38, 0.54], ground: [1.00, 1.00, 1.08],
+      bloom: 0.52, bloomThresh: 0.70, sat: 13, contrast: 13, vignette: 0.30,
+      grade: [0.82, 0.88, 1.18], gradeStr: 0.34, lift: 0.82
+    }
+  ];
+
   // CinematicLook.cs 全局 Volume 基础值（主题只覆盖 bloom/饱和/对比/暗角，其余固定）
   const BASE = {
     temperature: 8, tint: 2,
@@ -534,6 +572,15 @@
       bloom: th.bloom, bloomThresh: th.bloomThresh, sat: th.sat, contrast: th.contrast, vignette: th.vignette,
       gradeStr: th.gradeStr, lift: th.lift
     };
+    // P12-e：开启时用 GRADE_P12_OV 覆盖主题调色（颜色/标量），关闭则完全沿用原 THEMES
+    const _ov = GRADE_P12 ? GRADE_P12_OV[idx] : null;
+    if (_ov) {
+      ['key', 'fog', 'bg', 'ambient', 'ground', 'grade'].forEach(k => {
+        if (_ov[k]) tgt[k].set(_ov[k][0], _ov[k][1], _ov[k][2]);
+      });
+      ['intensity', 'bloom', 'bloomThresh', 'sat', 'contrast', 'vignette', 'gradeStr', 'lift']
+        .forEach(k => { if (_ov[k] != null) tgt[k] = _ov[k]; });
+    }
     if (immediate) {
       const c = PostFX._cur;
       c.key.copy(tgt.key); c.fog.copy(tgt.fog); c.bg.copy(tgt.bg); c.ambient.copy(tgt.ambient); c.ground.copy(tgt.ground);

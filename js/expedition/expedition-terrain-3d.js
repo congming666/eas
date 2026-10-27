@@ -198,6 +198,17 @@
             roughness: 0.95,
             metalness: 0.0
           });
+          // P12-a 地面法线颗粒：正俯视下靠法线明暗读出地表凹凸，不再是塑料平片
+          if (typeof GroundDetail !== 'undefined' && GroundDetail.enabled()) {
+            try {
+              const ntex = GroundDetail.groundNormalTexture(T);
+              if (ntex) {
+                ntex.repeat.set(cs / 128, cs / 128); // 约 128 世界单位一个法线 tile
+                mat.normalMap = ntex;
+                mat.normalScale = new T.Vector2(0.65, 0.65);
+              }
+            } catch (e) {}
+          }
           const mesh = new T.Mesh(geo, mat);
           mesh.position.set(ox + w / 2, 0, oy + h / 2);
           mesh.castShadow = false;      // 地形不自投影（避免大范围硬阴影带），靠法线明暗
@@ -229,7 +240,7 @@
         if (!canvas) continue;
         const tex = new T.CanvasTexture(canvas);
         if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
-        tex.anisotropy = 4;
+        tex.anisotropy = (typeof GroundDetail !== 'undefined' && GroundDetail.enabled()) ? 8 : 4;
         ch.mat.map = tex;
         ch.mat.color.set(0xffffff);
         ch.mat.needsUpdate = true;
@@ -467,7 +478,8 @@
       const N = Math.max(0, Math.min(N_MAX, Math.round(1300 * (g.density != null ? g.density : 1))));
       if (N <= 0) { this._grassMesh = null; return null; }
       const blades = Math.max(3, Math.min(7, g.blades || 5));
-      const geo = this._makeGrassTuftGeometry(blades);
+      const p12Grass = (typeof SceneryP12 !== 'undefined' && SceneryP12.enabled());
+      const geo = p12Grass ? SceneryP12.makeGrassTuftGeometry(T, blades) : this._makeGrassTuftGeometry(blades);
       this._windU = { value: 0 };
       const mat = new T.MeshStandardMaterial({
         color: 0xffffff, roughness: 0.92, metalness: 0, side: T.DoubleSide,
@@ -496,10 +508,12 @@
       let placed = 0;
       const size = hf.size;
       const yMin = (g.hMin != null ? g.hMin : 12) / 20, yMax = (g.hMax != null ? g.hMax : 22) / 20;
-      for (let i = 0; i < N * 6 && placed < N; i++) {
+      const maxAttempts = p12Grass ? N * 14 : N * 6;
+      for (let i = 0; i < maxAttempts && placed < N; i++) {
         const x = hash(i, 1) * size, y = hash(i, 2) * size;
         const type = exp.getTerrainTypeId ? exp.getTerrainTypeId(x, y) : 0;
         if (type !== 0 && type !== 3) continue;   // 只长在草甸/密林
+        if (p12Grass && !SceneryP12.grassDensityAt(x, y, 555, 0.5)) continue; // P12-b 波噪声成簇
         const e = exp.getElevation ? exp.getElevation(x, y) : 0;
         dummy.position.set(x, e * ELEV - 0.5, y);
         dummy.rotation.set(0, hash(i, 3) * 6.28, 0);
@@ -531,6 +545,7 @@
         exp._terrain3DShadeOff = true;   // 3D 用真实光照，2D 山体假光影不再烘焙
         this._terrainChunks = [];
         this._exp = exp;
+        this._expTierApplied = -1;   // 新远征首帧强制重设后期主题（确保 P12-e 调色覆盖落在 T1）
         this._mapId = (exp.map && exp.map.id) || 'map';
         this._theme = (window.MapThemes && exp.map) ? MapThemes.get(exp.map) : null;
         this._themeTint = this._theme ? new T.Color(this._theme.tint) : null;
@@ -547,6 +562,15 @@
         if (!glbObstaclesOn) this._buildProps(exp); else this._propMeshes = [];
         const grass = this._buildGrass(exp);
         if (grass) this.scene.add(grass);
+        // P12-b 纯视觉装饰地标（贴地树冠团/岩石群/枯树/废墟，不参与碰撞与战斗）
+        if (typeof SceneryP12 !== 'undefined' && SceneryP12.enabled()) {
+          try {
+            let qt = 1;
+            if (window.GraphicsQuality && typeof GraphicsQuality.tier === 'function') qt = GraphicsQuality.tier();
+            const sc = SceneryP12.build(T, exp, this.scene, qt);
+            if (sc) { this.scene.add(sc); this._sceneryP12 = sc; }
+          } catch (e) { console.warn('[Terrain3D] P12 装饰层失败：', e); }
+        }
         return true;
       } catch (e) {
         console.warn('[Terrain3D] 构建失败，回退 2D 地形：', e);
@@ -609,7 +633,7 @@
         if (fx && fx.ready && fx.enabled) {
           try {
             const tier = (exp.map && exp.map.tier) || 1;
-            if (fx._targetTier !== tier) fx.setTier(tier);
+            if (fx._targetTier !== tier || this._expTierApplied !== tier) { fx.setTier(tier, true); this._expTierApplied = tier; }
             if (this._fxW !== W || this._fxH !== H) { fx.setSize(W, H); this._fxW = W; this._fxH = H; }
             if (!fx.render(1 / 60)) this.renderer.render(this.scene, this.camera);
           } catch (e) { this.renderer.render(this.scene, this.camera); }
@@ -778,6 +802,13 @@
         }
       };
       if (this._grassMesh) { remove(this._grassMesh); this._grassMesh = null; }
+      if (this._sceneryP12) {
+        this._sceneryP12.traverse((o) => {
+          if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); }
+        });
+        if (this.scene) this.scene.remove(this._sceneryP12);
+        this._sceneryP12 = null;
+      }
       if (this._terrainChunks) this._terrainChunks.forEach((ch) => remove(ch.mesh));
       if (this._terrainGroup) { this.scene.remove(this._terrainGroup); this._terrainGroup = null; }
       this._terrainChunks = [];

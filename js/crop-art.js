@@ -86,26 +86,34 @@ const CropArt = {
     'poison_spore': 'icons/poison_spore_t.png',
     'ice_cactus': 'icons/ice_cactus_t.png',
 
-    // 农场作物
+    // 农场作物（P13-f：24 种子全套 AI 厚涂立绘，Seedream 洋红底 + 色相抠像）
     wheat: 'crops/wheat_t.png',
+    rice: 'crops/rice_t.png',
+    moon_rice: 'crops/moon_rice_t.png',
+    ningqi_grass: 'crops/ningqi_grass_t.png',
+    lingsui_wheat: 'crops/lingsui_wheat_t.png',
+    pea_shooter: 'crops/pea_shooter_t.png',
     sunflower: 'crops/sunflower_t.png',
-    watermelon: 'crops/watermelon_t.png',
-    pea: 'crops/pea_t.png',
     cabbage: 'crops/cabbage_t.png',
     carrot: 'crops/carrot_t.png',
     corn: 'crops/corn_t.png',
     pumpkin: 'crops/pumpkin_t.png',
-    chili: 'crops/chili_t.png',
-    garlic: 'crops/garlic_t.png',
-    mint: 'crops/mint_t.png',
-    cactus: 'crops/cactus_t.png',
+    watermelon: 'crops/watermelon_t.png',
     ginseng: 'crops/ginseng_t.png',
     tomato: 'crops/tomato_t.png',
+    chili: 'crops/chili_t.png',
+    tinder_grass: 'crops/tinder_grass_t.png',
+    garlic: 'crops/garlic_t.png',
+    deathcap: 'crops/deathcap_t.png',
+    mint: 'crops/mint_t.png',
     rosemary: 'crops/rosemary_t.png',
-    fire_grass: 'crops/fire_grass_t.png',
+    shadow_flower: 'crops/shadow_flower_t.png',
+    cactus: 'crops/cactus_t.png',
     frost_flower: 'crops/frost_flower_t.png',
     lightning_vine: 'crops/lightning_vine_t.png',
-    shadow_flower: 'crops/shadow_flower_t.png',
+    // 兼容旧键（P13 前遗留，非 24 种子清单成员，保留不破坏旧引用）
+    pea: 'crops/pea_t.png',
+    fire_grass: 'crops/fire_grass_t.png',
     rainbow_flower: 'crops/rainbow_flower_t.png',
     // 道具
     herb_potion: 'items/herb_potion_t.png',
@@ -166,11 +174,10 @@ const CropArt = {
   imgs: {},
   loaded: {},
 
-  // v5.8 别名：业务 id -> 已有素材 key（农场豌豆射手复用豌豆立绘；无图作物走 emoji 兜底）
+  // v5.8 别名：业务 id -> 已有素材 key（无图作物走 emoji 兜底）
+  // P13-f：pea_shooter 已有专属立绘（map 直接命中），旧 alias 移除
   alias: {
-    pea_shooter: 'pea',
   },
-
   // v5.8 荒野档案扩展素材：怪物待机动画 / v3 立绘 / Boss 立绘。
   // 路径为「项目根相对路径」（含 assets/ 或 docs/ 前缀），不参与 init() 预加载，
   // 图鉴打开时由 <img loading="lazy"> 按需拉取，不增加首屏负担。

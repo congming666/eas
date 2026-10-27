@@ -656,6 +656,50 @@ const ArtTextures = (() => {
     });
   })();
 
+  // ---- P12-d 交互物件 AI 厚涂立绘（AI 优先 + 程序化兜底，开关 farmArt2D_P12，默认开）----
+  // 统一暗黑废土厚涂、高角度俯视微斜视、纯色洋红底抠像（tools/gen-prop-art.py），
+  // 接触点 226/256，与塔 v3 一致；图片缺失/关开关时自动回退下方程序化绘制。
+  const ART2D_P12 = (() => {
+    try { return !/^(0|off|false|no)$/i.test(localStorage.getItem('farmArt2D_P12') || '1'); }
+    catch (e) { return true; }
+  })();
+  const propAiImgs = {};
+  (function preloadPropArtP12() {
+    if (!ART2D_P12) return;
+    const P12_PROPS = {
+      'w:chest:c': 'assets/art2d/chest_closed.png',
+      'w:chest:o': 'assets/art2d/chest_open.png',
+      'w:fire': 'assets/art2d/campfire.png',
+      'w:merch': 'assets/art2d/merchant.png',
+      'w:raider': 'assets/art2d/raider.png',
+      'w:portal': 'assets/art2d/portal.png',
+      'ally:kael': 'assets/art2d/ally_kael.png',
+      'ally:lore': 'assets/art2d/ally_lore.png',
+      'ally:chen': 'assets/art2d/ally_chen.png',
+      'ally:miao': 'assets/art2d/ally_miao.png'
+    };
+    Object.keys(P12_PROPS).forEach(k => {
+      const im = new Image();
+      im.onload = () => { propAiImgs[k] = im; cache.delete(k); };
+      im.onerror = () => { /* 图片缺失时保持程序化回退 */ };
+      im.src = P12_PROPS[k];
+    });
+  })();
+  // 合成 AI 主体 + 接触 AO（落地感）；返回 null 表示未就绪，调用方走程序化兜底。
+  function propAiCanvas(key, aoRx) {
+    const im = propAiImgs[key];
+    if (!im) return null;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const y = 226, rx = aoRx || 50;
+    const ao = g.createRadialGradient(128, y, 6, 128, y, rx);
+    ao.addColorStop(0, 'rgba(8,12,8,.42)'); ao.addColorStop(1, 'rgba(8,12,8,0)');
+    g.fillStyle = ao;
+    g.beginPath(); g.ellipse(128, y, rx, rx * .28, 0, 0, Math.PI * 2); g.fill();
+    g.drawImage(im, 0, 0);
+    return c;
+  }
+
   // 设计目标：状态可读性优先——旗/垛口染色带/窗灯三重状态信号，实战 88px 下一眼分清敌我
   // 受光：左上主光，三值面（亮/中/暗）硬切替代糊渐变；接触 AO 落地
   function towerArt(state) {
@@ -816,6 +860,8 @@ const ArtTextures = (() => {
   function chestArt(opened) {
     const key = 'w:chest:' + (opened ? 'o' : 'c');
     if (cache.has(key)) return cache.get(key);
+    const _aiC = propAiCanvas(key, 46);
+    if (_aiC) { cache.set(key, _aiC); return _aiC; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const R = rng(0x2A3F5);
@@ -866,6 +912,8 @@ const ArtTextures = (() => {
   function campfireArt() {
     const key = 'w:fire';
     if (cache.has(key)) return cache.get(key);
+    const _aiF = propAiCanvas(key, 56);
+    if (_aiF) { cache.set(key, _aiF); return _aiF; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const R = rng(0xF1E7); const TAU = Math.PI * 2, GX = 64, GY = 106;
@@ -908,6 +956,8 @@ const ArtTextures = (() => {
   function merchantArt() {
     const key = 'w:merch';
     if (cache.has(key)) return cache.get(key);
+    const _aiM = propAiCanvas(key, 44);
+    if (_aiM) { cache.set(key, _aiM); return _aiM; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const TAU = Math.PI * 2, GX = 64, GY = 108;
@@ -948,6 +998,8 @@ const ArtTextures = (() => {
   function raiderArt() {
     const key = 'w:raider';
     if (cache.has(key)) return cache.get(key);
+    const _aiR = propAiCanvas(key, 44);
+    if (_aiR) { cache.set(key, _aiR); return _aiR; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const TAU = Math.PI * 2, GX = 64, GY = 108;
@@ -983,6 +1035,8 @@ const ArtTextures = (() => {
   function portalArt() {
     const key = 'w:portal';
     if (cache.has(key)) return cache.get(key);
+    const _aiP = propAiCanvas(key, 64);
+    if (_aiP) { cache.set(key, _aiP); return _aiP; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const R = rng(0xF037); const TAU = Math.PI * 2, GX = 64, GY = 76;
@@ -1032,6 +1086,8 @@ const ArtTextures = (() => {
   function allyArt(variant) {
     const key = 'ally:' + variant;
     if (cache.has(key)) return cache.get(key);
+    const _aiA = propAiCanvas(key, 44);
+    if (_aiA) { cache.set(key, _aiA); return _aiA; }
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d'); g.scale(2, 2);
     const TAU = Math.PI * 2, GX = 64, GY = 108;

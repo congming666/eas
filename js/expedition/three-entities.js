@@ -25,6 +25,10 @@
   const LOCO_ENABLED = (function () {
     try { return localStorage.getItem('farmLocomotionV11') !== '0'; } catch (e) { return true; }
   })();
+  // P12-c 角色/怪物剪影可读性（金环降噪、软阴影增强、玩家光晕、boss/精英类型环）
+  const READABLE_P12 = (function () {
+    try { return localStorage.getItem('farmReadableP12') !== '0'; } catch (e) { return true; }
+  })();
 
   /* 业务怪物类型 → GLB 模型 id（规则同 LowPolyArt，未命中的精英留 Pixi） */
   const MONSTER_MODEL = {
@@ -423,13 +427,33 @@
       const cv = document.createElement('canvas'); cv.width = cv.height = 128;
       const c = cv.getContext('2d');
       const g = c.createRadialGradient(64, 64, 4, 64, 64, 62);
-      g.addColorStop(0, 'rgba(0,0,0,.5)');
-      g.addColorStop(.6, 'rgba(0,0,0,.24)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
+      if (READABLE_P12) {
+        g.addColorStop(0, 'rgba(0,0,0,.58)');
+        g.addColorStop(.55, 'rgba(0,0,0,.30)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+      } else {
+        g.addColorStop(0, 'rgba(0,0,0,.5)');
+        g.addColorStop(.6, 'rgba(0,0,0,.24)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+      }
       c.fillStyle = g; c.fillRect(0, 0, 128, 128);
       const tex = new T.CanvasTexture(cv);
       this._shadowTex = tex;
       return tex;
+    },
+
+    /* P12-c 玩家脚下柔和暖光晕（锚点，Additive），共享 */
+    _getHaloTexture() {
+      if (this._haloTex) return this._haloTex;
+      const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+      const c = cv.getContext('2d');
+      const g = c.createRadialGradient(64, 64, 6, 64, 64, 62);
+      g.addColorStop(0, 'rgba(255,240,196,.30)');
+      g.addColorStop(.62, 'rgba(255,226,150,.10)');
+      g.addColorStop(1, 'rgba(255,226,150,0)');
+      c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+      this._haloTex = new T.CanvasTexture(cv);
+      return this._haloTex;
     },
 
     /* ------------------------- 生命周期 ------------------------- */
@@ -543,8 +567,16 @@
       );
       ring.position.y = 0.4;
       root.add(ring);
+      // P12-c 玩家柔和暖光晕（仅玩家可见，强化复杂背景下的锚点）
+      const halo = new T.Mesh(
+        new T.CircleGeometry(0.5, 32).rotateX(-Math.PI / 2),
+        new T.MeshBasicMaterial({ map: this._getHaloTexture(), transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending })
+      );
+      halo.position.y = 0.32;
+      halo.renderOrder = -1;
+      root.add(halo);
       this._root.add(root);
-      return { root, model, shadow, ring, modelId: null, flashMats: null, weapon: null,
+      return { root, model, shadow, ring, halo, modelId: null, flashMats: null, weapon: null,
                baseMatOpacity: null, mixer: null, walkAction: null, idleAction: null,
                _skinned: false, _lastAt: 0, _walkDur: 1, _ww: 0, _iw: 1, _yaw: null,
                _yawAt: null, _feet: null, _groundClone: null, _v3: null, _rootV: null };
@@ -697,24 +729,52 @@
 
       // 软阴影：CircleGeometry 半径 0.5 挂在无缩放 root 上，scale 直接把半径换算到目标世界像素。
       // 目标椭圆宽 shR*2.2、深 shR*1.1（对齐 Pixi），故半宽/0.5=shR*2.2，半深/0.5=shR*1.1。
-      const shR = (kind === 'player' ? 40 : (o.type === 'boss' ? 70 : 30)) * depth * elite;
+      const shR = (kind === 'player' ? 44 : (o.type === 'boss' ? 74 : 33)) * depth * elite;
       e.shadow.scale.set(shR * 2.2, 1, shR * 1.1);
       e.shadow.position.set(0, 0.6, 0);
-      e.shadow.material.opacity = Math.max(0.08, 0.4 - lift * 0.004);
+      e.shadow.material.opacity = Math.max(0.10, (READABLE_P12 ? 0.5 : 0.4) - lift * 0.004);
       e.shadow.visible = lift < 90;
 
       // 战争迷雾：与 Unity 一致按 isWorldVisible 切 visible
       const vis = exp.isWorldVisible ? exp.isWorldVisible(o.x, o.y) : true;
       e.root.visible = vis;
 
-      // 玩家金环
-      e.ring.visible = kind === 'player';
-      if (kind === 'player') {
-        // RingGeometry 外半径 0.5 挂无缩放 root；目标外环世界半径 ≈0.55×像素身高（玩家脚边金环）
-        const ringR = 1.1 * pxH * depth;
-        e.ring.scale.set(ringR, ringR, ringR);
-        e.ring.position.y = 0.4;
-        e.ring.material.opacity = 0.85;
+      // P12-c 类型环：玩家淡金环、boss 红色、精英金色、普通怪无环（原版本为 0.85 浓金甜甜圈）
+      const isBoss = kind === 'monster' && o.type === 'boss';
+      const isElite = kind === 'monster' && !!o.elite;
+      if (READABLE_P12) {
+        if (kind === 'player') {
+          e.ring.visible = true; e.ring.material.color.setHex(0xffd36b);
+          const ringR = 1.0 * pxH * depth;
+          e.ring.scale.set(ringR, ringR, ringR); e.ring.position.y = 0.4; e.ring.material.opacity = 0.42;
+        } else if (isBoss) {
+          e.ring.visible = true; e.ring.material.color.setHex(0xff5a4d);
+          const rr = 1.5 * pxH * depth;
+          e.ring.scale.set(rr, rr, rr); e.ring.position.y = 0.4; e.ring.material.opacity = 0.55;
+        } else if (isElite) {
+          e.ring.visible = true; e.ring.material.color.setHex(0xffcf6b);
+          const rr2 = 1.1 * pxH * depth;
+          e.ring.scale.set(rr2, rr2, rr2); e.ring.position.y = 0.4; e.ring.material.opacity = 0.4;
+        } else {
+          e.ring.visible = false;
+        }
+        if (e.halo) {
+          e.halo.visible = kind === 'player';
+          if (kind === 'player') {
+            const hr = 1.7 * pxH * depth;
+            e.halo.scale.set(hr * 2.0, 1, hr * 1.3);
+            e.halo.material.opacity = 0.55;
+          }
+        }
+      } else {
+        e.ring.visible = kind === 'player';
+        if (kind === 'player') {
+          const ringR = 1.1 * pxH * depth;
+          e.ring.scale.set(ringR, ringR, ringR);
+          e.ring.position.y = 0.4;
+          e.ring.material.opacity = 0.85;
+        }
+        if (e.halo) e.halo.visible = false;
       }
 
       this._animate(e, o, kind, modelId, exp, pxH);

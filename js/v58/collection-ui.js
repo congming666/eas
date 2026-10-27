@@ -8,9 +8,8 @@
   'use strict';
 
   /* ---------------- 素材别名（defId -> CropArt id） ---------------- */
+  // P13-f：24 种子已全部有专属立绘（含 pea_shooter/tinder_grass），无需再回退到旧图
   var ART_ALIAS = {
-    pea_shooter: 'pea',       // 种子卡 豌豆射手 -> 作物素材 pea
-    tinder_grass: 'fire_grass' // 种子卡 火绒草 -> 作物素材 fire_grass
   };
 
   var TYPE_TABS = [
