@@ -96,17 +96,18 @@ console.log('%c[GM] 调试命令已就绪：GM.set(金币&种子) / GM.gold(n) /
 
 // ==================== 一次性指令：金币拉到 100,000 ====================
 // 玩家要求：打开游戏金币即为十万。执行一次后写入标记，之后不再重复。
-window.addEventListener('load', function () {
-  setTimeout(function () {
-    try {
-      if (localStorage.getItem('farm-gm-gold-100k-v1')) return;
-      if (typeof GameState === 'undefined' || !GameState) return;
-      GameState.gold = 100000;
-      try { SaveSystem.save(); } catch (e) {}
-      try { if (window.Farm && Farm.render) Farm.render(); } catch (e) {}
-      localStorage.setItem('farm-gm-gold-100k-v1', '1');
-      console.log('%c[GM] 金币已调整为 100,000', 'color:#7fd96a;font-weight:bold;');
-      try { showToast('💰 金币已调整为 100,000', 'gold'); } catch (e) {}
-    } catch (e) { console.warn('[GM] 一次性金币指令失败', e); }
-  }, 800);
-});
+// ⚠️ 必须在 SaveSystem.load() 之后调用（game.js startGame）：旧实现挂在 window.load + 800ms，
+// 此时存档尚未加载，直接 SaveSystem.save() 会把「默认新档」写回 localStorage，覆盖玩家存档。
+GM.applyOneTimeGold = function () {
+  try {
+    if (localStorage.getItem('farm-gm-gold-100k-v1')) return false;
+    if (typeof GameState === 'undefined' || !GameState) return false;
+    GameState.gold = 100000;
+    try { SaveSystem.save(); } catch (e) {}
+    try { if (GameState.screen === 'farm' && window.Farm && Farm.render) Farm.render(); } catch (e) {}
+    localStorage.setItem('farm-gm-gold-100k-v1', '1');
+    console.log('%c[GM] 金币已调整为 100,000', 'color:#7fd96a;font-weight:bold;');
+    try { showToast('💰 金币已调整为 100,000', 'gold'); } catch (e) {}
+    return true;
+  } catch (e) { console.warn('[GM] 一次性金币指令失败', e); return false; }
+};

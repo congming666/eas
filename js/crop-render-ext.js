@@ -9,7 +9,7 @@
   //   首帧即便先落到旧 2D 兜底，也会在图就绪的同一帧（约一帧内）自动切换为 3D 立绘，
   //   不再只依赖 1s 一次的农场定时器、不再持续停留在旧样子；③ 进入游戏后对当前在田作物后台预热。
   const STAGE3D_SIZE = [30, 38, 46, 56, 66];
-  const STAGE3D_VER = (typeof GAME_VERSION !== 'undefined' && GAME_VERSION) ? GAME_VERSION : '5.9.71';
+  const STAGE3D_VER = (typeof GAME_VERSION !== 'undefined' && GAME_VERSION) ? GAME_VERSION : '5.9.72';
   const STAGE3D_SPRITES = [0, 1, 3, 4]; // 实际会用到的精灵阶段（UI 1..4 → s0/s1/s3/s4）
   const stage3dImgs = {};
   let _redrawQueued = false;

@@ -18,6 +18,8 @@ const Game = {
       try {
         SaveSystem.load();
         Farm.init();
+        // 一次性 GM 金币指令：必须放在读档 + Farm.init 之后，避免用默认状态覆盖玩家存档
+        if (window.GM && typeof GM.applyOneTimeGold === 'function') { try { GM.applyOneTimeGold(); } catch (e) {} }
         Farm.render();
         // v0.8.0 初始化NPC和科技系统
         if (typeof NpcSystem !== 'undefined') NpcSystem.init();
